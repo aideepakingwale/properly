@@ -1,0 +1,19 @@
+{
+  "name": "properly-phonics-tutor",
+  "version": "2.0.0",
+  "description": "Properly — AI Phonics Tutor. Full-stack monorepo for Render.com deployment.",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "dev:api":     "npm --prefix backend run dev",
+    "dev:web":     "npm --prefix frontend run dev",
+    "build:web":   "npm --prefix frontend run build",
+    "start:api":   "npm --prefix backend start",
+    "seed":        "npm --prefix backend run seed",
+    "lint":        "npm --prefix frontend run lint"
+  }
+}

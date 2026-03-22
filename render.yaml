@@ -1,0 +1,153 @@
+# render.yaml — Properly AI Phonics Tutor
+# Render Infrastructure-as-Code Blueprint
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploys:
+#   1. properly-api   — Node.js Express REST API (Web Service, Free tier)
+#   2. properly-web   — React SPA (Static Site, Free tier)
+#
+# One-click deploy: https://render.com/deploy (point to this repo)
+
+services:
+  # ── BACKEND API ──────────────────────────────────────────────
+  - type: web
+    name: properly-api
+    runtime: node
+    region: oregon
+    # node:sqlite requires Node 22+
+    # Render uses Node 20 by default — set NODE_VERSION to upgrade          # Change to: frankfurt | singapore | ohio | virginia
+    plan: free              # Upgrade to starter ($7/mo) for persistent disk + no sleep
+
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+
+    # Persistent disk for SQLite database
+    # NOTE: Disk requires "starter" plan ($7/mo). On free tier the DB resets on each deploy.
+    # Uncomment the block below when upgrading from free → starter:
+    # disk:
+    #   name: properly-sqlite
+    #   mountPath: /data
+    #   sizeGB: 1
+
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      - key: NODE_VERSION
+        value: 22
+      - key: PORT
+        value: 10000          # Render assigns this automatically; keep in sync
+
+      # DB path — uses /data/properly.db when disk is mounted, else /tmp
+      - key: DB_PATH
+        value: /tmp/properly.db   # Change to /data/properly.db when disk mounted
+
+      # JWT secret — CHANGE THIS before deploying!
+      - key: JWT_SECRET
+        generateValue: true   # Render auto-generates a secure random value
+
+      - key: JWT_EXPIRES_IN
+        value: 7d
+
+      # CORS — set to your static site URL after first deploy
+      # e.g. https://properly-web.onrender.com
+      - key: CORS_ORIGINS
+        value: https://properly-web.onrender.com
+
+      # Rate limiting
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX
+        value: 200
+
+      # ── EMAIL VERIFICATION ────────────────────────────────
+      # App's public URL — used in verification email links
+      - key: APP_URL
+        value: https://properly-web.onrender.com
+
+      # SMTP for email verification (optional but recommended)
+      # Gmail: enable 2FA → App passwords → create one for Mail
+      - key: SMTP_PROVIDER
+        value: gmail
+      - key: SMTP_FROM_NAME
+        value: Properly Phonics
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+
+      # ── SOCIAL OAUTH ──────────────────────────────────────
+      # The backend's public URL (used as OAuth redirect base)
+      - key: API_URL
+        value: https://properly-api.onrender.com
+
+      # Google OAuth (console.cloud.google.com)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
+      # Facebook OAuth (developers.facebook.com)
+      - key: FACEBOOK_APP_ID
+        sync: false
+      - key: FACEBOOK_APP_SECRET
+        sync: false
+
+      # ── AI / SPEECH KEYS (fill in after creating services) ──
+      # Google Gemini Flash — PRIMARY FREE AI
+      # Free: 1,500 req/day, no billing needed
+      # Get key: https://aistudio.google.com/app/apikey
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Groq (Llama 3.1) — SECONDARY FREE AI
+      # Free: 14,400 req/day, no billing needed
+      # Get key: https://console.groq.com/keys
+      - key: GROQ_API_KEY
+        sync: false
+
+      # Azure Speech (Free F0) — https://portal.azure.com → Speech
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        value: uksouth
+
+  # ── FRONTEND STATIC SITE ─────────────────────────────────────
+  - type: web
+    name: properly-web
+    runtime: static
+    region: oregon
+
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+
+    # SPA routing — all paths serve index.html
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    headers:
+      # Cache bust JS/CSS on every deploy
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      # No cache for index.html
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+
+    envVars:
+      # Points to the backend API service above
+      # Render injects this at build time via VITE_ prefix
+      - key: VITE_API_URL
+        fromService:
+          name: properly-api
+          type: web
+          property: host
+          # Result will be: https://properly-api.onrender.com/api
+          # See frontend/src/services/api.js for how this is used
