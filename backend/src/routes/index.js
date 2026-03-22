@@ -16,6 +16,10 @@ import {
   recordStruggle, getStruggles, getGenerationStatus
 } from '../controllers/ai-story.controller.js';
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
+import {
+  getPlans, getSubscription, createCheckoutSession,
+  createPortalSession, stripeWebhook, verifyCheckout
+} from '../controllers/subscription.controller.js';
 
 const router = Router();
 
@@ -88,6 +92,15 @@ router.post('/ai/tts',      authMiddleware, getTTS);
 router.get('/speech/status',  getSpeechStatus);
 router.get('/speech/token',   authMiddleware, getSpeechToken);
 router.post('/speech/assess', authMiddleware, uploadMiddleware, assessSpeech);
+
+// ── SUBSCRIPTIONS ────────────────────────────────────────────
+router.get('/plans',                        getPlans);
+router.get('/subscription',                 authMiddleware, getSubscription);
+router.post('/subscription/checkout',       authMiddleware, createCheckoutSession);
+router.post('/subscription/portal',         authMiddleware, createPortalSession);
+router.get('/subscription/verify',          authMiddleware, verifyCheckout);
+// Stripe webhook — raw body required (configured in app.js)
+router.post('/webhooks/stripe',             stripeWebhook);
 
 // ── HEALTH ────────────────────────────────────────────────────
 router.get('/health', (_req, res) => res.json({

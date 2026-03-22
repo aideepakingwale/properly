@@ -69,6 +69,8 @@ app.use('/api/ai',             rateLimit({ windowMs: 60_000, max: 30 }));
 app.use('/api/speech/assess',  rateLimit({ windowMs: 60_000, max: 20 }));
 
 // ── BODY PARSING ──────────────────────────────────────────────
+// Stripe webhooks need raw body — must come before express.json()
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true }));
 

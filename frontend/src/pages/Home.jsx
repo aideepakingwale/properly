@@ -72,6 +72,7 @@ export default function Home() {
           <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
             {(child?.streak||1)>=2 && <div style={{ background:'rgba(239,68,68,0.15)', border:'1.5px solid rgba(239,68,68,0.3)', borderRadius:50, padding:'4px 10px', color:'#FCA5A5', fontWeight:800, fontSize:12 }}>🔥{child.streak}</div>}
             <button onClick={() => nav('/shop')} style={{ background:'rgba(245,158,11,0.12)', border:'1.5px solid rgba(245,158,11,0.3)', borderRadius:50, padding:'5px 12px', color:'#FCD34D', fontWeight:800, fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)' }}>🌰 {child?.acorns||0}</button>
+            <button onClick={() => nav('/pricing')} style={{ background:'rgba(45,106,79,0.25)', border:'1.5px solid rgba(45,106,79,0.5)', borderRadius:50, padding:'5px 10px', color:'#52B788', fontWeight:800, fontSize:11, cursor:'pointer', fontFamily:'var(--font-body)' }}>⭐ Plans</button>
             <button onClick={() => nav('/trophies')} style={{ background:'rgba(255,255,255,0.07)', border:'1.5px solid rgba(255,255,255,0.15)', borderRadius:50, padding:'5px 10px', color:'rgba(255,255,255,0.7)', fontWeight:700, fontSize:11, cursor:'pointer', fontFamily:'var(--font-body)' }}>🏆</button>
             <button onClick={() => setShowGate(true)} style={{ background:'rgba(255,255,255,0.07)', border:'1.5px solid rgba(255,255,255,0.15)', borderRadius:50, padding:'5px 10px', color:'rgba(255,255,255,0.7)', fontWeight:700, fontSize:11, cursor:'pointer', fontFamily:'var(--font-body)' }}>👨‍👩‍👧</button>
           </div>

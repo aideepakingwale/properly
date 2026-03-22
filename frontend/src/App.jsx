@@ -8,7 +8,9 @@ import Shop           from './pages/Shop';
 import Trophies       from './pages/Trophies';
 import ParentDash     from './pages/ParentDash';
 import VerifyEmail    from './pages/VerifyEmail';
-import SocialCallback  from './pages/SocialCallback';
+import SocialCallback       from './pages/SocialCallback';
+import Pricing              from './pages/Pricing';
+import SubscriptionSuccess  from './pages/SubscriptionSuccess';
 import Privacy        from './pages/Privacy';
 import Terms          from './pages/Terms';
 import './index.css';
@@ -39,7 +41,9 @@ export default function App() {
           <Route path="/"              element={<PublicRoute><Landing /></PublicRoute>} />
           <Route path="/auth"          element={<PublicRoute><Auth /></PublicRoute>} />
           <Route path="/verify-email"   element={<VerifyEmail />} />
-          <Route path="/social-callback" element={<SocialCallback />} />
+          <Route path="/social-callback"      element={<SocialCallback />} />
+          <Route path="/pricing"               element={<Pricing />} />
+          <Route path="/subscription/success"  element={<SubscriptionSuccess />} />
           <Route path="/privacy"       element={<Privacy />} />
           <Route path="/terms"         element={<Terms />} />
 

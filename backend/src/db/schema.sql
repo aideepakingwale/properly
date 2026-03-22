@@ -224,6 +224,25 @@ CREATE INDEX IF NOT EXISTS idx_struggled_child   ON struggled_words(child_id, fa
 
 -- ── EMAIL VERIFICATION ────────────────────────────────────────
 -- Columns added via migration in database.js (ALTER TABLE run safely at startup)
-CREATE INDEX IF NOT EXISTS idx_users_verify_token ON users(verify_token) IF NOT EXISTS;
+CREATE INDEX IF NOT EXISTS idx_users_verify_token ON users(verify_token);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
+
+-- ── SUBSCRIPTIONS ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                  TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id             TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  plan                TEXT NOT NULL DEFAULT 'free',   -- free | sprout | forest
+  status              TEXT NOT NULL DEFAULT 'active', -- active | cancelled | past_due | trialing
+  stripe_customer_id  TEXT UNIQUE,
+  stripe_sub_id       TEXT UNIQUE,
+  stripe_price_id     TEXT,
+  current_period_end  DATETIME,
+  cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+  trial_end           DATETIME,
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user   ON subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe ON subscriptions(stripe_customer_id);

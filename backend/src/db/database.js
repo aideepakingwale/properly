@@ -68,6 +68,24 @@ export function getDb() {
     _db.exec("ALTER TABLE users ADD COLUMN verify_sent_at DATETIME");
     console.log('✅ Migration: email verification columns added');
   }
+  // Ensure subscriptions table exists for existing DBs
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      plan TEXT NOT NULL DEFAULT 'free',
+      status TEXT NOT NULL DEFAULT 'active',
+      stripe_customer_id TEXT UNIQUE,
+      stripe_sub_id TEXT UNIQUE,
+      stripe_price_id TEXT,
+      current_period_end DATETIME,
+      cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+      trial_end DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   if (!cols.includes('oauth_provider')) {
     _db.exec("ALTER TABLE users ADD COLUMN oauth_provider TEXT");
     _db.exec("ALTER TABLE users ADD COLUMN oauth_id TEXT");
