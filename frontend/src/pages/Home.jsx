@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { storyAPI, aiStoryAPI } from '../services/api';
 import { AcornPill, ProgressBar, StarBg, Badge, Spinner, Toast } from '../components/ui';
 import StoryForest from '../components/StoryForest';
+import { PlansSection } from '../components/PlanCard';
 import ParentGate from '../components/layout/ParentGate';
 import { useToast } from '../hooks/useToast';
 
@@ -109,8 +110,9 @@ export default function Home() {
         {/* Tab switcher */}
         <div style={{ display:'flex', background:'rgba(255,255,255,0.08)', borderRadius:14, padding:4, marginBottom:18, gap:4 }}>
           {[
-            { k:'curriculum', l:'📚 Curriculum', d:'Structured phonics path' },
-            { k:'ai',         l:'✨ My Stories',  d:'AI-personalised just for you' },
+            { k:'curriculum', l:'📚 Curriculum',  d:'Structured phonics path' },
+            { k:'ai',         l:'✨ My Stories',   d:'AI-personalised just for you' },
+            { k:'plans',      l:'⭐ Plans',         d:'Upgrade for more features' },
           ].map(({ k, l, d }) => (
             <button key={k} onClick={() => setTab(k)}
               style={{ flex:1, padding:'10px 8px', borderRadius:11, border:'none', background:tab===k?'rgba(255,255,255,0.18)':'transparent', cursor:'pointer', fontFamily:'var(--font-body)', transition:'all 0.2s' }}>
@@ -172,6 +174,17 @@ export default function Home() {
             phaseLabel={meta.label}
             onPlayStory={playStory}
           />
+        )}
+
+        {/* ── PLANS TAB ── */}
+        {tab === 'plans' && (
+          <div>
+            <div style={{ marginBottom:16 }}>
+              <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, fontWeight:800, letterSpacing:'0.8px', marginBottom:4 }}>⭐ SUBSCRIPTION PLANS</p>
+              <p style={{ color:'rgba(255,255,255,0.35)', fontSize:12 }}>Upgrade to unlock Azure phoneme scoring, all phases, and more AI stories</p>
+            </div>
+            <PlansSection dark={true} showCTA={true} />
+          </div>
         )}
 
         {/* Custom goal */}

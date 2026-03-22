@@ -96,6 +96,16 @@ services:
       - key: FACEBOOK_APP_SECRET
         sync: false
 
+      # ── STRIPE SUBSCRIPTIONS ──────────────────────────────
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_SPROUT_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_FOREST_MONTHLY
+        sync: false
+
       # ── AI / SPEECH KEYS (fill in after creating services) ──
       # Google Gemini Flash — PRIMARY FREE AI
       # Free: 1,500 req/day, no billing needed
