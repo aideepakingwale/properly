@@ -9,13 +9,18 @@
  *   4. Set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_SPROUT_MONTHLY, STRIPE_PRICE_FOREST_MONTHLY
  */
 
-import Stripe  from 'stripe';
 import getDb   from '../db/database.js';
 import { PLANS, getPlanForUser } from '../config/plans.js';
 
-function getStripe() {
+async function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) return null;
-  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
+  try {
+    const { default: Stripe } = await import('stripe');
+    return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
+  } catch {
+    console.warn('stripe package not installed — run npm install in backend/');
+    return null;
+  }
 }
 
 export function stripeAvailable() {
@@ -45,7 +50,7 @@ export const getSubscription = (req, res) => {
 
 // ── CREATE CHECKOUT SESSION ───────────────────────────────────
 export const createCheckoutSession = async (req, res) => {
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) {
     return res.status(503).json({ success: false, message: 'Payment processing not configured. Please contact support.' });
   }
@@ -100,7 +105,7 @@ export const createCheckoutSession = async (req, res) => {
 
 // ── CUSTOMER PORTAL (manage/cancel subscription) ──────────────
 export const createPortalSession = async (req, res) => {
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) return res.status(503).json({ success: false, message: 'Not configured' });
 
   const db  = getDb();
@@ -125,7 +130,7 @@ export const createPortalSession = async (req, res) => {
 // ── STRIPE WEBHOOK ────────────────────────────────────────────
 // Receives events from Stripe to update subscription state in DB
 export const stripeWebhook = async (req, res) => {
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) return res.status(503).send('Not configured');
 
   const sig     = req.headers['stripe-signature'];
@@ -246,7 +251,7 @@ export const getPlans = (_req, res) => {
 
 // ── VERIFY CHECKOUT SUCCESS ───────────────────────────────────
 export const verifyCheckout = async (req, res) => {
-  const stripe = getStripe();
+  const stripe = await getStripe();
   if (!stripe) return res.status(503).json({ success: false });
   try {
     const session = await stripe.checkout.sessions.retrieve(req.query.session_id);

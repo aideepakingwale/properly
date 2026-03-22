@@ -1,36 +1,106 @@
 /**
- * PlanCard + PlansSection — reusable subscription plan components
- * Used on: Landing page, Pricing page, Home upgrade prompt
+ * PlanCard + PlansSection
+ *
+ * Plans are embedded in the frontend so they ALWAYS render
+ * even if the API is down or Stripe isn't configured.
+ * The API is called only to update "available" and "stripeReady" status.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const PLAN_COLORS = { free: '#059669', sprout: '#2D6A4F', forest: '#1B4332' };
-
 const API_BASE = (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null)
-  || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL)
+  || (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_URL : null)
   || '/api';
+
+// ── PLAN DATA (mirrored from backend/src/config/plans.js) ────
+// Kept here so cards render instantly without waiting for the API
+const STATIC_PLANS = [
+  {
+    id:          'free',
+    name:        'Seedling',
+    emoji:       '🌱',
+    price:       0,
+    tagline:     'Get started free',
+    color:       '#059669',
+    recommended: false,
+    features: [
+      '3 curriculum phonics stories',
+      '2 AI personalised stories/day',
+      'Browser microphone scoring',
+      'Golden Acorn rewards',
+      'Basic progress tracking',
+    ],
+    notIncluded: [
+      'Azure phoneme-level scoring',
+      'Natural Mrs. Owl voice',
+      'All 5 phonics phases',
+      'Multiple children profiles',
+      'Parent analytics dashboard',
+    ],
+  },
+  {
+    id:          'sprout',
+    name:        'Sprout',
+    emoji:       '🌿',
+    price:       3.99,
+    tagline:     'Most popular',
+    color:       '#2D6A4F',
+    recommended: true,
+    features: [
+      'All 14 curriculum stories',
+      '10 AI personalised stories/day',
+      '☁️ Azure phoneme-level scoring',
+      '🦉 Natural Mrs. Owl UK voice',
+      'All 5 phonics phases (2–6)',
+      'Parent analytics dashboard',
+      'Custom reading goals',
+    ],
+    notIncluded: [
+      'Multiple children profiles',
+      'PDF progress reports',
+    ],
+  },
+  {
+    id:          'forest',
+    name:        'Forest',
+    emoji:       '🌳',
+    price:       6.99,
+    tagline:     'For families',
+    color:       '#1B4332',
+    recommended: false,
+    features: [
+      'Everything in Sprout',
+      'Up to 5 children profiles',
+      'Unlimited AI stories',
+      'PDF progress reports',
+      'Priority email support',
+      'Early access to new features',
+    ],
+    notIncluded: [],
+  },
+];
 
 // ── SINGLE PLAN CARD ─────────────────────────────────────────
 export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = false }) {
   const isCurrent   = currentPlan && plan.id === currentPlan;
   const isDowngrade = currentPlan && currentPlan !== 'free' && plan.id === 'free';
-  const color       = PLAN_COLORS[plan.id] || '#2D6A4F';
+  const color       = plan.color || '#2D6A4F';
 
-  const cardBg      = dark ? 'rgba(255,255,255,0.07)' : 'white';
-  const cardBorder  = plan.recommended
+  const cardBg     = dark ? 'rgba(255,255,255,0.07)' : 'white';
+  const cardBorder = plan.recommended
     ? `2.5px solid ${color}`
     : dark ? '1.5px solid rgba(255,255,255,0.12)' : '1.5px solid #E5E7EB';
   const textPrimary   = dark ? 'white'                  : '#1C1917';
   const textMuted     = dark ? 'rgba(255,255,255,0.3)'  : '#9CA3AF';
   const checkColor    = dark ? 'rgba(82,183,136,0.9)'   : color;
-  const crossColor    = dark ? 'rgba(255,255,255,0.2)'  : '#D1D5DB';
+  const crossColor    = dark ? 'rgba(255,255,255,0.18)' : '#D1D5DB';
 
   return (
-    <div style={{ background: cardBg, backdropFilter: dark ? 'blur(10px)' : 'none', borderRadius: 24, border: cardBorder, overflow: 'hidden', position: 'relative', boxShadow: plan.recommended ? `0 8px 32px ${color}${dark?'40':'25'}` : 'none', transition: 'transform 0.15s' }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}>
-
+    <div
+      style={{ background: cardBg, backdropFilter: dark ? 'blur(10px)' : 'none', borderRadius: 24, border: cardBorder, overflow: 'hidden', position: 'relative', boxShadow: plan.recommended ? `0 8px 32px ${color}${dark ? '40' : '20'}` : 'none', transition: 'transform 0.15s, box-shadow 0.15s' }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = plan.recommended ? `0 12px 40px ${color}50` : `0 4px 20px rgba(0,0,0,0.12)`; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = plan.recommended ? `0 8px 32px ${color}${dark ? '40' : '20'}` : 'none'; }}
+    >
       {plan.recommended && (
         <div style={{ background: color, textAlign: 'center', padding: '6px 0', fontSize: 11, fontWeight: 800, color: 'white', letterSpacing: '0.5px' }}>
           ⭐ MOST POPULAR
@@ -39,7 +109,7 @@ export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = 
 
       <div style={{ padding: '22px 20px' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <span style={{ fontSize: 28 }}>{plan.emoji}</span>
           <div>
             <h3 style={{ margin: 0, fontSize: 19, fontWeight: 900, color: textPrimary }}>{plan.name}</h3>
@@ -52,23 +122,25 @@ export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = 
           {plan.price === 0
             ? <span style={{ fontSize: 30, fontWeight: 900, color: textPrimary }}>Free</span>
             : <>
-                <span style={{ fontSize: 13, fontWeight: 700, color: dark ? 'rgba(255,255,255,0.5)' : '#6B7280' }}>£</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: textMuted }}>£</span>
                 <span style={{ fontSize: 30, fontWeight: 900, color: textPrimary }}>{plan.price.toFixed(2)}</span>
-                <span style={{ fontSize: 12, color: textMuted }}>/mo</span>
+                <span style={{ fontSize: 12, color: textMuted }}>/month</span>
               </>
           }
         </div>
         {plan.price > 0 && (
-          <p style={{ fontSize: 11, color: '#10B981', fontWeight: 700, margin: '0 0 14px' }}>🎁 7-day free trial</p>
+          <p style={{ fontSize: 11, color: '#10B981', fontWeight: 700, margin: '2px 0 14px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            🎁 7-day free trial included
+          </p>
         )}
-        {plan.price === 0 && <div style={{ height: 18 }} />}
+        {plan.price === 0 && <div style={{ height: 20 }} />}
 
-        {/* CTA button */}
+        {/* CTA */}
         {onUpgrade && (
           <button
             onClick={() => !isCurrent && !isDowngrade && onUpgrade(plan.id)}
             disabled={isCurrent || isDowngrade || loading === plan.id}
-            style={{ width: '100%', padding: '11px', borderRadius: 50, border: 'none', background: isCurrent ? `${color}20` : `linear-gradient(135deg,${color},${color}BB)`, color: isCurrent ? color : 'white', fontWeight: 800, fontSize: 13, cursor: (isCurrent || isDowngrade) ? 'default' : 'pointer', fontFamily: 'var(--font-body)', marginBottom: 16, opacity: isDowngrade ? 0.4 : 1 }}>
+            style={{ width: '100%', padding: '12px', borderRadius: 50, border: 'none', background: isCurrent ? `${color}20` : `linear-gradient(135deg,${color},${color}BB)`, color: isCurrent ? color : 'white', fontWeight: 800, fontSize: 13, cursor: (isCurrent || isDowngrade) ? 'default' : 'pointer', fontFamily: 'var(--font-body)', marginBottom: 16, opacity: isDowngrade ? 0.4 : 1, transition: 'opacity 0.15s' }}>
             {loading === plan.id ? '⏳ Loading…'
               : isCurrent    ? '✓ Current plan'
               : isDowngrade  ? '—'
@@ -81,17 +153,17 @@ export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = 
         <div style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#F3F4F6'}`, marginBottom: 14 }} />
 
         {/* Features */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(plan.features || []).map(f => (
-            <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5 }}>
+            <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13 }}>
               <span style={{ color: checkColor, flexShrink: 0, marginTop: 1, fontWeight: 700 }}>✓</span>
-              <span style={{ color: dark ? 'rgba(255,255,255,0.75)' : '#374151', lineHeight: 1.45 }}>{f}</span>
+              <span style={{ color: dark ? 'rgba(255,255,255,0.78)' : '#374151', lineHeight: 1.45 }}>{f}</span>
             </div>
           ))}
           {(plan.notIncluded || []).map(f => (
-            <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5 }}>
+            <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13 }}>
               <span style={{ color: crossColor, flexShrink: 0, marginTop: 1 }}>✗</span>
-              <span style={{ color: dark ? 'rgba(255,255,255,0.25)' : '#C4B5A0', lineHeight: 1.45 }}>{f}</span>
+              <span style={{ color: dark ? 'rgba(255,255,255,0.22)' : '#C4B5A0', lineHeight: 1.45 }}>{f}</span>
             </div>
           ))}
         </div>
@@ -100,27 +172,28 @@ export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = 
   );
 }
 
-// ── PLANS SECTION — embed anywhere ──────────────────────────
+// ── PLANS SECTION ─────────────────────────────────────────────
 export function PlansSection({ dark = false, currentPlan = null, showCTA = true }) {
-  const [plans, setPlans]         = useState([]);
-  const [loading, setLoading]     = useState(null);
-  const [fetching, setFetching]   = useState(true);
   const [stripeReady, setStripeReady] = useState(false);
+  const [loading, setLoading]         = useState(null);
   const nav = useNavigate();
 
+  // Fetch live status from API (non-blocking — cards always show immediately)
   useEffect(() => {
-    fetch(`${API_BASE}/plans`)
-      .then(r => r.json())
-      .then(d => { if (d.success) { setPlans(d.data.plans); setStripeReady(d.data.stripeAvailable); } })
-      .catch(() => {})
-      .finally(() => setFetching(false));
+    fetch(`${API_BASE}/plans`, { signal: AbortSignal.timeout(5000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.success) setStripeReady(d.data.stripeAvailable); })
+      .catch(() => {}); // silent — static plans still shown
   }, []);
 
   const handleUpgrade = async (planId) => {
     const token = localStorage.getItem('properly_token');
     if (!token) { nav('/auth'); return; }
     if (planId === 'free') return;
-    if (!stripeReady) { alert('Payment processing coming soon. Join the free plan today!'); return; }
+    if (!stripeReady) {
+      alert('Payment processing is not yet configured. You can sign up for the free plan now, and upgrade later when payments are enabled.');
+      return;
+    }
     setLoading(planId);
     try {
       const res = await fetch(`${API_BASE}/subscription/checkout`, {
@@ -129,20 +202,15 @@ export function PlansSection({ dark = false, currentPlan = null, showCTA = true 
         body: JSON.stringify({ planId }),
       }).then(r => r.json());
       if (res.success && res.data?.checkoutUrl) window.location.href = res.data.checkoutUrl;
-      else alert(res.message || 'Something went wrong');
+      else alert(res.message || 'Something went wrong. Please try again.');
     } catch { alert('Network error. Please try again.'); }
     finally { setLoading(null); }
   };
 
-  if (fetching) return (
-    <div style={{ textAlign: 'center', padding: '32px 0', color: dark ? 'rgba(255,255,255,0.35)' : '#9CA3AF', fontSize: 14 }}>
-      🌱 Loading plans…
-    </div>
-  );
-
+  // Always render immediately using static plan data
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-      {plans.map(plan => (
+      {STATIC_PLANS.map(plan => (
         <PlanCard
           key={plan.id}
           plan={plan}
