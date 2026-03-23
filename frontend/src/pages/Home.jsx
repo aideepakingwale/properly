@@ -25,6 +25,9 @@ export default function Home() {
   const { toast, showToast, hideToast } = useToast();
   const nav = useNavigate();
 
+  // If authenticated but no child profile, redirect to setup
+  if (!child) return <Navigate to="/setup-child" replace />;
+
   const phase  = child?.phase || 2;
   const meta   = PHASE_META[phase] || PHASE_META[2];
   const done   = new Set(progress?.completedStories?.map(c => c.storyId) || []);

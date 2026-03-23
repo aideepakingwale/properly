@@ -9,21 +9,25 @@ import Trophies       from './pages/Trophies';
 import ParentDash     from './pages/ParentDash';
 import VerifyEmail    from './pages/VerifyEmail';
 import SocialCallback       from './pages/SocialCallback';
+import SetupChild          from './pages/SetupChild';
 import Pricing              from './pages/Pricing';
 import SubscriptionSuccess  from './pages/SubscriptionSuccess';
 import Privacy        from './pages/Privacy';
 import Terms          from './pages/Terms';
 import './index.css';
 
-function PrivateRoute({ children }) {
-  const { user, loading } = useAuth();
+function PrivateRoute({ children, requireChild = true }) {
+  const { user, child, loading } = useAuth();
   if (loading) return (
     <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16 }}>
       <div style={{ fontSize:64 }} className="animate-float">🦉</div>
       <p style={{ color:'var(--text-muted)', fontWeight:700 }}>Loading your forest…</p>
     </div>
   );
-  return user ? children : <Navigate to="/auth" replace />;
+  if (!user) return <Navigate to="/auth" replace />;
+  // If no child profile yet, redirect to setup (except for the setup page itself)
+  if (requireChild && !child) return <Navigate to="/setup-child" replace />;
+  return children;
 }
 
 function PublicRoute({ children }) {
@@ -42,6 +46,7 @@ export default function App() {
           <Route path="/auth"          element={<PublicRoute><Auth /></PublicRoute>} />
           <Route path="/verify-email"   element={<VerifyEmail />} />
           <Route path="/social-callback"      element={<SocialCallback />} />
+          <Route path="/setup-child"          element={<SetupChild />} />
           <Route path="/pricing"               element={<Pricing />} />
           <Route path="/subscription/success"  element={<SubscriptionSuccess />} />
           <Route path="/privacy"       element={<Privacy />} />

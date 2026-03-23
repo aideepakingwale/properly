@@ -41,8 +41,9 @@ function ThemePicker({ selected, onSelect, interests = [] }) {
   const themes = Object.entries(THEME_META);
   // Boost interest-matching themes to top
   const sorted = [...themes].sort(([a], [b]) => {
-    const aMatch = interests.some(i => i.toLowerCase().includes(a) || a.includes(i.toLowerCase()));
-    const bMatch = interests.some(i => i.toLowerCase().includes(b) || b.includes(i.toLowerCase()));
+    const normInts = interests.map(i => i.toLowerCase().trim());
+    const aMatch = normInts.some(i => i.includes(a) || a.includes(i));
+    const bMatch = normInts.some(i => i.includes(b) || b.includes(i));
     if (aMatch && !bMatch) return -1;
     if (!aMatch && bMatch) return 1;
     return 0;
@@ -51,7 +52,8 @@ function ThemePicker({ selected, onSelect, interests = [] }) {
   return (
     <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:14 }}>
       {sorted.map(([key, meta]) => {
-        const isMatch = interests.some(i => i.toLowerCase().includes(key) || key.includes(i.toLowerCase()));
+        const normInts = interests.map(i => i.toLowerCase().trim());
+        const isMatch = normInts.some(i => i.includes(key) || key.includes(i));
         return (
           <button key={key} onClick={() => onSelect(key)}
             style={{ padding:'7px 12px', borderRadius:50, border:`2px solid ${selected===key?'#2D6A4F':'#E5E7EB'}`, background:selected===key?'#F0FDF4':'white', color:selected===key?'#2D6A4F':'#6B7280', fontSize:12, fontWeight:selected===key?800:600, cursor:'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', gap:5, transition:'all 0.15s', position:'relative' }}>
@@ -94,6 +96,11 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
             Phase {story.phase}
           </span>
           {story.theme && <span style={{ fontSize:11, color:'#9CA3AF', fontWeight:600 }}>{THEME_META[story.theme]?.emoji} {story.theme}</span>}
+              {story.status && story.status !== 'unread' && (
+                <span style={{ fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:50, background: story.status === 'completed' ? '#D1FAE5' : '#FEF3C7', color: story.status === 'completed' ? '#065F46' : '#92400E' }}>
+                  {story.status === 'completed' ? 'done' : 'reading'}
+                </span>
+              )}
         </div>
 
         {/* Target phonemes */}
@@ -159,7 +166,7 @@ function GeneratingCard({ childName, theme }) {
 export default function StoryForest({ child, progress, phaseColor, phaseLabel, onPlayStory }) {
   const [aiStories, setAiStories]       = useState([]);
   const [generating, setGenerating]     = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState('adventure');
+  const [selectedTheme, setSelectedTheme] = useState('auto');
   const [showGenerator, setShowGenerator] = useState(false);
   const [interests, setInterests]       = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -189,7 +196,14 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
         setInterests(interestsRes.value.data.interests || []);
         // Set default theme based on first interest
         const firstInterest = interestsRes.value.data.interests?.[0];
-        if (firstInterest && THEME_META[firstInterest]) setSelectedTheme(firstInterest);
+        // Normalise to lowercase and find the closest matching theme key
+        const normalised = firstInterest?.toLowerCase().trim();
+        const matchedKey = Object.keys(THEME_META).find(k =>
+          k === normalised ||
+          normalised?.includes(k) ||
+          k.includes(normalised)
+        );
+        if (matchedKey) setSelectedTheme(matchedKey);
       }
       if (statusRes.status==='fulfilled' && statusRes.value.success) {
         setProviderInfo(statusRes.value.data);
@@ -201,14 +215,17 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleGenerate = async () => {
-    if (dailyLeft <= 0) { setError('Daily limit reached (5 stories/day). Come back tomorrow!'); return; }
+    if (dailyLeft <= 0) { setError('Daily batch limit reached (3 batches/day). Come back tomorrow!'); return; }
     setError('');
     setGenerating(true);
     setShowGenerator(false);
     try {
-      const res = await aiStoryAPI.generate(child.id, { theme: selectedTheme });
+      const res = await aiStoryAPI.generateBatch(child.id, {
+        count: 5,
+        forceThemes: selectedTheme !== 'auto' ? [selectedTheme] : null,
+      });
       if (res.success) {
-        setAiStories(prev => [res.data, ...prev]);
+        setAiStories(prev => [...(res.data.stories || []), ...prev]);
         setDailyLeft(d => Math.max(0, d-1));
       }
     } catch (e) {

@@ -1,7 +1,8 @@
+import React, { useState, useEffect, useCallback } from 'react';
 // ── SHOP PAGE ─────────────────────────────────────────────────
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import KidsManager from '../components/KidsManager';
 import { shopAPI, progressAPI, aiStoryAPI } from '../services/api';
 import { Button, AcornPill, Spinner, Toast } from '../components/ui';
 import { useToast } from '../hooks/useToast';
@@ -164,7 +165,15 @@ export function Trophies() {
 
 // ── PARENT DASHBOARD ──────────────────────────────────────────
 export function ParentDash() {
-  const { child, progress, updateChildLocally, logout } = useAuth();
+  const { child: activeChild, children, progress, updateChildLocally, switchChild, logout } = useAuth();
+  // Viewing child = the one selected in dashboard (default = active reading child)
+  const [viewingId, setViewingId] = useState(activeChild?.id);
+  const child = children?.find(c => c.id === viewingId) || activeChild;
+
+  const handleSwitchView = (id) => {
+    setViewingId(id);
+    switchChild(id); // also switch the active reading child
+  };
   const nav = useNavigate();
   const [goalForm, setGoalForm] = useState(false);
   const [gf, setGf]             = useState({ title: '', cost: '', emoji: '🎁' });
@@ -210,6 +219,7 @@ export function ParentDash() {
     { e: '🌰', l: 'Total Acorns',  v: (child.totalAcorns || 0).toLocaleString(), c: '#F59E0B' },
     { e: '💰', l: 'Balance',        v: (child.acorns || 0).toLocaleString(),      c: '#10B981' },
     { e: '📖', l: 'Words Read',     v: (child.wordsRead || 0).toLocaleString(),   c: '#3B82F6' },
+    { e: '✨', l: 'AI Stories Done',v: ((progress?.aiStorySummary?.completed) || 0).toLocaleString(), c: '#8B5CF6' },
     { e: '⭐', l: 'Stories Done',   v: done.length,                               c: '#8B5CF6' },
     { e: '🔥', l: 'Streak',         v: `${child.streak || 1}d`,                   c: '#EF4444' },
     { e: '🏆', l: 'Achievements',   v: `${progress?.achievements?.length || 0}`,  c: '#F59E0B' },
@@ -223,6 +233,16 @@ export function ParentDash() {
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: '0.5px', marginBottom: 4 }}>PARENT DASHBOARD</div>
             <h1 style={{ fontSize: 24, fontWeight: 900 }}>{child.name}'s Reading Journey</h1>
             <p style={{ color: '#86EFAC', fontSize: 13, marginTop: 4 }}>Phase {child.phase} · Joined {new Date(child.createdAt || Date.now()).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>
+            {children && children.length > 1 && (
+              <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
+                {children.map(c => (
+                  <button key={c.id} onClick={() => handleSwitchView(c.id)}
+                    style={{ padding:'4px 12px', borderRadius:50, border:`1.5px solid ${c.id===child?.id?'#52B788':'rgba(255,255,255,0.2)'}`, background:c.id===child?.id?'rgba(82,183,136,0.2)':'transparent', color:c.id===child?.id?'#52B788':'rgba(255,255,255,0.6)', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button onClick={() => nav('/home')} style={{ background: 'rgba(255,255,255,0.12)', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '9px 18px', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>Back to {child.name}</button>
         </div>
@@ -277,7 +297,28 @@ export function ParentDash() {
         </div>
 
         {/* Interests for AI Story Personalisation */}
+      {/* Recent reading history */}
+      {progress?.recentSessions?.length > 0 && (
+        <div style={{ background:'var(--card)', borderRadius:18, padding:'20px', marginBottom:16 }}>
+          <h3 style={{ fontSize:15, fontWeight:800, marginBottom:12 }}>Recent Reading</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {progress.recentSessions.slice(0,5).map(s => (
+              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', background:'rgba(0,0,0,0.03)', borderRadius:10 }}>
+                <span style={{ fontSize:16 }}>{s.storyType==='ai'?'✨':'📚'}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.storyTitle||'Story'}</div>
+                  <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.storyType==='ai'?'AI story':'Curriculum'} · {Math.round(s.accuracy||0)}% accuracy</div>
+                </div>
+                <span style={{ fontSize:12, fontWeight:700, color:'#F59E0B' }}>+{s.acornsEarned||0}🌰</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {child && <InterestsPanel childId={child.id} childName={child.name} initialInterests={[]} onSaved={() => {}}/>}
+      <div style={{ marginTop: 28 }}>
+        <KidsManager />
+      </div>
 
       {/* Custom goal */}
         <div style={{ background: 'white', borderRadius: 20, padding: 22, boxShadow: 'var(--shadow-sm)', marginBottom: 16 }}>

@@ -15,9 +15,9 @@ function generateToken() {
 // ── REGISTER ──────────────────────────────────────────────────
 export const register = async (req, res) => {
   try {
-    const { email, password, childName, phase = 2 } = req.body;
-    if (!email || !password || !childName) {
-      return res.status(400).json({ success: false, message: 'email, password, childName required' });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
     if (!email.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please enter a valid email address' });
@@ -32,47 +32,35 @@ export const register = async (req, res) => {
 
     const hash         = await bcrypt.hash(password, 12);
     const verifyToken  = generateToken();
-    const verifyExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hrs
+    const verifyExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    const insert = db.transaction(() => {
-      const u = db.prepare(`
-        INSERT INTO users (email, password, email_verified, verify_token, verify_expires, verify_sent_at)
-        VALUES (?,?,0,?,?,CURRENT_TIMESTAMP) RETURNING id
-      `).get(email.toLowerCase(), hash, verifyToken, verifyExpiry);
+    const userId = db.prepare(`
+      INSERT INTO users (email, password, email_verified, verify_token, verify_expires, verify_sent_at)
+      VALUES (?,?,0,?,?,CURRENT_TIMESTAMP) RETURNING id
+    `).get(email.toLowerCase(), hash, verifyToken, verifyExpiry).id;
 
-      const c = db.prepare(`
-        INSERT INTO children (user_id, name, phase, acorns, total_acorns)
-        VALUES (?,?,?,60,60) RETURNING *
-      `).get(u.id, childName.trim(), parseInt(phase));
-
-      return { userId: u.id, child: c };
-    });
-
-    const { userId, child } = insert();
-
-    // Send verification email (non-blocking — don't fail registration if email fails)
+    // No child created at registration — parent adds children after logging in
     const emailResult = await sendVerificationEmail({
       email: email.toLowerCase(),
-      childName: childName.trim(),
+      childName: 'there',   // generic welcome
       token: verifyToken,
     });
 
     res.status(201).json({
       success: true,
       data: {
-        emailSent:          emailResult.sent,
-        emailConfigured:    emailAvailable(),
-        requiresVerification: emailAvailable(), // if email not configured, skip verification gate
+        emailSent:            emailResult.sent,
+        emailConfigured:      emailAvailable(),
+        requiresVerification: emailAvailable(),
         message: emailResult.sent
           ? `Verification email sent to ${email}. Please check your inbox to activate your account.`
           : emailAvailable()
           ? 'Registration successful. There was a problem sending the verification email — please use Resend below.'
-          : 'Registration successful! Email verification is not configured — you can log in immediately.',
-        // If email not configured, return token so user can log in right away
+          : 'Registration successful! You can log in now.',
         ...(!emailAvailable() && {
           token: signToken(userId, email.toLowerCase()),
-          user: { id: userId, email: email.toLowerCase() },
-          child: formatChild(child),
+          user:  { id: userId, email: email.toLowerCase() },
+          children: [],
         }),
       },
     });
@@ -116,7 +104,8 @@ export const verifyEmail = async (req, res) => {
     const child    = children[0];
 
     // Send welcome email (fire-and-forget)
-    sendWelcomeEmail({ email: user.email, childName: child?.name || 'there' });
+    const firstChild = db.prepare('SELECT name FROM children WHERE user_id=? LIMIT 1').get(user.id);
+    sendWelcomeEmail({ email: user.email, childName: firstChild?.name || 'there' });
 
     const jwt_token = signToken(user.id, user.email);
     res.json({
@@ -160,11 +149,11 @@ export const resendVerification = async (req, res) => {
     db.prepare('UPDATE users SET verify_token = ?, verify_expires = ?, verify_sent_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(newToken, newExpiry, user.id);
 
-    const child = db.prepare('SELECT name FROM children WHERE user_id = ?').get(user.id);
+    const firstChild = db.prepare('SELECT name FROM children WHERE user_id=? LIMIT 1').get(user.id);
 
     const result = await sendResendVerificationEmail({
       email: user.email,
-      childName: child?.name || 'there',
+      childName: firstChild?.name || 'there',
       token: newToken,
     });
 

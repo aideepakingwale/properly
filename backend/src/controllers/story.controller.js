@@ -14,7 +14,7 @@ export const getStories = (req, res) => {
   // Attach completed status if childId provided
   let completedSet = new Set();
   if (childId) {
-    const rows = db.prepare('SELECT story_id FROM completed_stories WHERE child_id = ?').all(childId);
+    const rows = db.prepare("SELECT story_id FROM completed_stories WHERE child_id=? AND story_type='static'").all(childId);
     completedSet = new Set(rows.map(r => r.story_id));
   }
 

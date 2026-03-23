@@ -38,7 +38,7 @@ api.interceptors.response.use(
 
 // ── AUTH ─────────────────────────────────────────────────────
 export const authAPI = {
-  register:           d       => api.post('/auth/register', d),
+  register:           d       => api.post('/auth/register', d),  // { email, password } only
   login:              d       => api.post('/auth/login', d),
   me:                 ()      => api.get('/auth/me'),
   verifyEmail:        (token) => api.get(`/auth/verify-email?token=${token}`),
@@ -57,6 +57,14 @@ export const socialAuth = {
   redirectToFacebook: () => { window.location.href = socialAuth.facebookUrl(); },
 };
 
+// ── CHILDREN MANAGEMENT ─────────────────────────────────────
+export const childrenAPI = {
+  list:   ()           => api.get('/children'),
+  add:    (data)       => api.post('/children', data),
+  update: (id, data)   => api.patch(`/children/${id}`, data),
+  remove: (id)         => api.delete(`/children/${id}`),
+};
+
 // ── STORIES ──────────────────────────────────────────────────
 export const storyAPI = {
   list:   (phase, childId) => api.get('/stories', { params: { phase, childId } }),
@@ -68,7 +76,7 @@ export const storyAPI = {
 export const progressAPI = {
   get:             (cid)      => api.get(`/children/${cid}/progress`),
   updateChild:     (cid, d)   => api.patch(`/children/${cid}`, d),
-  startSession:    (cid, sid) => api.post(`/children/${cid}/sessions`, { storyId: sid }),
+  startSession:    (cid, sid, storyType='static') => api.post(`/children/${cid}/sessions`, { storyId: sid, storyType }),
   submitPage:      (cid, d)   => api.post(`/children/${cid}/sessions/page`, d),
   completeSession: (cid, d)   => api.post(`/children/${cid}/sessions/complete`, d),
   upsertGoal:      (cid, d)   => api.put(`/children/${cid}/goal`, d),
@@ -111,19 +119,37 @@ export default api;
 
 // ── AI STORY GENERATION ───────────────────────────────────────
 export const aiStoryAPI = {
-  themes:     ()             => api.get('/ai-stories/themes'),
-  status:     ()             => api.get('/ai-stories/status'),
-  phaseInfo:  (phase)        => api.get(`/ai-stories/phase/${phase}`),
-  list:       (childId)      => api.get(`/children/${childId}/ai-stories`),
-  get:        (childId, sid) => api.get(`/children/${childId}/ai-stories/${sid}`),
-  generate:   (childId, d)   => api.post(`/children/${childId}/ai-stories`, d, { timeout:45000 }),
-  remove:     (childId, sid) => api.delete(`/children/${childId}/ai-stories/${sid}`),
-  interests:  {
-    get: (childId)    => api.get(`/children/${childId}/interests`),
-    set: (childId, d) => api.put(`/children/${childId}/interests`, d),
+  // Batch generation — generates 3-5 stories in one AI call
+  generateBatch: (childId, opts) => api.post(`/children/${childId}/ai-stories/batch`, opts),
+  // Legacy single-story alias (uses batch size 1 internally)
+  generate: (childId, opts) => api.post(`/children/${childId}/ai-stories/batch`, { ...opts, count:1 }),
+
+  // Story library
+  list:     (childId, params) => api.get(`/children/${childId}/ai-stories`, { params }),
+  get:      (childId, storyId) => api.get(`/children/${childId}/ai-stories/${storyId}`),
+  delete:   (childId, storyId) => api.delete(`/children/${childId}/ai-stories/${storyId}`),
+
+  // Progress tracking
+  progress: (childId) => api.get(`/children/${childId}/ai-stories/progress`),
+
+  // Reading session lifecycle
+  startSession:    (childId, storyId) => api.post(`/children/${childId}/ai-stories/${storyId}/session`),
+  submitPage:      (childId, data) => api.post(`/children/${childId}/ai-stories/session/page`, data),
+  completeSession: (childId, data) => api.post(`/children/${childId}/ai-stories/session/complete`, data),
+
+  // Interests
+  interests: {
+    get: (childId) => api.get(`/children/${childId}/interests`),
+    set: (childId, data) => api.put(`/children/${childId}/interests`, data),
   },
+
+  // Struggle words (spaced repetition)
   struggles: {
-    record: (childId, d) => api.post(`/children/${childId}/struggles`, d),
-    get:    (childId)    => api.get(`/children/${childId}/struggles`),
+    record: (childId, data) => api.post(`/children/${childId}/struggles`, data),
+    get:    (childId) => api.get(`/children/${childId}/struggles`),
   },
+
+  // Meta
+  themes: () => api.get('/ai-stories/themes'),
+  status: () => api.get('/ai-stories/status'),
 };

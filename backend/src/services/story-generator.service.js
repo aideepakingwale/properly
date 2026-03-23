@@ -1,173 +1,189 @@
 /**
- * AI Story Generator — Personalised Phonics Stories
+ * AI Story Generator — Batch Personalised Phonics Stories
  *
- * Generates unique, curriculum-aligned phonics stories for each child using:
- *   - Child's name (woven into the story)
- *   - Current phonics phase (targets correct phoneme patterns)
- *   - Interests set by parent (themes: dinosaurs, space, cats, etc.)
- *   - Struggled words (spaced repetition — reintroduce difficult phonemes)
- *   - Reading history (avoids repeating recent stories)
+ * Generates 3-5 stories in one AI call using the full student profile:
+ *   - name, age, gender (he/she/they pronouns)
+ *   - phonics phase (curriculum-aligned difficulty)
+ *   - interests (themes, hobbies set by parent)
+ *   - struggled words (spaced repetition from past sessions)
+ *   - recent story history (avoids repeating)
  *
  * AI provider waterfall (all free):
- *   1. Google Gemini 1.5 Flash  — FREE: 15 req/min, 1,500 req/day
- *      Key: https://aistudio.google.com/app/apikey
- *   2. Groq (Llama 3.1 8B)      — FREE: 30 req/min, 14,400 req/day
- *      Key: https://console.groq.com/keys
- *   3. Deterministic fallback   — always works, zero API cost
+ *   1. Google Gemini 1.5 Flash  — free: 1,500 req/day
+ *   2. Groq (Llama 3.1 70B)    — free: 14,400 req/day
+ *   3. Deterministic fallback   — always works
  */
 
-// ── PHONICS CURRICULUM DATA ───────────────────────────────────
-// Maps each phase to its target phoneme patterns and example words
+// ── PHONICS CURRICULUM ────────────────────────────────────────
 export const PHASE_PHONICS = {
   2: {
     label: 'Simple CVC Words',
     patterns: ['s','a','t','p','i','n','m','d','g','o','c','k','ck','e','u','r','h','b','f','l','ff','ll','ss'],
     targetWords: ['sat','pat','tap','map','nap','tin','pin','fin','dot','hot','cut','bug','run','bed','hen'],
-    sentenceStyle: 'Very short (4-6 words). Only CVC words. One syllable each. No digraphs.',
-    vocab: 'cat, dog, pig, hen, fox, cup, mat, hat, pin, fin, dot, hot',
+    sentenceLength: '4–6 words',
+    vocab: 'cat, dog, pig, hen, fox, cup, mat, hat, pin, fin, dot, hot, big, red, top, sit, run, get, put, cap',
   },
   3: {
     label: 'Digraphs & Vowel Teams',
     patterns: ['ch','sh','th','ng','ai','ee','igh','oa','oo','ar','or','ur','ow','oi','ear','air'],
     targetWords: ['chat','shop','ship','rain','feet','night','boat','moon','look','park','corn','hurt'],
-    sentenceStyle: 'Short (5-8 words). Include digraphs naturally. Simple sentences.',
-    vocab: 'sheep, chain, shout, light, coach, tooth, dark, storm, turn, farm',
+    sentenceLength: '5–8 words',
+    vocab: 'sheep, chain, shout, light, coach, tooth, dark, storm, turn, farm, green, street, beach',
   },
   4: {
     label: 'CCVC & CVCC Blends',
-    patterns: ['bl','cl','fl','gl','pl','sl','br','cr','dr','fr','gr','pr','tr','st','sp','sn','sk','lt','lf','lp','lk'],
+    patterns: ['bl','cl','fl','gl','pl','sl','br','cr','dr','fr','gr','pr','tr','st','sp','sn','sk','lt','lf'],
     targetWords: ['frog','clap','drip','trip','flag','best','grip','plan','snip','stomp','crisp'],
-    sentenceStyle: 'Medium (6-9 words). Use consonant blends at start/end of words naturally.',
-    vocab: 'black, clock, flame, globe, plant, slide, brick, crab, dress, frost, stamp',
+    sentenceLength: '6–9 words',
+    vocab: 'black, clock, flame, globe, plant, slide, brick, crab, dress, frost, stamp, drink, spring',
   },
   5: {
     label: 'Split Digraphs & Alternatives',
-    patterns: ['a_e','e_e','i_e','o_e','u_e','ay','ea','ie','oe','ue','ew','oi','wh','ph'],
+    patterns: ['a_e','e_e','i_e','o_e','u_e','ay','ea','ie','oe','ue','ew','wh','ph'],
     targetWords: ['cake','slide','home','tune','play','dream','pie','blue','crew','phone'],
-    sentenceStyle: 'Medium (7-10 words). Include split digraph words naturally. More varied vocab.',
-    vocab: 'brave, smile, stone, huge, spray, treat, tried, clue, flew, photo',
+    sentenceLength: '7–10 words',
+    vocab: 'brave, smile, stone, huge, spray, treat, tried, clue, flew, photo, throne, while',
   },
   6: {
     label: 'Prefixes, Suffixes & Morphology',
     patterns: ['un-','re-','dis-','pre-','-ful','-less','-ness','-tion','-sion','-ment','-ly','-ing','-ed'],
     targetWords: ['unhappy','discovery','fearless','wonderful','careful','excitement','remarkable'],
-    sentenceStyle: 'Longer (8-12 words). Use morphologically rich words. Complex but clear sentences.',
-    vocab: 'remarkable, thoughtful, careless, restarted, discovery, invention, happiness',
+    sentenceLength: '8–12 words',
+    vocab: 'remarkable, thoughtful, careless, restarted, discovery, invention, happiness, protection',
   },
 };
 
-// Themes the AI can use — mapped to scene emojis
+// ── THEMES ────────────────────────────────────────────────────
 export const THEMES = {
-  adventure:    { emoji:'🗺️', scenes:['🌋🌿','🏔️⛺','🌊🏄','🧭✨'] },
-  animals:      { emoji:'🦁', scenes:['🌿🦋','🌳🦊','🌾🐮','🌊🐬'] },
-  space:        { emoji:'🚀', scenes:['🌟⭐','🪐🌌','🚀🌙','☄️✨'] },
-  dinosaurs:    { emoji:'🦕', scenes:['🌿🦕','🌋🦖','🏞️🥚','🌊🦴'] },
-  magic:        { emoji:'🧙', scenes:['✨🔮','🌈🪄','🏰🦄','🌙⭐'] },
-  ocean:        { emoji:'🌊', scenes:['🌊🐠','🐚🌊','🦈⭐','🐙🌿'] },
-  farm:         { emoji:'🐄', scenes:['🌻🐔','🌾🐑','🐄🌿','🌅🐓'] },
-  forest:       { emoji:'🌲', scenes:['🌲🍄','🌿🦔','🍃🐿️','🌸🦊'] },
-  dragons:      { emoji:'🐉', scenes:['🔥🐉','🏰⚔️','🌋🐲','✨🪄'] },
-  robots:       { emoji:'🤖', scenes:['⚙️🔧','🤖✨','💡🔩','🚀🤖'] },
-  cats:         { emoji:'🐱', scenes:['🐱🌸','🌙🐈','🐟🐱','🌿😺'] },
-  pirates:      { emoji:'🏴‍☠️', scenes:['⚓🗺️','🌊🦜','🏝️💎','⛵🌊'] },
-  superheroes:  { emoji:'🦸', scenes:['💥⚡','🌆🦸','✨🌟','🌈💪'] },
-  cooking:      { emoji:'🍳', scenes:['🍳🌿','🎂🍰','🥘🌶️','🧁✨'] },
+  adventure:   { emoji:'🗺️', scenes:['🌋🌿','🏔️⛺','🌊🏄','🧭✨'] },
+  animals:     { emoji:'🦁', scenes:['🌿🦋','🌳🦊','🌾🐮','🌊🐬'] },
+  space:       { emoji:'🚀', scenes:['🌟⭐','🪐🌌','🚀🌙','☄️✨'] },
+  dinosaurs:   { emoji:'🦕', scenes:['🌿🦕','🌋🦖','🏞️🥚','🌊🦴'] },
+  magic:       { emoji:'🧙', scenes:['✨🔮','🌈🪄','🏰🦄','🌙⭐'] },
+  ocean:       { emoji:'🌊', scenes:['🌊🐠','🐚🌊','🦈⭐','🐙🌿'] },
+  farm:        { emoji:'🐄', scenes:['🌻🐔','🌾🐑','🐄🌿','🌅🐓'] },
+  forest:      { emoji:'🌲', scenes:['🌲🍄','🌿🦔','🍃🐿️','🌸🦊'] },
+  dragons:     { emoji:'🐉', scenes:['🔥🐉','🏰⚔️','🌋🐲','✨🪄'] },
+  robots:      { emoji:'🤖', scenes:['⚙️🔧','🤖✨','💡🔩','🚀🤖'] },
+  cats:        { emoji:'🐱', scenes:['🐱🌸','🌙🐈','🐟🐱','🌿😺'] },
+  pirates:     { emoji:'🏴‍☠️', scenes:['⚓🗺️','🌊🦜','🏝️💎','⛵🌊'] },
+  superheroes: { emoji:'🦸', scenes:['💥⚡','🌆🦸','✨🌟','🌈💪'] },
+  cooking:     { emoji:'🍳', scenes:['🍳🌿','🎂🍰','🥘🌶️','🧁✨'] },
 };
 
-// Background classes (from index.css)
 const BG_CLASSES = ['bg-warm','bg-green','bg-blue','bg-pink','bg-purple','bg-orange'];
 
-// ── SYSTEM PROMPT BUILDER ─────────────────────────────────────
-function buildSystemPrompt(phase) {
-  const p = PHASE_PHONICS[phase];
-  return `You are an expert UK primary school phonics teacher creating personalised reading stories for children aged 4-8.
+// ── PRONOUN HELPER ────────────────────────────────────────────
+function pronouns(gender) {
+  if (gender === 'boy')    return { sub:'he',   obj:'him',  pos:'his'  };
+  if (gender === 'girl')   return { sub:'she',  obj:'her',  pos:'her'  };
+  return                          { sub:'they', obj:'them', pos:'their' };
+}
 
-PHONICS CURRICULUM RULES (STRICT — Phase ${phase}: ${p.label}):
-- Target phoneme patterns: ${p.patterns.slice(0,12).join(', ')}
-- Example target words: ${p.targetWords.slice(0,10).join(', ')}
-- Sentence style: ${p.sentenceStyle}
-- UK English spelling ONLY (colour not color, mum not mom, programme not program)
-- NEVER use words with phoneme patterns above Phase ${phase} difficulty
-- Each page sentence must naturally contain 1-2 target phoneme patterns
+// ── THEME-AWARE VOCABULARY ────────────────────────────────────
+const THEME_VOCAB = {
+  superheroes: 'cape, mask, fly, jump, run, zip, zap, big, fast, win, snap, cop, hero, top, tip',
+  space:       'ship, star, sun, hot, red, jet, fly, rock, map, dot, pod, moon, beam, zoom',
+  dinosaurs:   'dig, big, run, egg, pit, mud, hot, lap, tap, rock, snap, stomp, tail, claw',
+  dragons:     'fly, big, hot, red, snap, egg, top, zip, run, sit, pit, wing, roar, cave',
+  magic:       'wand, pop, zip, tap, spin, wish, glow, gem, bag, hum, orb, dust, ring',
+  pirates:     'ship, map, dig, flag, sand, rock, run, bag, cap, dot, mast, gold, gem',
+  robots:      'zap, spin, run, zip, big, top, tin, cog, tap, click, bolt, arm, pod',
+  ocean:       'fish, swim, fin, crab, shell, wave, dip, pop, wet, net, blue, deep, reef',
+  forest:      'log, ant, bug, fox, den, nest, nut, mud, run, hop, sit, dig, tap, bark',
+  farm:        'hen, pig, mud, egg, dog, cat, moo, run, hop, pat, fat, pen, oat, crop',
+  animals:     'cat, dog, pig, hen, fox, ant, bug, bee, pup, cub, kit, run, hop, lap',
+  cooking:     'mix, stir, pot, pan, hot, bake, melt, cup, tip, add, pop, stew, tart',
+  adventure:   'run, jump, hide, find, big, fast, go, map, bag, bold, trek, cliff, path',
+  cats:        'paw, purr, lap, sit, nap, bat, hiss, pad, fur, flap, pounce, stretch',
+};
+
+// ── BATCH SYSTEM PROMPT ───────────────────────────────────────
+function buildBatchSystemPrompt(phase) {
+  const p = PHASE_PHONICS[phase];
+  return `You are an expert UK primary school phonics teacher creating personalised reading stories for children aged 4–8.
+
+You will generate MULTIPLE complete stories in one response as a JSON array.
+
+PHONICS CURRICULUM — Phase ${phase}: ${p.label}
+- Target phoneme patterns: ${p.patterns.slice(0,14).join(', ')}
+- Example target words: ${p.targetWords.join(', ')}
+- Sentence length per page: ${p.sentenceLength}
+- UK English spelling ONLY (colour, mum, programme, behaviour)
+- NEVER use phoneme patterns above Phase ${phase} difficulty
 
 STORY RULES:
-- Exactly 3 pages. Each page = exactly ONE sentence (the reading target).
-- The sentence should be between ${phase <= 3 ? '4-7' : phase <= 4 ? '6-9' : '8-12'} words
-- Stories must have a clear beginning (page 1), middle (page 2), end (page 3)
-- Use the child's name in at least one page
-- Make it warm, exciting, and age-appropriate
-- Avoid scary, violent, or inappropriate content
+- Each story = exactly 3 pages. Each page = exactly ONE sentence (the reading target).
+- Clear beginning (page 1), middle (page 2), end (page 3) narrative arc.
+- Use the child's name AND correct pronouns in at least one page of each story.
+- Age-appropriate, warm, exciting. No scary/violent content.
+- Each story must have a DIFFERENT theme from the others in the same batch.
 
-OUTPUT FORMAT (JSON only, no markdown, no explanation):
-{
-  "title": "Story title (3-5 words)",
-  "emoji": "single relevant emoji",
-  "cover_scene": "2-3 emojis for cover",
-  "pages": [
-    { "text": "Sentence for page 1.", "scene": "2 emojis", "bg": "bg-warm", "target_words": ["word1","word2"] },
-    { "text": "Sentence for page 2.", "scene": "2 emojis", "bg": "bg-green", "target_words": ["word3","word4"] },
-    { "text": "Sentence for page 3.", "scene": "2 emojis", "bg": "bg-blue", "target_words": ["word5","word6"] }
-  ]
+OUTPUT FORMAT — JSON array only, no markdown:
+[
+  {
+    "title": "3–5 word title",
+    "emoji": "single emoji",
+    "cover_scene": "2–3 emojis",
+    "theme": "theme name",
+    "target_phonemes": ["phoneme1","phoneme2"],
+    "pages": [
+      { "text": "Sentence.", "scene": "2 emojis", "bg": "bg-warm", "target_words": ["word1","word2"] },
+      { "text": "Sentence.", "scene": "2 emojis", "bg": "bg-green", "target_words": ["word3"] },
+      { "text": "Sentence.", "scene": "2 emojis", "bg": "bg-blue", "target_words": ["word4","word5"] }
+    ]
+  }
+]
+
+bg values: bg-warm, bg-green, bg-blue, bg-pink, bg-purple, bg-orange`;
 }
 
-bg values must be one of: bg-warm, bg-green, bg-blue, bg-pink, bg-purple, bg-orange`;
-}
-
-function buildUserPrompt({ childName, phase, theme, interests, struggledWords, recentTitles }) {
-  const p = PHASE_PHONICS[phase];
-  const themeData = THEMES[theme] || THEMES.adventure;
-  const interestStr = interests?.length ? `Child's interests: ${interests.join(', ')}. ` : '';
+// ── BATCH USER PROMPT ─────────────────────────────────────────
+function buildBatchUserPrompt({ child, interests, struggledWords, recentTitles, themes, count }) {
+  const p = PHASE_PHONICS[child.phase];
+  const pr = pronouns(child.gender || 'neutral');
+  const age = child.age ? `${child.age} years old` : 'young child';
+  const themeList = themes.join(', ');
+  const vocabHints = themes.map(t => `${t}: ${THEME_VOCAB[t] || THEME_VOCAB.adventure}`).join('\n  ');
+  const interestStr = interests?.length ? interests.join(', ') : themes.join(', ');
   const struggledStr = struggledWords?.length
-    ? `Words this child has struggled with recently (try to include 1-2 naturally): ${struggledWords.slice(0,5).join(', ')}. `
+    ? `\nStruggledWords to reintroduce (include 1–2 naturally across the batch): ${struggledWords.slice(0,6).join(', ')}`
     : '';
   const avoidStr = recentTitles?.length
-    ? `Avoid these recent story titles/themes: ${recentTitles.slice(0,3).join(', ')}. `
+    ? `\nAvoid repeating these recent titles/themes: ${recentTitles.slice(0,5).join(', ')}`
     : '';
 
-  return `Create a Phase ${phase} (${p.label}) phonics story for a child named ${childName}.
+  return `Generate exactly ${count} phonics stories for this child:
 
-Theme: ${theme} ${themeData.emoji}
-${interestStr}${struggledStr}${avoidStr}
+STUDENT PROFILE:
+  Name: ${child.name}
+  Age: ${age}
+  Gender: ${child.gender || 'neutral'} (use pronouns: ${pr.sub}/${pr.obj}/${pr.pos})
+  Phonics phase: Phase ${child.phase} (${p.label})
+  Interests: ${interestStr}
 
-Requirements:
-- Weave "${childName}" naturally into at least one sentence
-- Target these Phase ${phase} phonemes: ${p.patterns.slice(0,8).join(', ')}
-- Keep all vocabulary at Phase ${phase} level or below
-- Make the story about: ${theme} (${interestStr || 'a fun adventure'})
+STORY THEMES FOR THIS BATCH (one story per theme, in this order):
+  ${themes.map((t, i) => `Story ${i+1}: ${t.toUpperCase()} ${THEMES[t]?.emoji || ''}`).join('\n  ')}
 
-Generate the JSON story now:`;
+THEME VOCABULARY (phase-appropriate words you can use per theme):
+  ${vocabHints}
+${struggledStr}
+${avoidStr}
+
+MANDATORY RULES:
+1. Every story MUST be set firmly in its assigned theme world — characters, setting, objects
+2. Use "${child.name}" and ${pr.sub}/${pr.obj}/${pr.pos} pronouns in each story
+3. All sentences MUST be Phase ${child.phase} phonics level (${p.sentenceLength})
+4. If theme words don't fit phonics perfectly, keep theme SETTING and simplify vocabulary
+5. Each story must feel complete with a satisfying ending
+
+Generate the JSON array of ${count} stories now:`;
 }
 
 // ── AI PROVIDER CALLS ─────────────────────────────────────────
-// Groq — Llama 3.1 70B for story generation (free tier: 14,400 req/day)
-// Key: https://console.groq.com/keys  (instant signup, no billing)
-async function generateWithGroq(systemPrompt, userPrompt) {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'llama-3.1-70b-versatile',   // 70B for story quality; use 8b-instant if hitting limits
-        max_tokens: 600,
-        temperature: 0.85,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userPrompt   },
-        ],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return { text: data.choices?.[0]?.message?.content?.trim(), provider: 'groq' };
-  } catch { return null; }
-}
-
-async function generateWithGemini(systemPrompt, userPrompt) {
+async function callGemini(systemPrompt, userPrompt) {
   const key = process.env.GEMINI_API_KEY;
-  if (!key || key === 'your-gemini-api-key-here') return null;
+  if (!key || key.includes('your-')) return null;
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
@@ -176,7 +192,7 @@ async function generateWithGemini(systemPrompt, userPrompt) {
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({
           contents: [{ parts:[{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-          generationConfig: { maxOutputTokens:600, temperature:0.85, responseMimeType:'application/json' },
+          generationConfig: { maxOutputTokens:2400, temperature:0.82, responseMimeType:'application/json' },
           safetySettings: [
             { category:'HARM_CATEGORY_HARASSMENT',        threshold:'BLOCK_LOW_AND_ABOVE' },
             { category:'HARM_CATEGORY_HATE_SPEECH',       threshold:'BLOCK_LOW_AND_ABOVE' },
@@ -186,120 +202,226 @@ async function generateWithGemini(systemPrompt, userPrompt) {
         }),
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) { console.warn('Gemini HTTP', res.status); return null; }
     const data = await res.json();
-    return { text: data.candidates?.[0]?.content?.parts?.[0]?.text?.trim(), provider: 'gemini' };
-  } catch { return null; }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+  } catch (e) { console.warn('Gemini error:', e.message); return null; }
 }
 
-// ── FALLBACK STORY TEMPLATES ──────────────────────────────────
-// Used when no AI is configured — still phonics-correct and personalised
-const FALLBACK_TEMPLATES = {
-  2: (name, theme) => ({
-    title: `${name} and the ${theme === 'animals' ? 'Big Cat' : theme === 'space' ? 'Red Dot' : 'Fat Fox'}`,
-    emoji: THEMES[theme]?.emoji || '📖',
-    cover_scene: THEMES[theme]?.scenes[0] || '🌿✨',
-    pages: [
-      { text:`${name} sat on the big mat.`,           scene:'🌞🌿', bg:'bg-warm',   target_words:['sat','big','mat'] },
-      { text:`A fat fox ran up to ${name}.`,           scene:'🦊🌿', bg:'bg-green',  target_words:['fat','fox','ran'] },
-      { text:`${name} and the fox had a nap.`,         scene:'🌙⭐', bg:'bg-purple', target_words:['had','nap'] },
-    ],
-  }),
-  3: (name, theme) => ({
-    title: `${name} at the ${theme === 'ocean' ? 'Rock Pool' : theme === 'farm' ? 'Sheep Farm' : 'Deep Wood'}`,
-    emoji: THEMES[theme]?.emoji || '📖',
-    cover_scene: THEMES[theme]?.scenes[1] || '🌲✨',
-    pages: [
-      { text:`${name} went out in the bright rain.`,       scene:'🌧️🌿', bg:'bg-blue',   target_words:['went','bright','rain'] },
-      { text:`A big snail left a trail on the path.`,      scene:'🐌✨',  bg:'bg-green',  target_words:['snail','trail','path'] },
-      { text:`${name} found a shell and took it home.`,    scene:'🐚🏠',  bg:'bg-warm',   target_words:['found','shell','home'] },
-    ],
-  }),
-  4: (name, theme) => ({
-    title: `${name} and the ${theme === 'dragons' ? 'Dragon Egg' : theme === 'space' ? 'Space Crash' : 'Best Plan'}`,
-    emoji: THEMES[theme]?.emoji || '📖',
-    cover_scene: THEMES[theme]?.scenes[2] || '🌟✨',
-    pages: [
-      { text:`${name} crept up to the steep cliff bank.`,   scene:'🏔️🌿', bg:'bg-green',  target_words:['crept','steep','cliff'] },
-      { text:`A frog jumped from a brown branch and swam.`, scene:'🐸🌊', bg:'bg-blue',   target_words:['frog','jumped','branch','swam'] },
-      { text:`${name} clapped when the frog found its pond.`,scene:'🌅🌊', bg:'bg-warm',  target_words:['clapped','found','pond'] },
-    ],
-  }),
-  5: (name, theme) => ({
-    title: `${name} and the ${theme === 'magic' ? 'Magic Stone' : theme === 'dragons' ? 'Fire Cave' : 'Brave Chase'}`,
-    emoji: THEMES[theme]?.emoji || '📖',
-    cover_scene: THEMES[theme]?.scenes[0] || '✨🌟',
-    pages: [
-      { text:`${name} made a huge kite on a fine day.`,         scene:'☀️🌤️', bg:'bg-warm',   target_words:['made','huge','kite','fine'] },
-      { text:`The kite rose into the wide blue sky above.`,     scene:'🌈☁️',  bg:'bg-blue',   target_words:['rose','wide','blue','sky'] },
-      { text:`${name} smiled as the brave kite came home.`,     scene:'🌅🏠',  bg:'bg-orange', target_words:['smiled','brave','came','home'] },
-    ],
-  }),
-  6: (name, theme) => ({
-    title: `${name}'s ${theme === 'space' ? 'Remarkable Discovery' : theme === 'robots' ? 'Thoughtful Invention' : 'Wonderful Quest'}`,
-    emoji: THEMES[theme]?.emoji || '📖',
-    cover_scene: THEMES[theme]?.scenes[3] || '🌟🏆',
-    pages: [
-      { text:`The fearless ${name} discovered a completely hidden valley.`, scene:'🏔️🌿', bg:'bg-green',  target_words:['fearless','discovered','completely','hidden'] },
-      { text:`She carefully mapped the entirely unfamiliar landscape.`,      scene:'🗺️✏️', bg:'bg-warm',   target_words:['carefully','mapped','entirely','unfamiliar'] },
-      { text:`Her remarkable discovery brought worldwide excitement and joy.`,scene:'🌍🎉', bg:'bg-blue',  target_words:['remarkable','discovery','worldwide','excitement'] },
-    ],
-  }),
-};
-
-function buildFallbackStory(childName, phase, theme) {
-  const templateFn = FALLBACK_TEMPLATES[phase] || FALLBACK_TEMPLATES[3];
-  return { story: templateFn(childName, theme), provider: 'fallback' };
+async function callGroq(systemPrompt, userPrompt) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-70b-versatile',
+        max_tokens: 2400,
+        temperature: 0.82,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role:'system', content: systemPrompt + '\n\nIMPORTANT: Your response must be a JSON object with a "stories" array key containing the array.' },
+          { role:'user',   content: userPrompt },
+        ],
+      }),
+    });
+    if (!res.ok) { console.warn('Groq HTTP', res.status); return null; }
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content?.trim();
+    // Groq wraps in object due to json_object mode — unwrap
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.stories) return JSON.stringify(parsed.stories);
+        // If it returned an array directly somehow
+        if (Array.isArray(parsed)) return JSON.stringify(parsed);
+      } catch {}
+    }
+    return raw || null;
+  } catch (e) { console.warn('Groq error:', e.message); return null; }
 }
 
-// ── JSON PARSER (tolerant) ────────────────────────────────────
-function parseStoryJSON(raw) {
+// ── JSON PARSER ───────────────────────────────────────────────
+function parseBatchJSON(raw, expectedCount) {
   if (!raw) return null;
   try {
-    // Strip markdown code fences if present
     const cleaned = raw.replace(/^```json\n?/,'').replace(/\n?```$/,'').trim();
     const parsed = JSON.parse(cleaned);
-    // Validate required shape
-    if (!parsed.title || !Array.isArray(parsed.pages) || parsed.pages.length < 2) return null;
-    // Ensure 3 pages
-    while (parsed.pages.length < 3) parsed.pages.push(parsed.pages[parsed.pages.length - 1]);
-    return parsed;
-  } catch { return null; }
+    const arr = Array.isArray(parsed) ? parsed : parsed.stories;
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    // Validate each story has required shape
+    const valid = arr.filter(s =>
+      s.title && Array.isArray(s.pages) && s.pages.length >= 2
+    ).map(s => {
+      // Ensure 3 pages
+      while (s.pages.length < 3) s.pages.push(s.pages[s.pages.length-1]);
+      s.pages = s.pages.slice(0, 3);
+      return s;
+    });
+    return valid.length > 0 ? valid : null;
+  } catch (e) { console.warn('Parse error:', e.message); return null; }
 }
 
-// ── MAIN EXPORT: generateStory ────────────────────────────────
+// ── FALLBACK BATCH ────────────────────────────────────────────
+const FALLBACK_STORIES = {
+  superheroes: {
+    2: (n, pr) => ({ title:`${n} the Big Hero`, emoji:'🦸', cover_scene:'💥⚡', theme:'superheroes', target_phonemes:['s','a','t','p'], pages:[
+      {text:`${n} put on a big red cap.`,scene:'🦸💥',bg:'bg-warm',target_words:['big','red','cap']},
+      {text:`${pr.sub.charAt(0).toUpperCase()+pr.sub.slice(1)} ran fast to stop the bad van.`,scene:'💨🦸',bg:'bg-blue',target_words:['ran','fast','bad']},
+      {text:`${n} got the map and all was well.`,scene:'🌟🦸',bg:'bg-purple',target_words:['got','map','well']}]}),
+    3: (n, pr) => ({ title:`${n} Saves the Town`, emoji:'🦸', cover_scene:'🌆🦸', theme:'superheroes', target_phonemes:['ch','sh','ai'], pages:[
+      {text:`${n} put on ${pr.pos} shining cape and flew.`,scene:'🦸✨',bg:'bg-blue',target_words:['shining','cape','flew']},
+      {text:`A shout rang out and ${pr.sub} rushed in.`,scene:'💥🌙',bg:'bg-purple',target_words:['shout','rushed']},
+      {text:`The crowd cheered as ${n} saved the day.`,scene:'🌟👏',bg:'bg-warm',target_words:['crowd','cheered','saved']}]}),
+  },
+  space: {
+    2: (n, pr) => ({ title:`${n} in Space`, emoji:'🚀', cover_scene:'🌟🚀', theme:'space', target_phonemes:['s','p','a','t'], pages:[
+      {text:`${n} sat in the big red pod.`,scene:'🚀⭐',bg:'bg-purple',target_words:['sat','big','red','pod']},
+      {text:`The pod shot up and up!`,scene:'🌙🚀',bg:'bg-blue',target_words:['shot','up']},
+      {text:`${n} saw a big dot of sun.`,scene:'⭐🌟',bg:'bg-warm',target_words:['saw','big','dot','sun']}]}),
+    3: (n, pr) => ({ title:`${n} on the Moon`, emoji:'🌙', cover_scene:'🌙🚀', theme:'space', target_phonemes:['igh','oo','ar'], pages:[
+      {text:`${n} took off in a bright rocket ship.`,scene:'🚀✨',bg:'bg-purple',target_words:['bright','rocket','ship']},
+      {text:`The moon was white and cool that night.`,scene:'🌙⭐',bg:'bg-blue',target_words:['white','cool','night']},
+      {text:`${n} found a moon rock and took it home.`,scene:'🪨🏠',bg:'bg-warm',target_words:['found','rock','home']}]}),
+  },
+  dinosaurs: {
+    2: (n, pr) => ({ title:`${n} and the Big Egg`, emoji:'🦕', cover_scene:'🌿🦕', theme:'dinosaurs', target_phonemes:['d','i','g','e'], pages:[
+      {text:`${n} dug in the mud and hit a big egg.`,scene:'🌿🥚',bg:'bg-green',target_words:['dug','mud','big','egg']},
+      {text:`The egg had a tap, tap, tap.`,scene:'🥚💥',bg:'bg-warm',target_words:['tap']},
+      {text:`A big red dino sat with ${n}.`,scene:'🦕🌿',bg:'bg-purple',target_words:['big','red','dino','sat']}]}),
+  },
+};
+
+function buildFallbackBatch(child, themes) {
+  const pr = pronouns(child.gender || 'neutral');
+  const stories = themes.map(theme => {
+    const themeTemplates = FALLBACK_STORIES[theme];
+    const phaseTemplates = themeTemplates || FALLBACK_STORIES.space;
+    const templateFn = (phaseTemplates[child.phase] || phaseTemplates[2] || phaseTemplates[3]);
+    if (templateFn) return templateFn(child.name, pr);
+    // Generic fallback
+    return {
+      title:`${child.name} and the ${theme}`, emoji: THEMES[theme]?.emoji||'📖',
+      cover_scene: THEMES[theme]?.scenes[0]||'🌿✨', theme,
+      target_phonemes: PHASE_PHONICS[child.phase]?.patterns.slice(0,4)||['s','a','t'],
+      pages:[
+        {text:`${child.name} went on a ${theme} trip.`,scene:'🌿✨',bg:'bg-warm',target_words:['went']},
+        {text:`${pr.sub.charAt(0).toUpperCase()+pr.sub.slice(1)} saw something big and red.`,scene:'💥🌿',bg:'bg-green',target_words:['big','red']},
+        {text:`${child.name} got home and felt glad.`,scene:'🏠🌟',bg:'bg-blue',target_words:['got','home','glad']},
+      ],
+    };
+  });
+  return stories;
+}
+
+// ── THEME SELECTOR ────────────────────────────────────────────
+// Pick themes for the batch — prioritise the child's interests,
+// ensure variety, fill remaining slots from defaults
+function selectThemes(interests, recentTitles, count) {
+  const allThemes = Object.keys(THEMES);
+  const recentThemes = new Set(
+    recentTitles.map(t => allThemes.find(k => t.toLowerCase().includes(k))).filter(Boolean)
+  );
+
+  // Normalise interests to valid theme keys
+  const interestThemes = (interests || [])
+    .map(i => allThemes.find(k => k.includes(i.toLowerCase()) || i.toLowerCase().includes(k)))
+    .filter(Boolean);
+
+  const selected = [];
+  const used = new Set();
+
+  // First: all interest-matched themes (no repeats)
+  for (const t of interestThemes) {
+    if (!used.has(t) && selected.length < count) { selected.push(t); used.add(t); }
+  }
+
+  // Fill: non-recent themes in a shuffled order
+  const remaining = allThemes
+    .filter(t => !used.has(t) && !recentThemes.has(t))
+    .sort(() => Math.random() - 0.5);
+
+  for (const t of remaining) {
+    if (selected.length >= count) break;
+    selected.push(t); used.add(t);
+  }
+
+  // Last resort: anything not already used
+  for (const t of allThemes) {
+    if (selected.length >= count) break;
+    if (!used.has(t)) { selected.push(t); used.add(t); }
+  }
+
+  return selected.slice(0, count);
+}
+
+// ── MAIN EXPORT: generateBatch ────────────────────────────────
 /**
- * Generate a personalised phonics story for a child.
+ * Generate a batch of personalised phonics stories for a child.
  *
  * @param {object} opts
- * @param {string}   opts.childName       - Child's first name
- * @param {number}   opts.phase           - Phonics phase (2-6)
- * @param {string}   opts.theme           - Story theme key (adventure, space, etc.)
- * @param {string[]} opts.interests       - Parent-set interests
- * @param {string[]} opts.struggledWords  - Words child recently got wrong
- * @param {string[]} opts.recentTitles    - Recent story titles to avoid repeating
- * @returns {Promise<{story, provider}>}
+ * @param {object}   opts.child          - Full child record { id, name, phase, age, gender }
+ * @param {string[]} opts.interests      - Parent-set interest keywords
+ * @param {string[]} opts.struggledWords - Recently failed words for spaced repetition
+ * @param {string[]} opts.recentTitles   - Recent story titles to avoid repeating
+ * @param {number}   opts.count          - Number of stories to generate (3–5)
+ * @param {string[]} [opts.forceThemes]  - Override theme selection (optional)
+ * @returns {Promise<{ stories: object[], provider: string, themes: string[] }>}
  */
-export async function generateStory(opts) {
-  const { childName, phase, theme = 'adventure', interests = [], struggledWords = [], recentTitles = [] } = opts;
-  const systemPrompt = buildSystemPrompt(phase);
-  const userPrompt   = buildUserPrompt({ childName, phase, theme, interests, struggledWords, recentTitles });
+export async function generateBatch(opts) {
+  const {
+    child,
+    interests     = [],
+    struggledWords = [],
+    recentTitles  = [],
+    count         = 5,
+    forceThemes   = null,
+  } = opts;
 
-  // 1. Google Gemini Flash — primary free AI (1,500 req/day)
-  const geminiRaw = await generateWithGemini(systemPrompt, userPrompt);
-  if (geminiRaw?.text) {
-    const parsed = parseStoryJSON(geminiRaw.text);
-    if (parsed) return { story: parsed, provider: 'gemini' };
+  const themes = forceThemes || selectThemes(interests, recentTitles, count);
+  const systemPrompt = buildBatchSystemPrompt(child.phase);
+  const userPrompt   = buildBatchUserPrompt({ child, interests, struggledWords, recentTitles, themes, count: themes.length });
+
+  console.log(`[story-gen] Generating batch of ${themes.length} stories for ${child.name} (Phase ${child.phase})`);
+  console.log(`[story-gen] Themes: ${themes.join(', ')}`);
+
+  // 1. Gemini
+  const geminiRaw = await callGemini(systemPrompt, userPrompt);
+  if (geminiRaw) {
+    const parsed = parseBatchJSON(geminiRaw, themes.length);
+    if (parsed) {
+      // Stamp theme from our selection if AI didn't set it correctly
+      parsed.forEach((s, i) => { if (!s.theme || !THEMES[s.theme]) s.theme = themes[i] || 'adventure'; });
+      console.log(`[story-gen] Gemini generated ${parsed.length} stories`);
+      return { stories: parsed, provider: 'gemini', themes };
+    }
   }
 
-  // 2. Groq (Llama 3.1 70B) — secondary free AI (14,400 req/day)
-  const groqRaw = await generateWithGroq(systemPrompt, userPrompt);
-  if (groqRaw?.text) {
-    const parsed = parseStoryJSON(groqRaw.text);
-    if (parsed) return { story: parsed, provider: 'groq' };
+  // 2. Groq
+  const groqRaw = await callGroq(systemPrompt, userPrompt);
+  if (groqRaw) {
+    const parsed = parseBatchJSON(groqRaw, themes.length);
+    if (parsed) {
+      parsed.forEach((s, i) => { if (!s.theme || !THEMES[s.theme]) s.theme = themes[i] || 'adventure'; });
+      console.log(`[story-gen] Groq generated ${parsed.length} stories`);
+      return { stories: parsed, provider: 'groq', themes };
+    }
   }
 
-  // Deterministic fallback — always works
-  return buildFallbackStory(childName, phase, theme);
+  // 3. Deterministic fallback
+  console.log(`[story-gen] Using deterministic fallback for ${themes.length} stories`);
+  return { stories: buildFallbackBatch(child, themes), provider: 'fallback', themes };
 }
 
+// Keep single-story export for backwards compat
+export async function generateStory(opts) {
+  const { childName, phase, theme = 'adventure', interests = [], struggledWords = [], recentTitles = [] } = opts;
+  const result = await generateBatch({
+    child: { name: childName, phase, age: null, gender: 'neutral' },
+    interests, struggledWords, recentTitles,
+    count: 1,
+    forceThemes: [theme],
+  });
+  return { story: result.stories[0], provider: result.provider };
+}

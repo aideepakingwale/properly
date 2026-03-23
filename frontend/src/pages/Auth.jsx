@@ -2,16 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI, socialAuth } from '../services/api';
-import { Button, Input, Select } from '../components/ui';
+import { Button, Input } from '../components/ui';
 import Footer from '../components/Footer';
-
-const PHASES = {
-  2: 'Phase 2 — Simple CVC Words (cat, dog)',
-  3: 'Phase 3 — Digraphs & Vowel Teams (rain, shop)',
-  4: 'Phase 4 — CCVC/CVCC Blends (frog, best)',
-  5: 'Phase 5 — Split Digraphs (cake, kite)',
-  6: 'Phase 6 — Prefixes & Suffixes (unhappy)',
-};
 
 // ── CHECK EMAIL SCREEN ────────────────────────────────────────
 function CheckEmailScreen({ email, onResend, onBack }) {
@@ -69,7 +61,7 @@ function CheckEmailScreen({ email, onResend, onBack }) {
 // ── MAIN AUTH PAGE ────────────────────────────────────────────
 export default function Auth() {
   const [mode, setMode]   = useState('login');
-  const [f, setF]         = useState({ email: '', password: '', name: '', phase: '2' });
+  const [f, setF]         = useState({ email: '', password: '' });
   const [err, setErr]     = useState('');
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(null);
@@ -89,14 +81,13 @@ export default function Auth() {
     setErr(''); setUnverifiedEmail('');
     if (!f.email.includes('@')) { setErr('Please enter a valid email address'); return; }
     if (f.password.length < 4)  { setErr('Password must be at least 4 characters'); return; }
-    if (mode === 'register' && !f.name.trim()) { setErr("Please enter your child's name"); return; }
     setLoading(true);
     try {
       if (mode === 'login') {
         await login(f.email, f.password);
         nav('/home', { replace: true });
       } else {
-        const res = await register(f.email, f.password, f.name.trim(), parseInt(f.phase));
+        const res = await register(f.email, f.password);
         if (res?.requiresVerification) {
           setCheckEmail(f.email);  // show check-email screen
         } else {
@@ -181,18 +172,11 @@ export default function Auth() {
                 <Input value={f.password} onChange={e => fi('password', e.target.value)} type="password" placeholder={mode === 'register' ? 'At least 6 characters' : 'Your password'} onKeyDown={e => e.key==='Enter' && handle()} />
               </div>
               {mode === 'register' && (
-                <>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:700, color:'#374151', display:'block', marginBottom:5 }}>Child's first name</label>
-                    <Input value={f.name} onChange={e => fi('name', e.target.value)} placeholder="e.g. Lily" />
-                  </div>
-                  <div>
-                    <label style={{ fontSize:12, fontWeight:700, color:'#374151', display:'block', marginBottom:5 }}>Starting phonics level</label>
-                    <Select value={f.phase} onChange={e => fi('phase', e.target.value)}>
-                      {Object.entries(PHASES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </Select>
-                  </div>
-                </>
+                <div style={{ background:'#F0FDF4', border:'1.5px solid #BBF7D0', borderRadius:12, padding:'10px 14px' }}>
+                  <p style={{ margin:0, fontSize:12, color:'#065F46', lineHeight:1.55 }}>
+                    🌳 After creating your account you'll add your child's profile — name, age, and phonics level — so stories are perfectly personalised for them.
+                  </p>
+                </div>
               )}
             </div>
 

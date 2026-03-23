@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser]         = useState(null);
   const [child, setChild]       = useState(null);
+  const [children, setChildren] = useState([]);
   const [progress, setProgress] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [token, setToken]       = useState(() => localStorage.getItem('properly_token'));
@@ -29,6 +30,7 @@ export function AuthProvider({ children }) {
           setUser(res.data.user);
           const savedChildId = localStorage.getItem('properly_child_id');
           const kids = res.data.children || [];
+          setChildren(kids);
           const activeChild = kids.find(c => c.id === savedChildId) || kids[0];
           if (activeChild) {
             setChild(activeChild);
@@ -58,7 +60,9 @@ export function AuthProvider({ children }) {
     localStorage.setItem('properly_token', res.data.token);
     setToken(res.data.token);
     setUser(res.data.user);
-    const first = res.data.children?.[0];
+    const kids = res.data.children || [];
+    setChildren(kids);
+    const first = kids[0];
     if (first) {
       setChild(first);
       localStorage.setItem('properly_child_id', first.id);
@@ -67,21 +71,15 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
-  const register = async (email, password, childName, phase) => {
-    const res = await authAPI.register({ email, password, childName, phase });
+  const register = async (email, password) => {
+    const res = await authAPI.register({ email, password });
     if (!res.success) throw new Error(res.message);
-    // If email verification is required, res.data.token will be undefined
-    // Just return the data — Auth.jsx handles the check-email screen
+    // If email not configured — token provided, log straight in
     if (res.data.token) {
-      // Email not configured — token provided, log straight in
       localStorage.setItem('properly_token', res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
-      if (res.data.child) {
-        setChild(res.data.child);
-        localStorage.setItem('properly_child_id', res.data.child.id);
-        await loadProgress(res.data.child.id);
-      }
+      // No child yet — parent adds kids after logging in
     }
     return res.data; // Auth.jsx checks res.requiresVerification
   };
@@ -94,6 +92,35 @@ export function AuthProvider({ children }) {
       setChild(firstChild);
       localStorage.setItem('properly_child_id', firstChild.id);
       await loadProgress(firstChild.id);
+    }
+  };
+
+  // Switch active child (for multi-child families)
+  const switchChild = async (childId) => {
+    const found = children.find(c => c.id === childId);
+    if (!found) return;
+    setChild(found);
+    localStorage.setItem('properly_child_id', found.id);
+    await loadProgress(found.id);
+  };
+
+  // Called after adding a new child via KidsManager
+  const addChildToState = (newChild) => {
+    setChildren(prev => [...prev, newChild]);
+    if (!child) {
+      setChild(newChild);
+      localStorage.setItem('properly_child_id', newChild.id);
+    }
+  };
+
+  const removeChildFromState = (childId) => {
+    setChildren(prev => prev.filter(c => c.id !== childId));
+    if (child?.id === childId) {
+      const remaining = children.filter(c => c.id !== childId);
+      const next = remaining[0] || null;
+      setChild(next);
+      if (next) localStorage.setItem('properly_child_id', next.id);
+      else      localStorage.removeItem('properly_child_id');
     }
   };
 
@@ -112,8 +139,9 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, child, progress, loading, token,
+      user, child, children, progress, loading, token,
       login, register, logout, loginDirect,
+      switchChild, addChildToState, removeChildFromState,
       refreshProgress, updateChildLocally, loadProgress,
       setChild, setProgress,
     }}>

@@ -89,7 +89,9 @@ export default function ReadingSession() {
   // Start backend session
   useEffect(() => {
     if (!story || !child || sessionId) return;
-    progressAPI.startSession(child.id, story.id).then(r => { if (r.success) setSessionId(r.data.sessionId); }).catch(() => {});
+    // Pass story type so backend inserts into correct table
+    progressAPI.startSession(child.id, story.id, story.isAiGenerated ? 'ai' : 'static')
+      .then(r => { if (r.success) setSessionId(r.data.sessionId); }).catch(() => {});
   }, [story, child]);
 
   // Reset on page change

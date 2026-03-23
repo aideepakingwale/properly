@@ -11,11 +11,13 @@ import { getShopItems, getOwnedItems, purchaseItem }               from '../cont
 import { getFeedback, getTTS }                                      from '../services/ai.service.js';
 import { assessSpeech, uploadMiddleware, getSpeechToken, getSpeechStatus } from '../controllers/speech.controller.js';
 import {
-  generateAiStory, getAiStories, getAiStory, deleteAiStory,
-  getThemes, getPhaseInfo, getInterests, setInterests,
-  recordStruggle, getStruggles, getGenerationStatus
+  generateAiStoryBatch, getAiStories, getAiStory, deleteAiStory,
+  startAiStorySession, submitAiStoryPage, completeAiStorySession,
+  getAiStoryProgress, getThemes, getPhaseInfo,
+  getInterests, setInterests, recordStruggle, getStruggles, getGenerationStatus
 } from '../controllers/ai-story.controller.js';
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
+import { listChildren, addChild, updateChild as updateChildMgmt, deleteChild } from '../controllers/children.controller.js';
 import {
   getPlans, getSubscription, createCheckoutSession,
   createPortalSession, stripeWebhook, verifyCheckout
@@ -57,21 +59,37 @@ router.get('/stories',     getStories);
 router.get('/stories/:id', getStory);
 
 // ── AI STORIES ────────────────────────────────────────────────
-router.get('/ai-stories/themes',        getThemes);
-router.get('/ai-stories/phase/:phase',  getPhaseInfo);
-router.get('/ai-stories/status',        getGenerationStatus);
-router.get('/children/:childId/ai-stories',              authMiddleware, requireChild, getAiStories);
-router.post('/children/:childId/ai-stories',             authMiddleware, requireChild, generateAiStory);
-router.get('/children/:childId/ai-stories/:storyId',     authMiddleware, requireChild, getAiStory);
-router.delete('/children/:childId/ai-stories/:storyId',  authMiddleware, requireChild, deleteAiStory);
-router.get('/children/:childId/interests',               authMiddleware, requireChild, getInterests);
-router.put('/children/:childId/interests',               authMiddleware, requireChild, setInterests);
-router.post('/children/:childId/struggles',              authMiddleware, requireChild, recordStruggle);
-router.get('/children/:childId/struggles',               authMiddleware, requireChild, getStruggles);
+// AI Stories — meta
+router.get('/ai-stories/themes',                              getThemes);
+router.get('/ai-stories/phase/:phase',                        getPhaseInfo);
+router.get('/ai-stories/status',                              getGenerationStatus);
+
+// AI Stories — CRUD + batch generation
+router.get('/children/:childId/ai-stories',                   authMiddleware, requireChild, getAiStories);
+router.post('/children/:childId/ai-stories/batch',            authMiddleware, requireChild, generateAiStoryBatch);
+router.get('/children/:childId/ai-stories/progress',          authMiddleware, requireChild, getAiStoryProgress);
+router.get('/children/:childId/ai-stories/:storyId',          authMiddleware, requireChild, getAiStory);
+router.delete('/children/:childId/ai-stories/:storyId',       authMiddleware, requireChild, deleteAiStory);
+
+// AI Story reading sessions (progress tracking)
+router.post('/children/:childId/ai-stories/:storyId/session',          authMiddleware, requireChild, startAiStorySession);
+router.post('/children/:childId/ai-stories/session/page',              authMiddleware, requireChild, submitAiStoryPage);
+router.post('/children/:childId/ai-stories/session/complete',          authMiddleware, requireChild, completeAiStorySession);
+
+// Child interests & struggle words
+router.get('/children/:childId/interests',                    authMiddleware, requireChild, getInterests);
+router.put('/children/:childId/interests',                    authMiddleware, requireChild, setInterests);
+router.post('/children/:childId/struggles',                   authMiddleware, requireChild, recordStruggle);
+router.get('/children/:childId/struggles',                    authMiddleware, requireChild, getStruggles);
+
+// ── CHILDREN MANAGEMENT (parent manages all kids) ───────────────
+router.get('/children',             authMiddleware, listChildren);
+router.post('/children',            authMiddleware, addChild);
+router.patch('/children/:childId',  authMiddleware, updateChildMgmt);
+router.delete('/children/:childId', authMiddleware, deleteChild);
 
 // ── CHILD PROGRESS ────────────────────────────────────────────
 router.get('/children/:childId',                   authMiddleware, requireChild, getChild);
-router.patch('/children/:childId',                 authMiddleware, requireChild, updateChild);
 router.get('/children/:childId/progress',          authMiddleware, requireChild, getProgress);
 router.post('/children/:childId/sessions',         authMiddleware, requireChild, startSession);
 router.post('/children/:childId/sessions/page',    authMiddleware, requireChild, submitPage);

@@ -86,6 +86,76 @@ export function getDb() {
     )
   `);
 
+  // ── Migrate reading_sessions and completed_stories story_type column ──────────
+  const rsCols = _db.prepare("PRAGMA table_info(reading_sessions)").all().map(r => r.name);
+  if (!rsCols.includes('story_type')) {
+    _db.exec("ALTER TABLE reading_sessions ADD COLUMN story_type TEXT NOT NULL DEFAULT 'static'");
+    console.log('✅ Migration: reading_sessions.story_type added');
+  }
+  const csCols = _db.prepare("PRAGMA table_info(completed_stories)").all().map(r => r.name);
+  if (!csCols.includes('story_type')) {
+    _db.exec("ALTER TABLE completed_stories ADD COLUMN story_type TEXT NOT NULL DEFAULT 'static'");
+    console.log('✅ Migration: completed_stories.story_type added');
+  }
+
+  // ── Migrate ai_stories progress columns ─────────────────────────────────────
+  const aiCols = _db.prepare("PRAGMA table_info(ai_stories)").all().map(r => r.name);
+  if (!aiCols.includes('batch_id')) {
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN batch_id TEXT");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN child_name TEXT NOT NULL DEFAULT ''");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN child_age INTEGER");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN child_gender TEXT DEFAULT 'neutral'");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN child_interests TEXT NOT NULL DEFAULT '[]'");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN struggled_words TEXT NOT NULL DEFAULT '[]'");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN status TEXT NOT NULL DEFAULT 'unread'");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN best_accuracy REAL DEFAULT 0");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN times_read INTEGER NOT NULL DEFAULT 0");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN last_read_at DATETIME");
+    _db.exec("ALTER TABLE ai_stories ADD COLUMN completed_at DATETIME");
+    console.log('✅ Migration: ai_stories progress columns added');
+  }
+  const aiPageCols = _db.prepare("PRAGMA table_info(ai_story_pages)").all().map(r => r.name);
+  if (!aiPageCols.includes('best_accuracy')) {
+    _db.exec("ALTER TABLE ai_story_pages ADD COLUMN best_accuracy REAL DEFAULT NULL");
+    _db.exec("ALTER TABLE ai_story_pages ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
+    _db.exec("ALTER TABLE ai_story_pages ADD COLUMN last_spoken TEXT");
+    _db.exec("ALTER TABLE ai_story_pages ADD COLUMN last_word_scores TEXT");
+    _db.exec("ALTER TABLE ai_story_pages ADD COLUMN completed_at DATETIME");
+    console.log('✅ Migration: ai_story_pages progress columns added');
+  }
+  const childCols = _db.prepare("PRAGMA table_info(children)").all().map(r => r.name);
+  if (!childCols.includes('age')) {
+    _db.exec("ALTER TABLE children ADD COLUMN age INTEGER");
+    _db.exec("ALTER TABLE children ADD COLUMN gender TEXT DEFAULT 'neutral'");
+    console.log('✅ Migration: children age+gender columns added');
+  }
+  // Create new tables if they don't exist
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_story_sessions (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+      ai_story_id TEXT NOT NULL REFERENCES ai_stories(id) ON DELETE CASCADE,
+      started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME,
+      pages_read INTEGER NOT NULL DEFAULT 0,
+      total_pages INTEGER NOT NULL DEFAULT 3,
+      accuracy REAL,
+      acorns_earned INTEGER DEFAULT 0
+    )
+  `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_story_batches (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+      requested_count INTEGER NOT NULL DEFAULT 5,
+      generated_count INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      themes_used TEXT NOT NULL DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME
+    )
+  `);
+
   if (!cols.includes('oauth_provider')) {
     _db.exec("ALTER TABLE users ADD COLUMN oauth_provider TEXT");
     _db.exec("ALTER TABLE users ADD COLUMN oauth_id TEXT");
