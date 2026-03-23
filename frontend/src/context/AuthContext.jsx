@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser]         = useState(null);
   const [child, setChild]       = useState(null);
-  const [children, setChildren] = useState([]);
+  const [kids, setKids] = useState([]);
   const [progress, setProgress] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [token, setToken]       = useState(() => localStorage.getItem('properly_token'));
@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
           setUser(res.data.user);
           const savedChildId = localStorage.getItem('properly_child_id');
           const kids = res.data.children || [];
-          setChildren(kids);
+          setKids(kids);
           const activeChild = kids.find(c => c.id === savedChildId) || kids[0];
           if (activeChild) {
             setChild(activeChild);
@@ -61,7 +61,7 @@ export function AuthProvider({ children }) {
     setToken(res.data.token);
     setUser(res.data.user);
     const kids = res.data.children || [];
-    setChildren(kids);
+    setKids(kids);
     const first = kids[0];
     if (first) {
       setChild(first);
@@ -97,7 +97,7 @@ export function AuthProvider({ children }) {
 
   // Switch active child (for multi-child families)
   const switchChild = async (childId) => {
-    const found = children.find(c => c.id === childId);
+    const found = kids.find(c => c.id === childId);
     if (!found) return;
     setChild(found);
     localStorage.setItem('properly_child_id', found.id);
@@ -106,7 +106,7 @@ export function AuthProvider({ children }) {
 
   // Called after adding a new child via KidsManager
   const addChildToState = (newChild) => {
-    setChildren(prev => [...prev, newChild]);
+    setKids(prev => [...prev, newChild]);
     if (!child) {
       setChild(newChild);
       localStorage.setItem('properly_child_id', newChild.id);
@@ -114,9 +114,9 @@ export function AuthProvider({ children }) {
   };
 
   const removeChildFromState = (childId) => {
-    setChildren(prev => prev.filter(c => c.id !== childId));
+    setKids(prev => prev.filter(c => c.id !== childId));
     if (child?.id === childId) {
-      const remaining = children.filter(c => c.id !== childId);
+      const remaining = kids.filter(c => c.id !== childId);
       const next = remaining[0] || null;
       setChild(next);
       if (next) localStorage.setItem('properly_child_id', next.id);
@@ -139,7 +139,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, child, children, progress, loading, token,
+      user, child, children: kids, progress, loading, token,
       login, register, logout, loginDirect,
       switchChild, addChildToState, removeChildFromState,
       refreshProgress, updateChildLocally, loadProgress,
