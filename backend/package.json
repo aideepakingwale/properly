@@ -31,7 +31,8 @@
     "passport-google-oauth20": "^2.0.0",
     "passport-facebook": "^3.0.0",
     "express-session": "^1.18.0",
-    "stripe": "^14.25.0"
+    "stripe": "^14.25.0",
+    "resend": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

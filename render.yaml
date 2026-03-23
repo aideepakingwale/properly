@@ -63,21 +63,24 @@ services:
       - key: RATE_LIMIT_MAX
         value: 200
 
-      # ── EMAIL VERIFICATION ────────────────────────────────
-      # App's public URL — used in verification email links
-      - key: APP_URL
-        value: https://properly-web.onrender.com
+      # ── EMAIL (Resend recommended — free, HTTPS, works on Render) ──
+      # OPTION A: Resend — resend.com → API Keys → Create (free, 3K/month)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: noreply@yourdomain.com   # update after adding domain in Resend
 
-      # SMTP for email verification (optional but recommended)
-      # Gmail: enable 2FA → App passwords → create one for Mail
-      - key: SMTP_PROVIDER
-        value: gmail
-      - key: SMTP_FROM_NAME
-        value: Properly Phonics
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
+      # OPTION B: Brevo — brevo.com → SMTP & API → API Keys (free, 300/day)
+      # - key: BREVO_API_KEY
+      #   sync: false
+
+      # OPTION C: SMTP — may timeout on Render free tier
+      # - key: SMTP_PROVIDER
+      #   value: gmail
+      # - key: SMTP_USER
+      #   sync: false
+      # - key: SMTP_PASS
+      #   sync: false
 
       # ── SOCIAL OAUTH ──────────────────────────────────────
       # The backend's public URL (used as OAuth redirect base)
