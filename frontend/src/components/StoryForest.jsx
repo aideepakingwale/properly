@@ -184,9 +184,10 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
         aiStoryAPI.status(),
       ]);
       if (storiesRes.status==='fulfilled' && storiesRes.value.success) {
-        setAiStories(storiesRes.value.data);
+        const storiesList = storiesRes.value.data.stories || storiesRes.value.data || [];
+        setAiStories(storiesList);
         // Calculate daily remaining
-        const todayCount = storiesRes.value.data.filter(s => {
+        const todayCount = storiesList.filter(s => {
           const d = new Date(s.createdAt);
           return d.toDateString() === new Date().toDateString();
         }).length;

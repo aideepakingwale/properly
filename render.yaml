@@ -1,12 +1,24 @@
 # render.yaml — Properly AI Phonics Tutor
 # Render Infrastructure-as-Code Blueprint
-# Docs: https://render.com/docs/blueprint-spec
 #
-# Deploys:
-#   1. properly-api   — Node.js Express REST API (Web Service, Free tier)
-#   2. properly-web   — React SPA (Static Site, Free tier)
-#
-# One-click deploy: https://render.com/deploy (point to this repo)
+# ┌────────────────────────────────────────────────────────────┐
+# │  PERSISTENT DATABASE — CHOOSE ONE OPTION                   │
+# │                                                            │
+# │  OPTION A: Turso  (FREE forever — recommended)             │
+# │  1. turso.tech → Sign up free                              │
+# │  2. Create a database → copy URL + token                   │
+# │  3. Add to Render env vars:                                │
+# │       TURSO_DATABASE_URL = libsql://your-db.turso.io      │
+# │       TURSO_AUTH_TOKEN   = eyJ...                          │
+# │  4. Leave DB_PATH as /tmp (Turso takes over automatically) │
+# │  Free limits: 500 MB, 1 billion row-reads/month            │
+# │                                                            │
+# │  OPTION B: Render Disk  ($7/mo Starter plan)               │
+# │  1. Upgrade properly-api service to Starter plan           │
+# │  2. Uncomment the `disk:` block below                      │
+# │  3. Change DB_PATH value to /data/properly.db              │
+# │  4. Redeploy                                               │
+# └────────────────────────────────────────────────────────────┘
 
 services:
   # ── BACKEND API ──────────────────────────────────────────────
@@ -14,17 +26,13 @@ services:
     name: properly-api
     runtime: node
     region: oregon
-    # node:sqlite requires Node 22+
-    # Render uses Node 20 by default — set NODE_VERSION to upgrade          # Change to: frankfurt | singapore | ohio | virginia
-    plan: free              # Upgrade to starter ($7/mo) for persistent disk + no sleep
+    plan: free              # Change to starter ($7/mo) for Option B (Render Disk)
 
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
 
-    # Persistent disk for SQLite database
-    # NOTE: Disk requires "starter" plan ($7/mo). On free tier the DB resets on each deploy.
-    # Uncomment the block below when upgrading from free → starter:
+    # OPTION B — Render Disk (uncomment + upgrade to Starter plan)
     # disk:
     #   name: properly-sqlite
     #   mountPath: /data
@@ -35,71 +43,65 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-
       - key: NODE_VERSION
         value: 22
       - key: PORT
-        value: 10000          # Render assigns this automatically; keep in sync
+        value: 10000
 
-      # DB path — uses /data/properly.db when disk is mounted, else /tmp
+      # ── DATABASE — CLOUDFLARE R2 (recommended, free) ───────
+      # dash.cloudflare.com → R2 → Create bucket "properly"
+      # R2 → Manage R2 API tokens → Create (Object Read & Write)
+      - key: R2_ACCOUNT_ID
+        sync: false         # Cloudflare Account ID
+      - key: R2_ACCESS_KEY_ID
+        sync: false         # R2 API token Access Key ID
+      - key: R2_SECRET_KEY
+        sync: false         # R2 API token Secret Access Key
+      - key: R2_BUCKET
+        value: properly     # Your R2 bucket name
+      # DB local path (R2 restore/backup happens on top of this file)
       - key: DB_PATH
-        value: /tmp/properly.db   # Change to /data/properly.db when disk mounted
+        value: /tmp/properly.db
 
-      # JWT secret — CHANGE THIS before deploying!
+      # ── RENDER DISK (alternative: $7/mo Starter plan) ────────
+      # 1. Upgrade service to Starter plan
+      # 2. Uncomment disk: block above
+      # 3. Change DB_PATH to /data/properly.db
+
+      # ── AUTH ──────────────────────────────────────────────────
       - key: JWT_SECRET
-        generateValue: true   # Render auto-generates a secure random value
-
+        generateValue: true
       - key: JWT_EXPIRES_IN
         value: 7d
 
-      # CORS — set to your static site URL after first deploy
-      # e.g. https://properly-web.onrender.com
+      # ── CORS ──────────────────────────────────────────────────
       - key: CORS_ORIGINS
         value: https://properly-web.onrender.com
-
-      # Rate limiting
       - key: RATE_LIMIT_WINDOW_MS
         value: 900000
       - key: RATE_LIMIT_MAX
         value: 200
 
-      # ── EMAIL (Resend recommended — free, HTTPS, works on Render) ──
-      # OPTION A: Resend — resend.com → API Keys → Create (free, 3K/month)
+      # ── EMAIL (Resend — free, HTTPS, works on Render) ─────────
+      # resend.com → API Keys → Create
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
-        value: noreply@yourdomain.com   # update after adding domain in Resend
+        value: noreply@properly.app
 
-      # OPTION B: Brevo — brevo.com → SMTP & API → API Keys (free, 300/day)
-      # - key: BREVO_API_KEY
-      #   sync: false
-
-      # OPTION C: SMTP — may timeout on Render free tier
-      # - key: SMTP_PROVIDER
-      #   value: gmail
-      # - key: SMTP_USER
-      #   sync: false
-      # - key: SMTP_PASS
-      #   sync: false
-
-      # ── SOCIAL OAUTH ──────────────────────────────────────
-      # The backend's public URL (used as OAuth redirect base)
+      # ── SOCIAL OAUTH ──────────────────────────────────────────
       - key: API_URL
         value: https://properly-api.onrender.com
-
-      # Google OAuth (console.cloud.google.com)
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
-
-      # Facebook OAuth (developers.facebook.com)
       - key: FACEBOOK_APP_ID
         sync: false
       - key: FACEBOOK_APP_SECRET
         sync: false
 
-      # ── STRIPE SUBSCRIPTIONS ──────────────────────────────
+      # ── STRIPE ────────────────────────────────────────────────
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
@@ -109,20 +111,11 @@ services:
       - key: STRIPE_PRICE_FOREST_MONTHLY
         sync: false
 
-      # ── AI / SPEECH KEYS (fill in after creating services) ──
-      # Google Gemini Flash — PRIMARY FREE AI
-      # Free: 1,500 req/day, no billing needed
-      # Get key: https://aistudio.google.com/app/apikey
+      # ── AI / SPEECH ───────────────────────────────────────────
       - key: GEMINI_API_KEY
         sync: false
-
-      # Groq (Llama 3.1) — SECONDARY FREE AI
-      # Free: 14,400 req/day, no billing needed
-      # Get key: https://console.groq.com/keys
       - key: GROQ_API_KEY
         sync: false
-
-      # Azure Speech (Free F0) — https://portal.azure.com → Speech
       - key: AZURE_SPEECH_KEY
         sync: false
       - key: AZURE_SPEECH_REGION
@@ -138,29 +131,22 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
 
-    # SPA routing — all paths serve index.html
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
 
     headers:
-      # Cache bust JS/CSS on every deploy
       - path: /assets/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
-      # No cache for index.html
       - path: /index.html
         name: Cache-Control
         value: no-cache, no-store, must-revalidate
 
     envVars:
-      # Points to the backend API service above
-      # Render injects this at build time via VITE_ prefix
       - key: VITE_API_URL
         fromService:
           name: properly-api
           type: web
           property: host
-          # Result will be: https://properly-api.onrender.com/api
-          # See frontend/src/services/api.js for how this is used

@@ -5,7 +5,7 @@ import helmet        from 'helmet';
 import morgan        from 'morgan';
 import rateLimit     from 'express-rate-limit';
 import session       from 'express-session';
-import { getDb }     from './db/database.js';
+import { initDatabase } from './db/database.js';
 import { seed }      from './db/seed.js';
 import routes        from './routes/index.js';
 import { configurePassport } from './services/passport.service.js';
@@ -90,12 +90,16 @@ app.use((err, _req, res, _next) => {
 // ── STARTUP ───────────────────────────────────────────────────
 async function start() {
   try {
-    getDb(); seed();
+    await initDatabase();
+    seed();
     app.listen(PORT, '0.0.0.0', () => {
       console.log('\n🦉 Properly API');
       console.log(`   Port     : ${PORT}`);
       console.log(`   Env      : ${process.env.NODE_ENV}`);
-      console.log(`   DB       : ${process.env.DB_PATH}`);
+      const { dbStorageMode } = await import('./db/database.js');
+      const r2On = !!(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID);
+      console.log(\`   DB       : \${dbStorageMode}\`);
+      console.log(\`   R2       : \${r2On ? '✅ enabled' : '⚠️  not set — DB is ephemeral'}\`);
       console.log(`   Azure    : ${process.env.AZURE_SPEECH_KEY    ? '✅' : '⚠️  not set'}`);
       console.log(`   Gemini   : ${process.env.GEMINI_API_KEY      ? '✅' : '⚠️  not set'}`);
       console.log(`   Email    : ${process.env.SMTP_USER           ? '✅' : '⚠️  not set'}`);

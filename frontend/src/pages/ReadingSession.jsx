@@ -55,6 +55,8 @@ export default function ReadingSession() {
   const [scoringMode, setScoringMode] = useState(null); // 'azure' | 'text-comparison' | 'no-transcript'
   const [loading, setLoading]    = useState(true);
   const [error, setError]        = useState('');
+  const [speakingWordIdx, setSpeakingWordIdx] = useState(-1);  // word lit up during TTS playback
+  const [revealedCount, setRevealedCount]     = useState(0);   // scores revealed progressively after assessment
   const [providerInfo, setProviderInfo] = useState(null);
   const triesRef = useRef(0);
 
@@ -95,7 +97,7 @@ export default function ReadingSession() {
   }, [story, child]);
 
   // Reset on page change
-  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); triesRef.current = 0; }, [pageIdx]);
+  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); }, [pageIdx]);
 
   const page = story?.pages?.[pageIdx];
 
@@ -113,7 +115,12 @@ export default function ReadingSession() {
       const { wordScores, overallAccuracy, overallFluency, overallCompleteness,
               overallProsody, displayText, source, azureAssessed } = assessRes.data;
 
+      setRevealedCount(0);
       setWordScores(wordScores);
+      // Reveal scores word by word with a stagger effect
+      wordScores.forEach((_, i) => {
+        setTimeout(() => setRevealedCount(i + 1), 120 + i * 180);
+      });
       setScoringMode(azureAssessed ? 'azure' : source === 'no-transcript' ? 'no-transcript' : 'text-comparison');
       if (azureAssessed) {
         setAzureDetails({ fluency: overallFluency, completeness: overallCompleteness, prosody: overallProsody, source: 'azure' });
@@ -300,6 +307,12 @@ export default function ReadingSession() {
           </div>
         )}
 
+        <style>{`
+          @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0);   }
+          }
+        `}</style>
         <div className="animate-float" style={{ fontSize: 72, lineHeight: 1, marginBottom: 20, textAlign: 'center' }}>{page.scene}</div>
 
         {/* ── WORD DISPLAY ── */}
@@ -312,16 +325,54 @@ export default function ReadingSession() {
             const clean = word.slice(0, word.length - punct.length);
             const colors = getWordColor(sc);
             const badge = getErrorBadge(errorType);
+            const isRevealed   = i < revealedCount;          // score shown
+            const isSpeaking   = i === speakingWordIdx;         // TTS is on this word
+            const showScore    = isRevealed && wordScores.length > 0;
+            const scoreVal     = showScore ? wordScores[i]?.score ?? null : null;
+            const revealColors = showScore ? getWordColor(scoreVal) : null;
+            const revealBadge  = showScore ? getErrorBadge(wordScores[i]?.errorType) : null;
+
             return (
-              <span key={i} style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ fontSize: 'clamp(22px,5vw,32px)', fontWeight: 800, color: colors ? colors.text : textCol, background: colors ? colors.bg : 'transparent', padding: colors ? '3px 8px' : '2px 4px', borderRadius: 9, border: colors ? `1.5px solid ${colors.border}` : 'none', transition: 'all 0.4s ease', lineHeight: 1.5, display: 'inline-block' }}>{clean}</span>
+              <span key={i} style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center',
+                transform: isSpeaking ? 'scale(1.18) translateY(-3px)' : isRevealed && scoreVal !== null ? 'scale(1.0)' : 'scale(1)',
+                transition: 'transform 0.18s ease, opacity 0.25s ease',
+              }}>
+                {/* Score badge — shown above word after reveal */}
+                {showScore && scoreVal !== null && (
+                  <span style={{ position: 'absolute', top: -18, fontSize: 10, fontWeight: 900,
+                    color: scoreVal >= 80 ? '#059669' : scoreVal >= 60 ? '#D97706' : '#DC2626',
+                    animation: 'fadeInUp 0.25s ease',
+                    whiteSpace: 'nowrap' }}>
+                    {Math.round(scoreVal)}%
+                  </span>
+                )}
+                <span style={{
+                  fontSize: 'clamp(22px,5vw,32px)', fontWeight: 800,
+                  color: isSpeaking ? '#1E40AF' : revealColors ? revealColors.text : textCol,
+                  background: isSpeaking ? '#DBEAFE' : revealColors ? revealColors.bg : 'transparent',
+                  padding: (isSpeaking || revealColors) ? '3px 10px' : '2px 4px',
+                  borderRadius: 10,
+                  border: isSpeaking ? '2px solid #3B82F6' : revealColors ? \`1.5px solid \${revealColors.border}\` : 'none',
+                  boxShadow: isSpeaking ? '0 0 12px rgba(59,130,246,0.4)' : 'none',
+                  transition: 'all 0.25s ease',
+                  lineHeight: 1.5, display: 'inline-block',
+                }}>{clean}</span>
                 {punct && <span style={{ fontSize: 'clamp(22px,5vw,32px)', fontWeight: 800, color: mutedCol }}>{punct}</span>}
-                {badge && <span style={{ position: 'absolute', top: -16, fontSize: 9, background: badge.color, color: 'white', borderRadius: 50, padding: '1px 5px', fontWeight: 800, whiteSpace: 'nowrap' }}>{badge.label}</span>}
-                {/* Phoneme details on hover — only shown if Azure returned them */}
-                {wordScores[i]?.phonemes?.length > 0 && (
-                  <span style={{ fontSize: 8, color: colors?.text || mutedCol, marginTop: 2, display: 'flex', gap: 1 }}>
+                {revealBadge && (
+                  <span style={{ position: 'absolute', top: -16, fontSize: 9, background: revealBadge.color, color: 'white', borderRadius: 50, padding: '1px 5px', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                    {revealBadge.label}
+                  </span>
+                )}
+                {/* Phoneme detail row — shown after reveal if Azure returned them */}
+                {showScore && wordScores[i]?.phonemes?.length > 0 && (
+                  <span style={{ fontSize: 8, color: revealColors?.text || mutedCol, marginTop: 3, display: 'flex', gap: 2 }}>
                     {wordScores[i].phonemes.slice(0, 6).map((p, j) => (
-                      <span key={j} style={{ background: getWordColor(p.score)?.bg || 'transparent', borderRadius: 2, padding: '0 2px', fontWeight: 700 }}>{p.phoneme}</span>
+                      <span key={j} style={{
+                        background: getWordColor(p.score)?.bg || 'transparent',
+                        color: getWordColor(p.score)?.text || mutedCol,
+                        borderRadius: 3, padding: '0 3px', fontWeight: 700,
+                        fontSize: 8,
+                      }}>{p.phoneme}</span>
                     ))}
                   </span>
                 )}
@@ -387,7 +438,13 @@ export default function ReadingSession() {
 
         {/* Hear sentence */}
         {wordScores.length === 0 && !isRecording && (
-          <button onClick={() => speak(page.text)} style={{ background: 'rgba(59,130,246,0.1)', border: '1.5px solid rgba(59,130,246,0.25)', borderRadius: 50, padding: '7px 18px', color: '#2563EB', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-body)', marginBottom: 8 }}>
+          <button onClick={() => {
+              const pageWords = page.text.split(' ');
+              setSpeakingWordIdx(0);
+              pageWords.forEach((_, i) => setTimeout(() => setSpeakingWordIdx(i), i * 380));
+              setTimeout(() => setSpeakingWordIdx(-1), pageWords.length * 380 + 500);
+              speak(page.text);
+            }} style={{ background: 'rgba(59,130,246,0.1)', border: '1.5px solid rgba(59,130,246,0.25)', borderRadius: 50, padding: '7px 18px', color: '#2563EB', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-body)', marginBottom: 8 }}>
             🔊 Hear the sentence first
           </button>
         )}
