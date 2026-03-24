@@ -19,12 +19,28 @@ function ConfigRow({ label, value, status, note }) {
 }
 
 export default function Config() {
-  const [cfg, setCfg]       = useState(null);
+  const [cfg, setCfg]         = useState(null);
+  const [r2, setR2]           = useState(null);
+  const [r2Loading, setR2Loading] = useState(true);
+  const [backing, setBacking] = useState(false);
+  const [backupMsg, setBackupMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     adminAPI.config().then(r => { if (r.success) setCfg(r.data); }).finally(() => setLoading(false));
+    adminAPI.r2Status().then(r => setR2(r.data)).catch(() => setR2({ error: 'Could not reach backend' })).finally(() => setR2Loading(false));
   }, []);
+
+  const triggerBackup = async () => {
+    setBacking(true); setBackupMsg('');
+    try {
+      await adminAPI.triggerBackup();
+      setBackupMsg('✅ Backup completed successfully');
+      // Refresh R2 status
+      adminAPI.r2Status().then(r => setR2(r.data)).catch(() => {});
+    } catch (e) { setBackupMsg('❌ ' + (e.message || 'Backup failed')); }
+    finally { setBacking(false); }
+  };
 
   if (loading) return <div style={{ padding:40, color:'var(--muted)' }}>Loading…</div>;
   if (!cfg)    return <div style={{ padding:40, color:'var(--danger)' }}>Failed to load</div>;
@@ -35,6 +51,51 @@ export default function Config() {
         <h1 style={{ fontSize:22, fontWeight:800 }}>Configuration</h1>
         <div style={{ fontSize:12, color:'var(--muted)', marginTop:3 }}>Read-only view of runtime configuration</div>
       </div>
+
+      {/* R2 Live Status */}
+      <section style={{ marginBottom:24 }}>
+        <div style={{ fontFamily:'var(--font-ui)', fontWeight:700, fontSize:14, color:'var(--accent)', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+          <span>◆</span> Cloudflare R2 — Database Persistence
+        </div>
+        <div style={{ background:'var(--surface)', border:`1px solid ${r2?.backupExists?'rgba(0,229,160,0.3)':r2?.error?'rgba(255,68,68,0.3)':'var(--border)'}`, borderRadius:8, padding:20 }}>
+          {r2Loading ? (
+            <div style={{ color:'var(--muted)' }}>Checking R2 status…</div>
+          ) : (
+            <div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <div>
+                  <span className={`badge ${r2?.backupExists?'badge-green':r2?.error?'badge-red':r2?.configured?'badge-amber':'badge-red'}`} style={{ fontSize:12, padding:'4px 12px' }}>
+                    {r2?.backupExists ? '✅ R2 Connected & Backup Found' : r2?.error ? '❌ R2 Connection Failed' : r2?.configured ? '⚠️ Connected — No Backup Yet' : '❌ R2 Not Configured'}
+                  </span>
+                </div>
+                {r2?.configured && (
+                  <button className="btn btn-ghost btn-sm" onClick={triggerBackup} disabled={backing}>
+                    {backing ? 'Backing up…' : '↑ Backup Now'}
+                  </button>
+                )}
+              </div>
+
+              <div style={{ fontSize:12, color:'var(--muted)', lineHeight:2 }}>
+                <div><strong style={{ color:'var(--text)' }}>Storage mode:</strong> {r2?.storageMode}</div>
+                {r2?.bucket && <div><strong style={{ color:'var(--text)' }}>Bucket:</strong> {r2.bucket}</div>}
+                {r2?.backupSize && <div><strong style={{ color:'var(--text)' }}>Backup size:</strong> {r2.backupSize}</div>}
+                {r2?.backupLastModified && <div><strong style={{ color:'var(--text)' }}>Last backup:</strong> {new Date(r2.backupLastModified).toLocaleString('en-GB')}</div>}
+                {r2?.error && <div style={{ color:'var(--danger)', marginTop:8 }}><strong>Error:</strong> {r2.error}</div>}
+                <div style={{ marginTop:8, color: r2?.backupExists?'var(--accent)':r2?.error?'var(--danger)':'var(--muted)' }}>{r2?.message}</div>
+              </div>
+
+              {backupMsg && <div style={{ marginTop:10, fontSize:12, color: backupMsg.startsWith('✅')?'var(--accent)':'var(--danger)', fontWeight:600 }}>{backupMsg}</div>}
+
+              {!r2?.configured && (
+                <div style={{ marginTop:12, padding:'10px 12px', background:'rgba(255,68,68,0.08)', borderRadius:6, fontSize:11, color:'var(--danger)', lineHeight:1.7 }}>
+                  <strong>Action required:</strong> Add these env vars in Render → properly-api → Environment:<br/>
+                  <code>R2_ACCOUNT_ID</code> · <code>R2_ACCESS_KEY_ID</code> · <code>R2_SECRET_KEY</code> · <code>R2_BUCKET=properly</code>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* AI Services */}
       <section style={{ marginBottom:24 }}>

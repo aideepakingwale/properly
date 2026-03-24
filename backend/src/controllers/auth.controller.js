@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import getDb  from '../db/database.js';
 import { sendVerificationEmail, sendWelcomeEmail, sendResendVerificationEmail, emailAvailable } from '../services/email.service.js';
 import { autoPromoteAdmins } from '../middleware/admin.middleware.js';
+import { backupNow } from '../db/database.js';
 
 function signToken(userId, email) {
   return jwt.sign({ userId, email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
@@ -46,6 +47,9 @@ export const register = async (req, res) => {
       childName: 'there',   // generic welcome
       token: verifyToken,
     });
+
+    // Backup immediately after registration — don't wait 60s
+    backupNow().catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -90,7 +94,7 @@ export const verifyEmail = async (req, res) => {
       return res.json({
         success: true,
         alreadyVerified: true,
-        data: { token: jwt_token, user: { id: user.id, email: user.email }, children: children.map(formatChild) },
+        data: { token: jwt_token, user: { id: user.id, email: user.email, isAdmin: Boolean(user.is_admin) }, children: children.map(formatChild) },
       });
     }
     if (new Date(user.verify_expires) < new Date()) {
@@ -181,8 +185,14 @@ export const login = async (req, res) => {
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-    // Block unverified users only if email IS configured (so non-email setups work)
-    if (emailAvailable() && !user.email_verified) {
+    // Auto-promote BEFORE verification check so admin emails can always log in
+    autoPromoteAdmins(user.id, user.email, db);
+
+    // Re-fetch to get updated is_admin
+    const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+
+    // Block unverified users — but allow admins through regardless
+    if (emailAvailable() && !freshUser.email_verified && !freshUser.is_admin) {
       return res.status(403).json({
         success: false,
         unverified: true,
@@ -190,13 +200,12 @@ export const login = async (req, res) => {
         email: user.email,
       });
     }
-
-    const children = db.prepare('SELECT * FROM children WHERE user_id = ?').all(user.id);
-    const token    = signToken(user.id, user.email);
+    const children  = db.prepare('SELECT * FROM children WHERE user_id = ?').all(user.id);
+    const token     = signToken(user.id, user.email);
 
     res.json({
       success: true,
-      data: { token, user: { id: user.id, email: user.email }, children: children.map(formatChild) },
+      data: { token, user: { id: freshUser.id, email: freshUser.email, isAdmin: Boolean(freshUser.is_admin) }, children: children.map(formatChild) },
     });
   } catch (err) {
     console.error('login:', err);
@@ -207,11 +216,11 @@ export const login = async (req, res) => {
 // ── GET ME ────────────────────────────────────────────────────
 export const getMe = (req, res) => {
   const db   = getDb();
-  const user = db.prepare('SELECT id, email, email_verified, created_at FROM users WHERE id = ?').get(req.user.userId);
+  const user = db.prepare('SELECT id, email, email_verified, is_admin, created_at FROM users WHERE id = ?').get(req.user.userId);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
   const children = db.prepare('SELECT * FROM children WHERE user_id = ?').all(user.id);
-  res.json({ success: true, data: { user, children: children.map(formatChild) } });
+  res.json({ success: true, data: { user: { ...user, isAdmin: Boolean(user.is_admin) }, children: children.map(formatChild) } });
 };
 
 function formatChild(c) {

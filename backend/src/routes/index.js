@@ -17,7 +17,7 @@ import {
 } from '../controllers/ai-story.controller.js';
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
 import { requireAdmin } from '../middleware/admin.middleware.js';
-import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig } from '../controllers/admin.controller.js';
+import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup } from '../controllers/admin.controller.js';
 import { listChildren, addChild, updateChild as updateChildMgmt, deleteChild } from '../controllers/children.controller.js';
 import {
   getPlans, getSubscription, createCheckoutSession,
@@ -144,5 +144,7 @@ router.get('/admin/stories',               authMiddleware, requireAdmin, listSto
 router.get('/admin/stories/ai-stats',      authMiddleware, requireAdmin, getAiStoryStats);
 router.get('/admin/analytics',             authMiddleware, requireAdmin, getAnalytics);
 router.get('/admin/config',                authMiddleware, requireAdmin, getConfig);
+router.get('/admin/r2-status',             authMiddleware, requireAdmin, getR2Status);
+router.post('/admin/r2-backup',            authMiddleware, requireAdmin, triggerBackup);
 
 export default router;

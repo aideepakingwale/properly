@@ -17,7 +17,15 @@ export default function Login() {
       await login(email, pass);
       nav('/dashboard');
     } catch (e) {
-      setErr(e.message || 'Login failed');
+      // Surface specific error messages
+      const msg = e.message || 'Login failed';
+      if (msg.includes('verify your email')) {
+        setErr('Email not verified. Add this email to ADMIN_EMAILS in Render env vars so it bypasses verification, then redeploy.');
+      } else if (msg.includes('admin access')) {
+        setErr('Account exists but has no admin access. Add email to ADMIN_EMAILS in Render env vars and log into the main app once.');
+      } else {
+        setErr(msg);
+      }
     } finally { setLoading(false); }
   };
 

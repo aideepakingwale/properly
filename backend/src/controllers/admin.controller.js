@@ -307,6 +307,66 @@ export const getAnalytics = (_req, res) => {
 };
 
 // ── CONFIG ─────────────────────────────────────────────────────
+export const getR2Status = async (_req, res) => {
+  const { USE_R2, dbStorageMode } = await import('../db/database.js').then(m => ({
+    USE_R2: m.dbStorageMode === 'r2',
+    dbStorageMode: m.dbStorageMode,
+  }));
+
+  if (!USE_R2) {
+    return res.json({ success: true, data: {
+      configured: false,
+      storageMode: dbStorageMode,
+      message: 'R2 not configured — set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_KEY, R2_BUCKET in Render env vars',
+    }});
+  }
+
+  // Test actual R2 connectivity
+  try {
+    const { S3Client, HeadBucketCommand, ListObjectsV2Command } = await import('@aws-sdk/client-s3');
+    const s3 = new S3Client({
+      region:   'auto',
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId:     process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_KEY,
+      },
+    });
+    const bucket = process.env.R2_BUCKET;
+
+    // List objects with db/ prefix to see backup
+    const list = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: 'db/' }));
+    const dbBackup = list.Contents?.find(o => o.Key === 'db/properly.db');
+
+    res.json({ success: true, data: {
+      configured: true,
+      storageMode: dbStorageMode,
+      bucket,
+      backupExists: !!dbBackup,
+      backupSize: dbBackup ? `${(dbBackup.Size / 1024).toFixed(1)} KB` : null,
+      backupLastModified: dbBackup?.LastModified || null,
+      message: dbBackup ? 'R2 connected ✅ — backup found' : 'R2 connected but no backup yet — will appear within 3s of startup',
+    }});
+  } catch (e) {
+    res.json({ success: false, data: {
+      configured: true,
+      storageMode: dbStorageMode,
+      error: e.message,
+      message: 'R2 credentials set but connection FAILED — check values in Render env vars',
+    }});
+  }
+};
+
+export const triggerBackup = async (_req, res) => {
+  try {
+    const { backupNow } = await import('../db/database.js');
+    await backupNow();
+    res.json({ success: true, data: { message: 'Backup completed successfully' } });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
 export const getConfig = (_req, res) => {
   res.json({ success: true, data: {
     azure:   { key: process.env.AZURE_SPEECH_KEY   ? '***' : null, region: process.env.AZURE_SPEECH_REGION || 'uksouth' },

@@ -14,7 +14,10 @@ api.interceptors.request.use(cfg => {
 api.interceptors.response.use(
   r => r.data,
   err => {
-    if (err.response?.status === 401 || err.response?.status === 403) {
+    // Only auto-redirect on 401 from authenticated routes (token expired)
+    // Do NOT redirect on 403 from /auth/login — that's a valid error (unverified, not admin)
+    const isLoginAttempt = err.config?.url?.includes('/auth/login');
+    if (err.response?.status === 401 && !isLoginAttempt) {
       localStorage.removeItem('admin_token');
       window.location.href = '/login';
     }
@@ -41,6 +44,8 @@ export const adminAPI = {
   aiStats:    ()             => api.get('/admin/stories/ai-stats'),
   analytics:  ()             => api.get('/admin/analytics'),
   config:     ()             => api.get('/admin/config'),
+  r2Status:   ()             => api.get('/admin/r2-status'),
+  triggerBackup: ()          => api.post('/admin/r2-backup'),
 };
 
 export default api;

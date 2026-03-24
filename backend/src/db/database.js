@@ -1,155 +1,193 @@
 /**
- * Database — SQLite with Cloudflare R2 backup/restore
+ * Database — SQLite with Cloudflare R2 persistence
  *
- * ┌──────────────────────────────────────────────────────────────┐
- * │  OPTION A — Cloudflare R2  (FREE — recommended)              │
- * │  • 10 GB free, zero egress fees                              │
- * │  • DB backed up to R2 every 5 min + on graceful shutdown     │
- * │  • Restored from R2 on every startup                         │
- * │  • Setup: see R2_ACCOUNT_ID / R2_ACCESS_KEY_ID in .env       │
- * ├──────────────────────────────────────────────────────────────┤
- * │  OPTION B — Render Disk  ($7/mo Starter plan)                │
- * │  • Uncomment disk: block in render.yaml                      │
- * │  • Set DB_PATH=/data/properly.db                             │
- * └──────────────────────────────────────────────────────────────┘
+ * STARTUP  → checkpoint WAL → download db/properly.db from R2 → open
+ * RUNTIME  → backup every 60s + after every critical write
+ * SHUTDOWN → checkpoint + upload on SIGTERM/SIGINT
  *
- * Auto-detection order:
- *   1. R2_ACCOUNT_ID set  → R2 backup/restore
- *   2. DB_PATH = /data/…  → Render Disk (persistent local file)
- *   3. fallback           → /tmp  (ephemeral — warns on startup)
+ * KEY FIX: WAL checkpoint before every backup.
+ * SQLite WAL mode keeps recent writes in .db-wal, NOT the main .db file.
+ * Reading the .db file without checkpointing = stale/missing data.
  */
 
-import { DatabaseSync } from 'node:sqlite';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { DatabaseSync }                            from 'node:sqlite';
+import { readFileSync, writeFileSync, mkdirSync }  from 'fs';
+import { dirname, join }                           from 'path';
+import { fileURLToPath }                           from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const DB_PATH   = process.env.DB_PATH || '/tmp/properly.db';
 
-// ── STORAGE MODE DETECTION ────────────────────────────────────
-const DB_PATH = process.env.DB_PATH || '/tmp/properly.db';
-
-const USE_R2   = Boolean(
-  process.env.R2_ACCOUNT_ID &&
+const USE_R2 = Boolean(
+  process.env.R2_ACCOUNT_ID    &&
   process.env.R2_ACCESS_KEY_ID &&
-  process.env.R2_SECRET_KEY &&
+  process.env.R2_SECRET_KEY    &&
   process.env.R2_BUCKET
 );
-const USE_DISK = !USE_R2 && DB_PATH.startsWith('/data/');
-const STORAGE  = USE_R2 ? 'r2' : USE_DISK ? 'render-disk' : 'ephemeral';
+const USE_DISK  = !USE_R2 && DB_PATH.startsWith('/data/');
+export const dbStorageMode = USE_R2 ? 'r2' : USE_DISK ? 'render-disk' : 'ephemeral';
 
-// ── SINGLETON ─────────────────────────────────────────────────
 let _db          = null;
 let _initPromise = null;
 let _backupTimer = null;
 
-// ── STARTUP: RESTORE FROM R2 ──────────────────────────────────
-async function restoreFromR2(localPath) {
-  const { r2RestoreDb } = await import('../services/r2.service.js');
-  return r2RestoreDb(localPath);
+// ── R2 CLIENT (lazy, singleton) ───────────────────────────────
+let _s3 = null;
+async function getS3() {
+  if (_s3) return _s3;
+  const { S3Client } = await import('@aws-sdk/client-s3');
+  _s3 = new S3Client({
+    region:   'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId:     process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_KEY,
+    },
+  });
+  return _s3;
 }
 
-// ── PERIODIC BACKUP TO R2 ─────────────────────────────────────
-function scheduleR2Backup(localPath) {
-  if (_backupTimer) clearInterval(_backupTimer);
-  // Backup every 5 minutes
-  _backupTimer = setInterval(async () => {
-    const { r2BackupDb } = await import('../services/r2.service.js');
-    await r2BackupDb(localPath);
-  }, 5 * 60 * 1000);
+const R2_KEY    = 'db/properly.db';
+const R2_BUCKET = () => process.env.R2_BUCKET;
 
-  // Also backup on graceful shutdown
-  const shutdown = async (sig) => {
-    console.log(`\n[${sig}] Backing up DB before shutdown...`);
-    const { r2BackupDb } = await import('../services/r2.service.js');
-    await r2BackupDb(localPath);
-    process.exit(0);
-  };
-  process.once('SIGTERM', () => shutdown('SIGTERM'));
-  process.once('SIGINT',  () => shutdown('SIGINT'));
+// ── R2 OPERATIONS ─────────────────────────────────────────────
+async function r2Upload(buf) {
+  const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const s3 = await getS3();
+  await s3.send(new PutObjectCommand({
+    Bucket:      R2_BUCKET(),
+    Key:         R2_KEY,
+    Body:        buf,
+    ContentType: 'application/octet-stream',
+    Metadata:    { ts: new Date().toISOString(), bytes: String(buf.length) },
+  }));
+}
+
+async function r2Download() {
+  const { GetObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3');
+  const s3 = await getS3();
+
+  // Check existence
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: R2_BUCKET(), Key: R2_KEY }));
+  } catch (e) {
+    if (e.name === 'NotFound' || e.$metadata?.httpStatusCode === 404) return null;
+    throw e; // re-throw unexpected errors
+  }
+
+  const res    = await s3.send(new GetObjectCommand({ Bucket: R2_BUCKET(), Key: R2_KEY }));
+  const chunks = [];
+  for await (const chunk of res.Body) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+// ── BACKUP (checkpoint WAL first) ─────────────────────────────
+async function backup(reason = 'scheduled') {
+  if (!USE_R2 || !_db) return;
+  try {
+    // Force all WAL writes into the main .db file before reading it
+    _db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    const buf = readFileSync(DB_PATH);
+    await r2Upload(buf);
+    console.log(`✅ R2 backup [${reason}]: ${(buf.length / 1024).toFixed(1)} KB`);
+  } catch (e) {
+    console.error(`❌ R2 backup [${reason}] FAILED:`, e.message);
+  }
+}
+
+// ── RESTORE (on startup) ──────────────────────────────────────
+async function restore() {
+  if (!USE_R2) return;
+  console.log('🔄 R2: attempting DB restore…');
+  try {
+    const buf = await r2Download();
+    if (!buf) {
+      console.log('📦 R2: no backup found — fresh DB will be created and uploaded after init');
+      return;
+    }
+    try { mkdirSync(dirname(DB_PATH), { recursive: true }); } catch {}
+    writeFileSync(DB_PATH, buf);
+    console.log(`✅ R2: restored ${(buf.length / 1024).toFixed(1)} KB → ${DB_PATH}`);
+  } catch (e) {
+    console.error('❌ R2 restore FAILED:', e.message);
+    console.error('   Check R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_KEY, R2_BUCKET env vars');
+    console.error('   Starting with empty DB — existing users will be missing until R2 is fixed');
+  }
 }
 
 // ── MAIN INIT ─────────────────────────────────────────────────
 async function initDb() {
-  let dbPath = DB_PATH;
+  try { mkdirSync(dirname(DB_PATH), { recursive: true }); } catch {}
 
-  if (STORAGE === 'ephemeral') {
-    console.warn('⚠️  DB is EPHEMERAL — data lost on redeploy!');
-    console.warn('   Fix: set R2_ACCOUNT_ID + R2_ACCESS_KEY_ID + R2_SECRET_KEY + R2_BUCKET');
-    console.warn('   Free: dash.cloudflare.com → R2 → Create bucket');
+  if (dbStorageMode === 'ephemeral') {
+    console.warn('⚠️  DB EPHEMERAL — users lost on every deploy!');
+    console.warn('   → Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_KEY, R2_BUCKET in Render env');
   }
 
-  if (USE_R2) {
-    // Ensure local directory exists
-    try { mkdirSync(dirname(dbPath), { recursive: true }); } catch {}
-    // Restore DB from R2 if a backup exists
-    await restoreFromR2(dbPath);
-    console.log(`✅ DB: R2-backed SQLite → ${dbPath}`);
-  } else if (USE_DISK) {
-    try { mkdirSync(dirname(dbPath), { recursive: true }); } catch {}
-    console.log(`✅ DB: Render Disk → ${dbPath}`);
-  } else {
-    try { mkdirSync(dirname(dbPath), { recursive: true }); } catch {}
-  }
+  // Always try to restore from R2 first
+  await restore();
 
   // Open SQLite
-  const db = new DatabaseSync(dbPath);
+  const db = new DatabaseSync(DB_PATH);
 
-  // Performance pragmas
+  // WAL mode with synchronous=FULL for durability, checkpoint aggressively
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA foreign_keys = ON');
-  db.exec('PRAGMA synchronous = NORMAL');
-  db.exec('PRAGMA cache_size = -32000');
+  db.exec('PRAGMA synchronous = FULL');
+  db.exec('PRAGMA cache_size = -16000');
   db.exec('PRAGMA temp_store = MEMORY');
+  db.exec('PRAGMA wal_autocheckpoint = 50'); // checkpoint every 50 pages (more frequent)
 
-  // Transaction shim (better-sqlite3 compatible API)
+  // Transaction shim (matches better-sqlite3 API)
   db.transaction = (fn) => (...args) => {
     db.exec('BEGIN');
     try   { const r = fn(...args); db.exec('COMMIT');   return r; }
     catch (e) { try { db.exec('ROLLBACK'); } catch {} throw e; }
   };
 
-  // Schema
+  // Schema + migrations
   db.exec(readFileSync(join(__dirname, 'schema.sql'), 'utf8'));
-
-  // Migrations
   migrate(db);
 
-  // Schedule R2 backups after first write
-  if (USE_R2) scheduleR2Backup(dbPath);
-
-  // Do an immediate backup after init so the first deploy creates a baseline
   if (USE_R2) {
-    const { r2BackupDb } = await import('../services/r2.service.js');
-    r2BackupDb(dbPath).catch(() => {});  // non-blocking
+    // Backup every 60 seconds
+    _backupTimer = setInterval(() => backup('60s'), 60_000);
+
+    // Shutdown hooks
+    const shutdown = async (sig) => {
+      console.log(`\n[${sig}] Final DB backup before shutdown…`);
+      clearInterval(_backupTimer);
+      await backup('shutdown');
+      process.exit(0);
+    };
+    process.once('SIGTERM', () => shutdown('SIGTERM'));
+    process.once('SIGINT',  () => shutdown('SIGINT'));
+
+    // Upload baseline after 3s (ensures R2 has something even on first deploy)
+    setTimeout(() => backup('init'), 3000);
   }
 
-  console.log(`✅ DB ready (${STORAGE})`);
+  console.log(`✅ DB ready [${dbStorageMode}] — ${DB_PATH}`);
   return db;
 }
 
 // ── MIGRATIONS ────────────────────────────────────────────────
 function migrate(db) {
-  const userCols = db.prepare('PRAGMA table_info(users)').all().map(r => r.name);
+  const cols = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map(r => r.name);
 
-  if (!userCols.includes('is_admin')) {
-    db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
-    console.log('✅ Migration: users.is_admin added');
+  const uc = cols('users');
+  if (!uc.includes('is_admin'))       { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0'); }
+  if (!uc.includes('email_verified')) {
+    db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+    db.exec('ALTER TABLE users ADD COLUMN verify_token TEXT');
+    db.exec('ALTER TABLE users ADD COLUMN verify_expires DATETIME');
+    db.exec('ALTER TABLE users ADD COLUMN verify_sent_at DATETIME');
   }
-
-  if (!userCols.includes('email_verified')) {
-    db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0");
-    db.exec("ALTER TABLE users ADD COLUMN verify_token TEXT");
-    db.exec("ALTER TABLE users ADD COLUMN verify_expires DATETIME");
-    db.exec("ALTER TABLE users ADD COLUMN verify_sent_at DATETIME");
-    console.log('✅ Migration: email verification columns');
-  }
-  if (!userCols.includes('oauth_provider')) {
-    db.exec("ALTER TABLE users ADD COLUMN oauth_provider TEXT");
-    db.exec("ALTER TABLE users ADD COLUMN oauth_id TEXT");
-    db.exec("ALTER TABLE users ADD COLUMN oauth_name TEXT");
-    db.exec("ALTER TABLE users ADD COLUMN oauth_avatar TEXT");
-    console.log('✅ Migration: OAuth columns');
+  if (!uc.includes('oauth_provider')) {
+    db.exec('ALTER TABLE users ADD COLUMN oauth_provider TEXT');
+    db.exec('ALTER TABLE users ADD COLUMN oauth_id TEXT');
+    db.exec('ALTER TABLE users ADD COLUMN oauth_name TEXT');
+    db.exec('ALTER TABLE users ADD COLUMN oauth_avatar TEXT');
   }
 
   db.exec(`CREATE TABLE IF NOT EXISTS subscriptions (
@@ -162,40 +200,36 @@ function migrate(db) {
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  const rsCols = db.prepare('PRAGMA table_info(reading_sessions)').all().map(r => r.name);
-  if (!rsCols.includes('story_type'))
+  const rc = cols('reading_sessions');
+  if (!rc.includes('story_type'))
     db.exec("ALTER TABLE reading_sessions ADD COLUMN story_type TEXT NOT NULL DEFAULT 'static'");
 
-  const csCols = db.prepare('PRAGMA table_info(completed_stories)').all().map(r => r.name);
-  if (!csCols.includes('story_type'))
+  const cc = cols('completed_stories');
+  if (!cc.includes('story_type'))
     db.exec("ALTER TABLE completed_stories ADD COLUMN story_type TEXT NOT NULL DEFAULT 'static'");
 
-  const aiCols = db.prepare('PRAGMA table_info(ai_stories)').all().map(r => r.name);
-  if (!aiCols.includes('batch_id')) {
-    for (const col of [
-      "batch_id TEXT", "child_name TEXT NOT NULL DEFAULT ''", "child_age INTEGER",
-      "child_gender TEXT DEFAULT 'neutral'", "child_interests TEXT NOT NULL DEFAULT '[]'",
-      "struggled_words TEXT NOT NULL DEFAULT '[]'", "status TEXT NOT NULL DEFAULT 'unread'",
-      "best_accuracy REAL DEFAULT 0", "times_read INTEGER NOT NULL DEFAULT 0",
-      "last_read_at DATETIME", "completed_at DATETIME",
-    ]) db.exec(`ALTER TABLE ai_stories ADD COLUMN ${col}`);
-    console.log('✅ Migration: ai_stories progress columns');
+  const ac = cols('ai_stories');
+  if (!ac.includes('batch_id')) {
+    for (const c of [
+      "batch_id TEXT","child_name TEXT NOT NULL DEFAULT ''","child_age INTEGER",
+      "child_gender TEXT DEFAULT 'neutral'","child_interests TEXT NOT NULL DEFAULT '[]'",
+      "struggled_words TEXT NOT NULL DEFAULT '[]'","status TEXT NOT NULL DEFAULT 'unread'",
+      "best_accuracy REAL DEFAULT 0","times_read INTEGER NOT NULL DEFAULT 0",
+      "last_read_at DATETIME","completed_at DATETIME",
+    ]) db.exec(`ALTER TABLE ai_stories ADD COLUMN ${c}`);
   }
 
-  const aiPgCols = db.prepare('PRAGMA table_info(ai_story_pages)').all().map(r => r.name);
-  if (!aiPgCols.includes('best_accuracy')) {
-    for (const col of [
-      'best_accuracy REAL DEFAULT NULL', 'attempts INTEGER NOT NULL DEFAULT 0',
-      'last_spoken TEXT', 'last_word_scores TEXT', 'completed_at DATETIME',
-    ]) db.exec(`ALTER TABLE ai_story_pages ADD COLUMN ${col}`);
-    console.log('✅ Migration: ai_story_pages progress columns');
+  const pc = cols('ai_story_pages');
+  if (!pc.includes('best_accuracy')) {
+    for (const c of ['best_accuracy REAL DEFAULT NULL','attempts INTEGER NOT NULL DEFAULT 0',
+      'last_spoken TEXT','last_word_scores TEXT','completed_at DATETIME'])
+      db.exec(`ALTER TABLE ai_story_pages ADD COLUMN ${c}`);
   }
 
-  const childCols = db.prepare('PRAGMA table_info(children)').all().map(r => r.name);
-  if (!childCols.includes('age')) {
+  const chc = cols('children');
+  if (!chc.includes('age')) {
     db.exec('ALTER TABLE children ADD COLUMN age INTEGER');
     db.exec("ALTER TABLE children ADD COLUMN gender TEXT DEFAULT 'neutral'");
-    console.log('✅ Migration: children age+gender');
   }
 
   db.exec(`CREATE TABLE IF NOT EXISTS ai_story_sessions (
@@ -206,6 +240,7 @@ function migrate(db) {
     pages_read INTEGER NOT NULL DEFAULT 0, total_pages INTEGER NOT NULL DEFAULT 3,
     accuracy REAL, acorns_earned INTEGER DEFAULT 0
   )`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS ai_story_batches (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
@@ -213,6 +248,8 @@ function migrate(db) {
     status TEXT NOT NULL DEFAULT 'pending', themes_used TEXT NOT NULL DEFAULT '[]',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, completed_at DATETIME
   )`);
+
+  console.log('✅ Migrations complete');
 }
 
 // ── PUBLIC API ────────────────────────────────────────────────
@@ -224,9 +261,11 @@ export async function initDatabase() {
 }
 
 export function getDb() {
-  if (!_db) throw new Error('DB not ready — call initDatabase() at startup first');
+  if (!_db) throw new Error('DB not ready — await initDatabase() first');
   return _db;
 }
 
-export { STORAGE as dbStorageMode };
+/** Call after critical writes (registration, plan change) to avoid data loss */
+export const backupNow = () => backup('immediate');
+
 export default getDb;
