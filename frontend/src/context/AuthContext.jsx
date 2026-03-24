@@ -37,7 +37,13 @@ export function AuthProvider({ children }) {
             await loadProgress(activeChild.id);
           }
         }
-      } catch { logout(); }
+      } catch {
+        // Token invalid or server down — clear in-memory state only
+        // Leave localStorage token intact so user can re-login (not re-register)
+        setUser(null); setChild(null); setKids([]); setProgress(null);
+        setToken(null);
+        setLoading(false);
+      }
       finally { setLoading(false); }
     })();
   }, []);
@@ -127,6 +133,8 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('properly_token');
     localStorage.removeItem('properly_child_id');
+    // NOTE: we intentionally do NOT clear any user-identifying data
+    // so the login form can pre-fill the email if stored
     setToken(null); setUser(null); setChild(null); setProgress(null);
   };
 

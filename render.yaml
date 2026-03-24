@@ -69,10 +69,13 @@ services:
       # 3. Change DB_PATH to /data/properly.db
 
       # ── AUTH ──────────────────────────────────────────────────
+      # ⚠️  IMPORTANT: Set this ONCE manually and never change it.
+      # Changing JWT_SECRET logs out ALL users instantly.
+      # Generate a strong secret: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_EXPIRES_IN
-        value: 7d
+        value: 30d   # 30 days — users stay logged in across deploys
 
       # ── CORS ──────────────────────────────────────────────────
       - key: CORS_ORIGINS

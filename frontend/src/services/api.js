@@ -23,14 +23,25 @@ api.interceptors.request.use(cfg => {
   return cfg;
 });
 
-// Global 401 → force logout
+// Global 401 handler
+// Only dispatches logout if the token is genuinely invalid (not just a child-level 403)
+// Keeps localStorage intact so users can re-login without re-registering
+let _logoutDispatched = false;
 api.interceptors.response.use(
   r => r.data,
   err => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('properly_token');
-      localStorage.removeItem('properly_child_id');
-      window.dispatchEvent(new Event('auth:logout'));
+      const url = err.config?.url || '';
+      // Only force logout for auth-level 401s, not per-resource ones
+      const isAuthRoute = url.includes('/auth/me') || url.includes('/auth/login');
+      if (isAuthRoute && !_logoutDispatched) {
+        _logoutDispatched = true;
+        // Keep the token in localStorage — just signal the app to show login screen
+        // User can log in again without losing their account
+        window.dispatchEvent(new Event('auth:logout'));
+        // Allow dispatching again after a short delay (e.g. after re-login)
+        setTimeout(() => { _logoutDispatched = false; }, 5000);
+      }
     }
     return Promise.reject(err.response?.data || { message: err.message || 'Network error' });
   }
