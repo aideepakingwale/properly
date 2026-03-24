@@ -110,7 +110,7 @@ export const shopAPI = {
 
 // ── AI ───────────────────────────────────────────────────────
 export const aiAPI = {
-  feedback: (word, sentence, phase) => api.post('/ai/feedback', { word, sentence, phase }),
+  feedback: (word, sentence, phase, worstPhoneme) => api.post('/ai/feedback', { word, sentence, phase, worstPhoneme }),
 };
 
 // ── SPEECH ───────────────────────────────────────────────────

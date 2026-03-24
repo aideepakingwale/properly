@@ -145,30 +145,52 @@ const FALLBACKS = [
 /**
  * POST /api/ai/feedback
  * Returns a phonics coaching tip for a word the child struggled with.
- * All providers are free — no billing on any path.
+ *
+ * Pipeline (in order):
+ *   1. Gemini Flash   — primary AI, contextual tip
+ *   2. Groq/Llama     — secondary AI
+ *   3. Static cache   — phoneme lookup (last resort, uses worstPhoneme if supplied by Azure)
+ *   4. Rule-based     — always works
+ *
+ * NOTE: Static cache is intentionally LAST so it only fires when AI is unavailable.
+ * Putting it first caused the same cached tip ("sh in Devansh") to appear for every
+ * word containing that phoneme, regardless of what the child actually struggled with.
+ *
+ * @param {string} word         - The word the child scored lowest on
+ * @param {string} sentence     - Full sentence context
+ * @param {number} phase        - Child's phonics phase (2-6)
+ * @param {string} worstPhoneme - Specific phoneme Azure identified as worst (optional)
+ *                                When supplied, static cache targets this phoneme exactly
+ *                                instead of guessing from the word spelling
  */
 export const getFeedback = async (req, res) => {
-  const { word, sentence, phase } = req.body;
+  const { word, sentence, phase, worstPhoneme } = req.body;
   if (!word || !sentence) {
     return res.status(400).json({ success: false, message: 'word and sentence are required' });
   }
 
-  // 1. Static phoneme cache — instant, always free
-  const staticTip = findStaticTip(word);
-  if (staticTip) {
-    return res.json({ success: true, data: { tip: staticTip, source: 'cache', provider: 'static' } });
-  }
-
-  // 2. Google Gemini Flash — primary free AI
+  // 1. Google Gemini Flash — primary free AI (contextual, personalised)
   const geminiTip = await askGemini(word, sentence, phase);
   if (geminiTip) {
     return res.json({ success: true, data: { tip: geminiTip, source: 'ai', provider: 'gemini' } });
   }
 
-  // 3. Groq (Llama 3.1) — secondary free AI
+  // 2. Groq (Llama 3.1) — secondary free AI
   const groqTip = await askGroq(word, sentence, phase);
   if (groqTip) {
     return res.json({ success: true, data: { tip: groqTip, source: 'ai', provider: 'groq' } });
+  }
+
+  // 3. Static phoneme cache — uses Azure's identified phoneme if available,
+  //    otherwise falls back to scanning the word spelling (last resort only)
+  const lookupWord  = worstPhoneme || word;
+  const staticTip   = findStaticTip(lookupWord);
+  if (staticTip) {
+    // If we used a specific phoneme, format tip differently so it makes sense
+    const tip = worstPhoneme
+      ? staticTip.replace(`The "${lookupWord}" in "${lookupWord}"`, `The "${worstPhoneme}" sound`)
+      : staticTip;
+    return res.json({ success: true, data: { tip, source: 'cache', provider: 'static' } });
   }
 
   // 4. Rule-based fallback — always works

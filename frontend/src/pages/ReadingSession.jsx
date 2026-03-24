@@ -164,29 +164,45 @@ export default function ReadingSession() {
       updateChildLocally({ wordsRead: (child?.wordsRead || 0) + page.text.split(/\s+/).length });
 
       // 2. Identify worst word for coaching
-      const poor = wordScores.filter(w => w.score < 60);
+      // Only fire feedback when Azure actually assessed the audio (not text-comparison fallback)
+      // Text-comparison gives every word 75-100% which isn't meaningful for coaching
+      const isRealAssessment = source === 'azure' || azureAssessed;
+      const threshold = isRealAssessment ? 70 : 40; // stricter threshold for fallback scoring
+      const poor = wordScores.filter(w => w.score < threshold);
       if (poor.length > 0) {
         const worst = [...poor].sort((a, b) => a.score - b.score)[0];
-        // Record struggle for spaced repetition in AI story generation
+        const cleanWord = worst.word.replace(/[.,!?;:'"]/g, '');
+
+        // Find the worst-scoring phoneme from Azure's phoneme-level data
+        // This lets the static cache target the RIGHT sound, not just scan the spelling
+        let worstPhoneme = null;
+        if (worst.phonemes?.length > 0) {
+          const lowestPhoneme = [...worst.phonemes].sort((a, b) => a.score - b.score)[0];
+          if (lowestPhoneme.score < 60) worstPhoneme = lowestPhoneme.phoneme;
+        }
+
+        // Record the actual struggle for AI story personalisation
         if (child) {
           aiStoryAPI.struggles.record(child.id, {
-            word: worst.word.replace(/[.,!?]/g,''),
-            phoneme: null,
+            word:    cleanWord,
+            phoneme: worstPhoneme,
           }).catch(() => {});
         }
+
         setLoadingFb(true); setFeedbackData(null);
         try {
           const fbRes = await aiAPI.feedback(
-            worst.word.replace(/[.,!?]/g, ''),
+            cleanWord,
             page.text,
-            child?.phase
+            child?.phase,
+            worstPhoneme   // pass Azure's identified phoneme for precise static-cache lookup
           );
           if (fbRes.success) {
             setFeedbackData(fbRes.data);
             await speak(fbRes.data.tip);
           }
         } catch {
-          const fb = { tip: `Try saying "${worst.word}" slowly — one sound at a time! 🦉`, source: 'fallback', provider: 'rules' };
+          const fb = { tip: `Try saying "${cleanWord}" slowly — one sound at a time! 🦉`, source: 'fallback', provider: 'rules' };
           setFeedbackData(fb); speak(fb.tip);
         } finally { setLoadingFb(false); }
 
