@@ -13,6 +13,48 @@
 const AZURE_KEY    = process.env.AZURE_SPEECH_KEY;
 const AZURE_REGION = process.env.AZURE_SPEECH_REGION || 'uksouth';
 
+/**
+ * Convert any audio buffer to WAV PCM 16kHz 16-bit mono — what Azure requires.
+ * Uses ffmpeg (available on Render.com and all Linux hosts).
+ * Falls back to returning original buffer if ffmpeg unavailable.
+ */
+async function toWavPcm16k(inputBuffer, inputMime) {
+  const { execFileSync } = await import('child_process');
+  const { writeFileSync, readFileSync, unlinkSync } = await import('fs');
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+  const { randomBytes } = await import('crypto');
+
+  const id  = randomBytes(8).toString('hex');
+  const ext = inputMime?.includes('webm') ? 'webm'
+            : inputMime?.includes('ogg')  ? 'ogg'
+            : inputMime?.includes('mp4')  ? 'mp4'
+            : 'wav';
+  const inFile  = join(tmpdir(), `az_in_${id}.${ext}`);
+  const outFile = join(tmpdir(), `az_out_${id}.wav`);
+
+  try {
+    writeFileSync(inFile, inputBuffer);
+    execFileSync('ffmpeg', [
+      '-y',                          // overwrite output
+      '-i', inFile,                  // input
+      '-ar', '16000',                // resample to 16kHz
+      '-ac', '1',                    // mono
+      '-acodec', 'pcm_s16le',        // 16-bit signed PCM little-endian
+      '-f', 'wav',                   // WAV container
+      outFile,
+    ], { stdio: 'pipe', timeout: 15000 });
+    const wavBuffer = readFileSync(outFile);
+    return wavBuffer;
+  } catch (e) {
+    console.warn('ffmpeg conversion failed, sending original audio:', e.message);
+    return inputBuffer; // best-effort fallback
+  } finally {
+    try { unlinkSync(inFile);  } catch {}
+    try { unlinkSync(outFile); } catch {}
+  }
+}
+
 /** Returns true if Azure is configured */
 export function azureAvailable() {
   return Boolean(AZURE_KEY && AZURE_KEY !== 'your-azure-speech-key-here');
@@ -36,6 +78,15 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   // Docs: https://learn.microsoft.com/azure/ai-services/speech-service/rest-speech-to-text
   const endpoint = `https://${AZURE_REGION}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`;
 
+  // Convert audio to WAV PCM 16kHz mono — Azure REST API requires this format.
+  // Avoids 500 errors caused by WebM/OGG at browser sample rates (48kHz).
+  let audioToSend = audioBuffer;
+  let mimeToSend  = 'audio/wav';
+  if (!mimeType.includes('wav') || mimeType.includes('16000') === false) {
+    audioToSend = await toWavPcm16k(audioBuffer, mimeType);
+    mimeToSend  = 'audio/wav';
+  }
+
   // Pronunciation Assessment configuration (JSON, base64-encoded)
   const pronConfig = {
     ReferenceText: referenceText,
@@ -51,21 +102,15 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
     format: 'detailed',
   });
 
-  // Determine Content-Type for Azure
-  const contentType = mimeType.includes('wav') ? 'audio/wav; codecs=audio/pcm; samplerate=16000'
-    : mimeType.includes('webm') ? 'audio/webm; codecs=opus'
-    : mimeType.includes('ogg')  ? 'audio/ogg; codecs=opus'
-    : 'audio/wav';
-
   const response = await fetch(`${endpoint}?${params}`, {
     method: 'POST',
     headers: {
       'Ocp-Apim-Subscription-Key': AZURE_KEY,
-      'Content-Type': contentType,
+      'Content-Type': 'audio/wav',   // always WAV after conversion
       'Pronunciation-Assessment': pronConfigB64,
       'Accept': 'application/json',
     },
-    body: audioBuffer,
+    body: audioToSend,
   });
 
   if (!response.ok) {

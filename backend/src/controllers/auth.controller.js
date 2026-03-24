@@ -3,6 +3,7 @@ import jwt    from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import getDb  from '../db/database.js';
 import { sendVerificationEmail, sendWelcomeEmail, sendResendVerificationEmail, emailAvailable } from '../services/email.service.js';
+import { autoPromoteAdmins } from '../middleware/admin.middleware.js';
 
 function signToken(userId, email) {
   return jwt.sign({ userId, email }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });

@@ -77,6 +77,10 @@ services:
       - key: JWT_EXPIRES_IN
         value: 30d   # 30 days — users stay logged in across deploys
 
+      # Comma-separated emails auto-promoted to admin on login
+      - key: ADMIN_EMAILS
+        sync: false
+
       # ── CORS ──────────────────────────────────────────────────
       - key: CORS_ORIGINS
         value: https://properly-web.onrender.com
@@ -146,6 +150,28 @@ services:
       - path: /index.html
         name: Cache-Control
         value: no-cache, no-store, must-revalidate
+
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: properly-api
+          type: web
+          property: host
+
+  # ── ADMIN PANEL (separate static site) ──────────────────────
+  - type: web
+    name: properly-admin
+    runtime: static
+    region: oregon
+
+    rootDir: admin
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
     envVars:
       - key: VITE_API_URL

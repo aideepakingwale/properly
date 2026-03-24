@@ -132,6 +132,11 @@ async function initDb() {
 function migrate(db) {
   const userCols = db.prepare('PRAGMA table_info(users)').all().map(r => r.name);
 
+  if (!userCols.includes('is_admin')) {
+    db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
+    console.log('✅ Migration: users.is_admin added');
+  }
+
   if (!userCols.includes('email_verified')) {
     db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0");
     db.exec("ALTER TABLE users ADD COLUMN verify_token TEXT");

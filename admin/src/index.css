@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap');
+
+:root {
+  --bg:        #0A0A0B;
+  --surface:   #111113;
+  --border:    #1E1E22;
+  --border2:   #2A2A30;
+  --text:      #E8E8EC;
+  --muted:     #555560;
+  --accent:    #00E5A0;
+  --accent2:   #F5A623;
+  --danger:    #FF4444;
+  --blue:      #4A9EFF;
+  --purple:    #9B6DFF;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-ui:   'Syne', sans-serif;
+  --radius:    6px;
+  --radius-lg: 10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-ui); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* Utility */
+.mono { font-family: var(--font-mono); }
+.accent { color: var(--accent); }
+.muted { color: var(--muted); }
+.danger { color: var(--danger); }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 8px 12px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+tr:hover td { background: var(--surface); }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.badge-green  { background: rgba(0,229,160,0.12); color: var(--accent); border: 1px solid rgba(0,229,160,0.25); }
+.badge-amber  { background: rgba(245,166,35,0.12); color: var(--accent2); border: 1px solid rgba(245,166,35,0.25); }
+.badge-red    { background: rgba(255,68,68,0.12);  color: var(--danger); border: 1px solid rgba(255,68,68,0.25); }
+.badge-blue   { background: rgba(74,158,255,0.12); color: var(--blue); border: 1px solid rgba(74,158,255,0.25); }
+.badge-purple { background: rgba(155,109,255,0.12);color: var(--purple); border: 1px solid rgba(155,109,255,0.25); }
+.badge-gray   { background: rgba(255,255,255,0.05);color: var(--muted); border: 1px solid var(--border2); }
+
+/* Inputs */
+input, select, textarea {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-accent  { background: var(--accent);  color: #000; }
+.btn-ghost   { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+.btn-danger  { background: var(--danger);  color: #fff; }
+.btn-sm      { padding: 4px 10px; font-size: 11px; }

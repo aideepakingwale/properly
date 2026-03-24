@@ -16,6 +16,8 @@ import {
   getInterests, setInterests, recordStruggle, getStruggles, getGenerationStatus
 } from '../controllers/ai-story.controller.js';
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
+import { requireAdmin } from '../middleware/admin.middleware.js';
+import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig } from '../controllers/admin.controller.js';
 import { listChildren, addChild, updateChild as updateChildMgmt, deleteChild } from '../controllers/children.controller.js';
 import {
   getPlans, getSubscription, createCheckoutSession,
@@ -127,5 +129,20 @@ router.get('/health', (_req, res) => res.json({
   google:   Boolean(process.env.GOOGLE_CLIENT_ID),
   facebook: Boolean(process.env.FACEBOOK_APP_ID),
 }));
+
+// ── ADMIN ROUTES ──────────────────────────────────────────────
+router.get('/admin/dashboard',              authMiddleware, requireAdmin, getDashboard);
+router.get('/admin/users',                  authMiddleware, requireAdmin, listUsers);
+router.get('/admin/users/:userId',          authMiddleware, requireAdmin, getUser);
+router.patch('/admin/users/:userId',        authMiddleware, requireAdmin, updateUser);
+router.delete('/admin/users/:userId',       authMiddleware, requireAdmin, deleteUser);
+router.get('/admin/shop',                   authMiddleware, requireAdmin, listShopItems);
+router.post('/admin/shop',                  authMiddleware, requireAdmin, createShopItem);
+router.patch('/admin/shop/:itemId',         authMiddleware, requireAdmin, updateShopItem);
+router.delete('/admin/shop/:itemId',        authMiddleware, requireAdmin, deleteShopItem);
+router.get('/admin/stories',               authMiddleware, requireAdmin, listStories);
+router.get('/admin/stories/ai-stats',      authMiddleware, requireAdmin, getAiStoryStats);
+router.get('/admin/analytics',             authMiddleware, requireAdmin, getAnalytics);
+router.get('/admin/config',                authMiddleware, requireAdmin, getConfig);
 
 export default router;
