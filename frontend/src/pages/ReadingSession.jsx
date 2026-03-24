@@ -352,7 +352,7 @@ export default function ReadingSession() {
                   background: isSpeaking ? '#DBEAFE' : revealColors ? revealColors.bg : 'transparent',
                   padding: (isSpeaking || revealColors) ? '3px 10px' : '2px 4px',
                   borderRadius: 10,
-                  border: isSpeaking ? '2px solid #3B82F6' : revealColors ? \`1.5px solid \${revealColors.border}\` : 'none',
+                  border: isSpeaking ? '2px solid #3B82F6' : revealColors ? `1.5px solid ${revealColors.border}` : 'none',
                   boxShadow: isSpeaking ? '0 0 12px rgba(59,130,246,0.4)' : 'none',
                   transition: 'all 0.25s ease',
                   lineHeight: 1.5, display: 'inline-block',
