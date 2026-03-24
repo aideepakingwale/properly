@@ -32,8 +32,9 @@ import {
   getInterests, setInterests, recordStruggle, getStruggles, getGenerationStatus
 } from '../controllers/ai-story.controller.js';
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
+import getDb from '../db/database.js';
 import { requireAdmin } from '../middleware/admin.middleware.js';
-import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe, debugEnv } from '../controllers/admin.controller.js';
+import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe, debugEnv, getDebugMode, setDebugMode } from '../controllers/admin.controller.js';
 import { listChildren, addChild, updateChild as updateChildMgmt, deleteChild } from '../controllers/children.controller.js';
 import {
   getPlans, getSubscription, createCheckoutSession,
@@ -135,6 +136,15 @@ router.get('/subscription/verify',          authMiddleware, verifyCheckout);
 router.post('/webhooks/stripe',             stripeWebhook);
 
 // ── HEALTH ────────────────────────────────────────────────────
+// Public — frontend reads to show/hide debug panel (no auth needed)
+router.get('/debug-mode', (_req, res) => {
+  try {
+    const db = getDb();
+    const s  = db.prepare("SELECT value FROM app_settings WHERE key='debug_mode'").get();
+    res.json({ success: true, data: { enabled: s?.value === 'true' } });
+  } catch { res.json({ success: true, data: { enabled: false } }); }
+});
+
 router.get('/health', (_req, res) => res.json({
   status:   'ok',
   ts:       new Date().toISOString(),
@@ -168,5 +178,7 @@ router.post('/admin/test/groq',            authMiddleware, requireAdmin, testGro
 router.post('/admin/test/resend',          authMiddleware, requireAdmin, testResend);
 router.post('/admin/test/stripe',          authMiddleware, requireAdmin, testStripe);
 router.get('/admin/debug/env',             authMiddleware, requireAdmin, debugEnv);
+router.get('/admin/debug-mode',            authMiddleware, requireAdmin, getDebugMode);
+router.post('/admin/debug-mode',           authMiddleware, requireAdmin, setDebugMode);
 
 export default router;

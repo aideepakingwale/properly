@@ -52,7 +52,7 @@ export default function ReadingSession() {
   const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const isAiStory    = searchParams.get('ai') === '1';
   const aiChildId    = searchParams.get('childId');
-  const { child, refreshProgress, updateChildLocally } = useAuth();
+  const { child, user, refreshProgress, updateChildLocally } = useAuth();
   const nav                      = useNavigate();
   const { speak, stop }          = useMrsOwl();
 
@@ -72,6 +72,8 @@ export default function ReadingSession() {
   const [scoringMode, setScoringMode] = useState(null); // 'azure' | 'text-comparison' | 'no-transcript'
   const [loading, setLoading]    = useState(true);
   const [error, setError]        = useState('');
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugInfo, setDebugInfo] = useState(null);  // raw Azure data when debug on
   const [speakingWordIdx, setSpeakingWordIdx] = useState(-1);  // word lit up during TTS playback
   const [revealedCount, setRevealedCount]     = useState(0);   // scores revealed progressively after assessment
   const [providerInfo, setProviderInfo] = useState(null);
@@ -96,18 +98,24 @@ export default function ReadingSession() {
         const storyLoader = isAiStory && resolvedChildId
           ? aiStoryAPI.get(resolvedChildId, storyId)
           : storyAPI.get(storyId);
-        const [storyRes, statusRes] = await Promise.allSettled([storyLoader, speechAPI.status()]);
+        const [storyRes, statusRes, debugRes] = await Promise.allSettled([
+          storyLoader,
+          speechAPI.status(),
+          // Only fetch debug mode for admin users — never expose to regular parents/children
+          (user?.isAdmin
+            ? fetch('/api/debug-mode').then(r => r.json())
+            : Promise.resolve({ data: { enabled: false } })
+          ).catch(() => ({ data: { enabled: false } })),
+        ]);
+        if (debugRes.status === 'fulfilled') {
+          setDebugMode(user?.isAdmin && debugRes.value?.data?.enabled === true);
+        }
         if (storyRes.status === 'fulfilled' && storyRes.value.success) {
           const s = storyRes.value.data;
-          // Trust isAiGenerated from the server response (backend now always sets it)
           setStory({ ...s, isAiGenerated: s.isAiGenerated ?? isAiStory });
         } else {
-          // If AI story load failed, try static as last resort
-          if (isAiStory) {
-            setError('AI story not found — it may have been deleted.');
-          } else {
-            setError('Story not found');
-          }
+          if (isAiStory) { setError('AI story not found — it may have been deleted.'); }
+          else           { setError('Story not found'); }
         }
         if (statusRes.status === 'fulfilled' && statusRes.value.success) setProviderInfo(statusRes.value.data);
       } catch { setError('Could not load story. Is the server running?'); }
@@ -124,7 +132,7 @@ export default function ReadingSession() {
   }, [story, child]);
 
   // Reset on page change
-  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); }, [pageIdx]);
+  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); }, [pageIdx]);
 
   const page = story?.pages?.[pageIdx];
 
@@ -140,7 +148,10 @@ export default function ReadingSession() {
       if (!assessRes.success) return;
 
       const { wordScores, overallAccuracy, overallFluency, overallCompleteness,
-              overallProsody, displayText, source, azureAssessed } = assessRes.data;
+              overallProsody, displayText, source, azureAssessed, _debugInfo } = assessRes.data;
+
+      // Store raw Azure debug data if debug mode is on
+      if (debugMode && user?.isAdmin && _debugInfo) setDebugInfo(_debugInfo);
 
       setRevealedCount(0);
       setWordScores(wordScores);
@@ -480,6 +491,63 @@ export default function ReadingSession() {
         {micError && <p style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13, textAlign: 'center', background: '#FEF2F2', borderRadius: 10, padding: '8px 14px', marginBottom: 8, width: '100%' }}>⚠️ {micError}</p>}
 
         {/* Hear sentence */}
+        {/* ── DEBUG PANEL — only shown when admin has enabled debug mode ── */}
+        {debugMode && user?.isAdmin && (
+          <div style={{ width:'100%', marginBottom:12 }}>
+            <details style={{ background:'rgba(245,158,11,0.08)', border:'1.5px solid rgba(245,158,11,0.3)', borderRadius:12, padding:'10px 14px' }}>
+              <summary style={{ cursor:'pointer', fontSize:12, fontWeight:700, color:'#F59E0B', userSelect:'none' }}>
+                🐛 Debug — Azure Pronunciation Assessment {debugInfo ? '(data received)' : '(waiting for assessment…)'}
+              </summary>
+              {debugInfo ? (
+                <div style={{ marginTop:10, fontSize:11, fontFamily:'monospace' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div style={{ background:'rgba(0,0,0,0.2)', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ color:'#86EFAC', fontWeight:700, marginBottom:4 }}>REQUEST</div>
+                      <div style={{ color:'rgba(255,255,255,0.7)', lineHeight:1.8 }}>
+                        <div>Audio: {debugInfo.audioSizeKb} KB ({debugInfo.audioMime})</div>
+                        <div>Reference: "{debugInfo.referenceText}"</div>
+                        <div>Endpoint: {debugInfo.endpoint?.split('?')[0]}</div>
+                        <div>Time: {debugInfo.requestedAt}</div>
+                        <div style={{ marginTop:6, color:'#93C5FD' }}>Pronunciation Config:</div>
+                        <pre style={{ margin:0, color:'#93C5FD', whiteSpace:'pre-wrap', wordBreak:'break-all' }}>
+                          {JSON.stringify(debugInfo.pronConfig, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                    <div style={{ background:'rgba(0,0,0,0.2)', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ color:'#86EFAC', fontWeight:700, marginBottom:4 }}>RESPONSE — NBest[0]</div>
+                      <div style={{ color:'rgba(255,255,255,0.7)', lineHeight:1.8 }}>
+                        {debugInfo.azureRawResponse?.NBest?.[0] ? (
+                          <>
+                            <div>RecognizedText: "{debugInfo.azureRawResponse.NBest[0].Display}"</div>
+                            <div>Accuracy: {debugInfo.azureRawResponse.NBest[0].PronunciationAssessment?.AccuracyScore}%</div>
+                            <div>Fluency: {debugInfo.azureRawResponse.NBest[0].PronunciationAssessment?.FluencyScore}%</div>
+                            <div style={{ marginTop:6, color:'#FCA5A5' }}>Raw Words ({debugInfo.azureRawResponse.NBest[0].Words?.length}):</div>
+                            <div style={{ maxHeight:180, overflow:'auto' }}>
+                              {debugInfo.azureRawResponse.NBest[0].Words?.map((w, i) => (
+                                <div key={i} style={{ color: w.PronunciationAssessment?.ErrorType === 'Insertion' ? '#9CA3AF' : w.PronunciationAssessment?.AccuracyScore < 60 ? '#FCA5A5' : '#86EFAC', marginBottom:2 }}>
+                                  [{w.PronunciationAssessment?.ErrorType || 'None'}] "{w.Word}" → {Math.round(w.PronunciationAssessment?.AccuracyScore ?? 0)}%
+                                  {w.PronunciationAssessment?.ErrorType === 'Insertion' ? ' (extra — filtered)' : ''}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <pre style={{ margin:0, color:'#FCA5A5', whiteSpace:'pre-wrap', wordBreak:'break-all', maxHeight:200, overflow:'auto' }}>
+                            {JSON.stringify(debugInfo.azureRawResponse, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop:8, color:'rgba(255,255,255,0.4)', fontSize:11 }}>Record your voice to see Azure API data here.</div>
+              )}
+            </details>
+          </div>
+        )}
+
         {wordScores.length === 0 && !isRecording && (
           <button onClick={() => {
               const pageWords = page.text.split(' ');

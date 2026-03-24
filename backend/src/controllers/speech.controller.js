@@ -45,6 +45,14 @@ export const assessSpeech = async (req, res) => {
     return res.status(400).json({ success: false, message: 'referenceText is required' });
   }
 
+  // Check if debug mode is enabled in app settings
+  let debugMode = false;
+  try {
+    const db = getDb();
+    const setting = db.prepare("SELECT value FROM app_settings WHERE key='debug_mode'").get();
+    debugMode = setting?.value === 'true';
+  } catch {}
+
   // ── AZURE PRONUNCIATION ASSESSMENT ───────────────────────────
   if (azureAvailable() && req.file) {
     try {
@@ -54,12 +62,20 @@ export const assessSpeech = async (req, res) => {
         req.file.mimetype || 'audio/wav'
       );
 
+      // Extract debug info before stripping private fields
+      const debugInfo = debugMode ? result._debug : undefined;
+
+      // Strip internal fields before sending to client
+      const { _debug, _azureRaw, ...publicResult } = result;
+
       return res.json({
         success: true,
         data: {
-          ...result,
+          ...publicResult,
           source: 'azure',
           azureAssessed: true,
+          // Only include raw debug data when debug mode is on
+          ...(debugInfo && { _debugInfo: debugInfo }),
         },
       });
     } catch (err) {

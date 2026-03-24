@@ -106,11 +106,12 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
     format: 'detailed',
   });
 
+  const requestedAt = new Date().toISOString();
   const response = await fetch(`${endpoint}?${params}`, {
     method: 'POST',
     headers: {
       'Ocp-Apim-Subscription-Key': AZURE_KEY,
-      'Content-Type': 'audio/wav',   // always WAV after conversion
+      'Content-Type': 'audio/wav',
       'Pronunciation-Assessment': pronConfigB64,
       'Accept': 'application/json',
     },
@@ -123,51 +124,87 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   }
 
   const result = await response.json();
-  return parseAzureResult(result, referenceText);
+  const parsed = parseAzureResult(result, referenceText);
+
+  // Attach debug info (stripped before sending to client unless debug mode on)
+  parsed._debug = {
+    requestedAt,
+    endpoint:      `${endpoint}?${params}`,
+    audioSizeKb:   (audioToSend.length / 1024).toFixed(1),
+    audioMime:     mimeToSend,
+    referenceText,
+    pronConfig,
+    azureRawResponse: result,
+  };
+
+  return parsed;
 }
 
 /**
  * Parse Azure Detailed Pronunciation Assessment response
- * into a standardised word-score format
+ * into a standardised word-score format.
+ *
+ * KEY FIX: With EnableMiscue=true, Azure's Words array already aligns to
+ * the reference text words. Insertion words (extra words the child said that
+ * aren't in the reference) must be filtered BEFORE index-based alignment —
+ * otherwise they consume array slots and shift all subsequent words out of
+ * alignment (e.g. "Devansh" split into "D","De","Dev" shifts "saves","the","town").
+ *
+ * Alignment strategy:
+ *   1. Strip Insertion words from Azure's array
+ *   2. Remaining words align 1:1 with reference words in order
+ *   3. Any reference word not covered → score 0 (Omission)
  */
 function parseAzureResult(result, referenceText) {
   const nBest = result?.NBest?.[0];
   if (!nBest) {
-    // Fallback: Azure returned no result (silence, noise)
     return buildFallback(referenceText, 0);
   }
 
-  const pa = nBest.PronunciationAssessment || {};
-  const words = nBest.Words || [];
+  const pa    = nBest.PronunciationAssessment || {};
+  const allWords = nBest.Words || [];
 
-  // Map Azure words → our format
-  const wordScores = words.map(w => ({
-    word:       w.Word,
-    score:      Math.round(w.PronunciationAssessment?.AccuracyScore ?? 0),
-    fluency:    Math.round(w.PronunciationAssessment?.FluencyScore ?? 0),
+  // Step 1: Separate inserted words (not in reference) from reference-aligned words
+  // Insertion = child said an extra word; all others map to reference text words
+  const refAligned  = allWords.filter(w =>
+    (w.PronunciationAssessment?.ErrorType || 'None') !== 'Insertion'
+  );
+
+  // Step 2: Map reference-aligned Azure words → our format
+  const azureByRef = refAligned.map(w => ({
+    word:         w.Word,
+    score:        Math.round(w.PronunciationAssessment?.AccuracyScore ?? 0),
+    fluency:      Math.round(w.PronunciationAssessment?.FluencyScore ?? 0),
     completeness: Math.round(w.PronunciationAssessment?.CompletenessScore ?? 100),
-    errorType:  w.PronunciationAssessment?.ErrorType || 'None',  // None | Omission | Insertion | Mispronunciation
+    errorType:    w.PronunciationAssessment?.ErrorType || 'None',
     phonemes: (w.Phonemes || []).map(p => ({
       phoneme: p.Phoneme,
       score:   Math.round(p.PronunciationAssessment?.AccuracyScore ?? 0),
     })),
   }));
 
-  // Fill in any target words not returned by Azure (omissions)
-  const targetWords = referenceText.trim().split(/\s+/);
-  const paddedScores = targetWords.map((tw, i) => {
-    const match = wordScores[i];
-    if (match) return match;
+  // Step 3: Align to reference words 1:1 (now safe because Insertions are removed)
+  const targetWords  = referenceText.trim().split(/\s+/);
+  const wordScores   = targetWords.map((tw, i) => {
+    const az = azureByRef[i];
+    if (az) {
+      // Use reference word text (not Azure's recognised text) so UI always shows
+      // the correct word — Azure may recognise "Devansh" as "Devansh" or similar
+      return { ...az, word: tw };
+    }
+    // Word not returned by Azure at all — child omitted it
     return { word: tw, score: 0, errorType: 'Omission', phonemes: [] };
   });
 
   return {
-    wordScores:           paddedScores,
-    overallAccuracy:      Math.round(pa.AccuracyScore    ?? 0),
-    overallFluency:       Math.round(pa.FluencyScore     ?? 0),
-    overallCompleteness:  Math.round(pa.CompletenessScore?? 0),
-    overallProsody:       Math.round(pa.ProsodyScore     ?? 0),
-    displayText:          nBest.Display || '',
+    wordScores,
+    overallAccuracy:     Math.round(pa.AccuracyScore     ?? 0),
+    overallFluency:      Math.round(pa.FluencyScore      ?? 0),
+    overallCompleteness: Math.round(pa.CompletenessScore ?? 0),
+    overallProsody:      Math.round(pa.ProsodyScore      ?? 0),
+    displayText:         nBest.Display || '',
+    // Raw Azure data passed through for debug mode
+    _azureRaw: { nBest: nBest, allWords, refAligned },
   };
 }
 

@@ -417,6 +417,36 @@ export const getConfig = (_req, res) => {
   }});
 };
 
+// ── DEBUG MODE CONTROL ────────────────────────────────────────
+
+/**
+ * GET /api/admin/debug-mode
+ * Returns current debug mode state.
+ */
+export const getDebugMode = (_req, res) => {
+  const db = getDb();
+  const setting = db.prepare("SELECT value FROM app_settings WHERE key='debug_mode'").get();
+  const enabled = setting?.value === 'true';
+  res.json({ success: true, data: { enabled } });
+};
+
+/**
+ * POST /api/admin/debug-mode
+ * Body: { enabled: true|false }
+ * Toggles debug mode — when on, Azure raw request/response shown in UI.
+ */
+export const setDebugMode = (req, res) => {
+  const db      = getDb();
+  const enabled = Boolean(req.body.enabled);
+  db.prepare(`
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES ('debug_mode', ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP
+  `).run(enabled ? 'true' : 'false');
+  console.log(`🐛 Debug mode ${enabled ? 'ENABLED' : 'DISABLED'} by admin`);
+  res.json({ success: true, data: { enabled } });
+};
+
 // ── API KEY TEST ENDPOINTS ─────────────────────────────────────
 
 export const testAzure = async (_req, res) => {

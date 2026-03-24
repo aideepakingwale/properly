@@ -102,7 +102,10 @@ export default function Config() {
   const [r2Loading, setR2Loading] = useState(true);
   const [backing,   setBacking]   = useState(false);
   const [debugData, setDebugData] = useState(null);
-  const [debugging, setDebugging] = useState(false);
+  const [debugging,   setDebugging]   = useState(false);
+  const [debugMode,   setDebugMode]   = useState(false);
+  const [debugSaving, setDebugSaving] = useState(false);
+  const [debugMsg,    setDebugMsg]    = useState('');
   const [backupMsg, setBackupMsg] = useState('');
   const [loading,   setLoading]   = useState(true);
   const [testing,   setTesting]   = useState(null);
@@ -110,6 +113,7 @@ export default function Config() {
 
   useEffect(() => {
     adminAPI.config().then(r => { if (r.success) setCfg(r.data); }).finally(() => setLoading(false));
+    adminAPI.getDebugMode().then(r => { if (r.success) setDebugMode(r.data.enabled); }).catch(() => {});
     adminAPI.r2Status().then(r => setR2(r.data)).catch(() => setR2({ error:'Could not reach backend' })).finally(() => setR2Loading(false));
   }, []);
 
@@ -123,6 +127,17 @@ export default function Config() {
     } catch (e) {
       setResults(prev => ({ ...prev, [service]: { success:false, error: e.message || 'Request failed' } }));
     } finally { setTesting(null); }
+  };
+
+  const toggleDebugMode = async (enabled) => {
+    setDebugSaving(true); setDebugMsg('');
+    try {
+      await adminAPI.setDebugMode(enabled);
+      setDebugMode(enabled);
+      setDebugMsg(enabled ? 'Debug mode ON — Azure raw data shown in reading sessions' : 'Debug mode OFF');
+      setTimeout(() => setDebugMsg(''), 3000);
+    } catch (e) { setDebugMsg('Failed: ' + e.message); }
+    finally { setDebugSaving(false); }
   };
 
   const runDebug = async () => {
@@ -155,6 +170,39 @@ export default function Config() {
           Live config status. Click Test to verify each key is working correctly.
         </div>
       </div>
+
+      {/* Debug Mode */}
+      <section style={{ marginBottom:24 }}>
+        <SectionTitle icon="\u25C6">Debug Mode</SectionTitle>
+        <div style={{ background:'var(--surface)', border:`1px solid ${debugMode?'rgba(245,166,35,0.4)':'var(--border)'}`, borderRadius:8, padding:20 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', marginBottom:4 }}>
+                Azure Pronunciation Assessment Debug
+              </div>
+              <div style={{ fontSize:11, color:'var(--muted)', lineHeight:1.7 }}>
+                When ON: Azure raw API request and response shown in a collapsible panel during reading sessions.<br/>
+                Includes audio size, reference text, pronunciation config, and full JSON response.<br/>
+                <strong style={{ color:'var(--accent2)' }}>Turn OFF in production — for development only.</strong>
+              </div>
+            </div>
+            <div style={{ flexShrink:0, marginLeft:24, textAlign:'center' }}>
+              <button
+                onClick={() => toggleDebugMode(!debugMode)}
+                disabled={debugSaving}
+                style={{ padding:'10px 24px', borderRadius:6, border:'none', fontFamily:'var(--font-mono)', fontWeight:700, fontSize:13, cursor:'pointer',
+                  background: debugMode ? 'var(--accent2)' : 'var(--border2)',
+                  color: debugMode ? '#000' : 'var(--muted)',
+                  minWidth:100,
+                }}>
+                {debugSaving ? 'Saving...' : debugMode ? 'ON' : 'OFF'}
+              </button>
+              <div style={{ fontSize:10, color:'var(--muted)', marginTop:4 }}>Click to toggle</div>
+            </div>
+          </div>
+          {debugMsg && <div style={{ marginTop:12, fontSize:12, fontWeight:600, color: debugMsg.includes('Failed')?'var(--danger)':'var(--accent)' }}>{debugMsg}</div>}
+        </div>
+      </section>
 
       {/* R2 */}
       <section style={{ marginBottom:24 }}>

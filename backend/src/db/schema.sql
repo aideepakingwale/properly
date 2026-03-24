@@ -315,3 +315,10 @@ CREATE TABLE IF NOT EXISTS ai_story_batches (
 CREATE INDEX IF NOT EXISTS idx_ai_stories_child_status ON ai_stories(child_id, status);
 CREATE INDEX IF NOT EXISTS idx_ai_stories_batch        ON ai_stories(batch_id);
 CREATE INDEX IF NOT EXISTS idx_ai_sessions_child       ON ai_story_sessions(child_id, ai_story_id);
+
+-- App settings — key/value store for runtime configuration flags
+CREATE TABLE IF NOT EXISTS app_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

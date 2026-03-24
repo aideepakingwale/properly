@@ -246,6 +246,13 @@ function migrate(db) {
     accuracy REAL, acorns_earned INTEGER DEFAULT 0
   )`);
 
+  // App settings table (debug flags, feature toggles)
+  db.exec(`CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS ai_story_batches (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
