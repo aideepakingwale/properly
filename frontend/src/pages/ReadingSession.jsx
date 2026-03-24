@@ -505,8 +505,16 @@ export default function ReadingSession() {
                       <div style={{ color:'#86EFAC', fontWeight:700, marginBottom:4 }}>REQUEST</div>
                       <div style={{ color:'rgba(255,255,255,0.7)', lineHeight:1.8 }}>
                         <div>Audio: {debugInfo.audioSizeKb} KB ({debugInfo.audioMime})</div>
-                        <div>Reference: "{debugInfo.referenceText}"</div>
-                        <div>Endpoint: {debugInfo.endpoint?.split('?')[0]}</div>
+                        <div>Original ref: "{debugInfo.originalRefText}"</div>
+                        {debugInfo.sanitisedRefText !== debugInfo.originalRefText && (
+                          <div style={{ color:'#FCD34D' }}>Sent to Azure: "{debugInfo.sanitisedRefText}"</div>
+                        )}
+                        {debugInfo.properNounsReplaced?.length > 0 && (
+                          <div style={{ color:'#FCD34D' }}>
+                            Proper nouns replaced: {debugInfo.properNounsReplaced.join(', ')} → "yes" (scored at 85)
+                          </div>
+                        )}
+                        <div>Region: {debugInfo.endpoint?.split('.')[0]?.replace('https://', '')}</div>
                         <div>Time: {debugInfo.requestedAt}</div>
                         <div style={{ marginTop:6, color:'#93C5FD' }}>Pronunciation Config:</div>
                         <pre style={{ margin:0, color:'#93C5FD', whiteSpace:'pre-wrap', wordBreak:'break-all' }}>

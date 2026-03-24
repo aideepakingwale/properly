@@ -15,6 +15,7 @@
  */
 
 import multer from 'multer';
+import getDb from '../db/database.js';
 import { assessPronunciation, azureAvailable, getAzureSasToken } from '../services/azure-speech.service.js';
 
 // Multer: store audio in memory (max 10MB — a reading sentence is tiny)
@@ -22,7 +23,9 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['audio/wav', 'audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/x-m4a'];
+    // Accept both bare and codec-qualified MIME types (browsers vary)
+    const allowed = ['audio/wav', 'audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/x-m4a',
+                      'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm;codecs=pcm'];
     cb(null, allowed.includes(file.mimetype) || file.originalname.match(/\.(wav|webm|ogg|mp3|m4a)$/i));
   },
 });
