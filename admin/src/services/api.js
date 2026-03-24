@@ -46,6 +46,13 @@ export const adminAPI = {
   config:     ()             => api.get('/admin/config'),
   r2Status:   ()             => api.get('/admin/r2-status'),
   triggerBackup: ()          => api.post('/admin/r2-backup'),
+  test: {
+    azure:  () => api.post('/admin/test/azure'),
+    gemini: () => api.post('/admin/test/gemini'),
+    groq:   () => api.post('/admin/test/groq'),
+    resend: () => api.post('/admin/test/resend'),
+    stripe: () => api.post('/admin/test/stripe'),
+  },
 };
 
 export default api;

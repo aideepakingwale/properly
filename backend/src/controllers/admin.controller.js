@@ -379,3 +379,148 @@ export const getConfig = (_req, res) => {
     jwtExpiry: process.env.JWT_EXPIRES_IN || '30d',
   }});
 };
+
+// ── API KEY TEST ENDPOINTS ─────────────────────────────────────
+
+export const testAzure = async (_req, res) => {
+  const key    = process.env.AZURE_SPEECH_KEY;
+  const region = process.env.AZURE_SPEECH_REGION || 'uksouth';
+  if (!key) return res.json({ success: false, service: 'azure', error: 'AZURE_SPEECH_KEY not set' });
+
+  const results = {};
+
+  // Test 1: TTS — synthesise a short phrase
+  try {
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB"><voice name="en-GB-SoniaNeural"><prosody rate="0.9">Test</prosody></voice></speak>`;
+    const ttsRes = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': key,
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+      },
+      body: ssml,
+    });
+    results.tts = ttsRes.ok
+      ? { ok: true, note: `Neural TTS working (${region}) — ${ttsRes.headers.get('content-length') || '?'} bytes returned` }
+      : { ok: false, note: `TTS HTTP ${ttsRes.status}: ${await ttsRes.text()}` };
+  } catch (e) {
+    results.tts = { ok: false, note: e.message };
+  }
+
+  // Test 2: STT token (quick auth check)
+  try {
+    const tokenRes = await fetch(`https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, {
+      method: 'POST',
+      headers: { 'Ocp-Apim-Subscription-Key': key },
+    });
+    results.stt = tokenRes.ok
+      ? { ok: true, note: 'Speech-to-Text auth token issued successfully' }
+      : { ok: false, note: `STT token HTTP ${tokenRes.status}: ${await tokenRes.text()}` };
+  } catch (e) {
+    results.stt = { ok: false, note: e.message };
+  }
+
+  const allOk = Object.values(results).every(r => r.ok);
+  res.json({ success: allOk, service: 'azure', region, results });
+};
+
+export const testGemini = async (_req, res) => {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || key === 'your-gemini-api-key-here')
+    return res.json({ success: false, service: 'gemini', error: 'GEMINI_API_KEY not set' });
+
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'Say "Properly API test OK" and nothing else.' }] }] }),
+      }
+    );
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      return res.json({ success: false, service: 'gemini', error: `HTTP ${r.status}: ${err?.error?.message || r.statusText}` });
+    }
+    const data   = await r.json();
+    const reply  = data?.candidates?.[0]?.content?.parts?.[0]?.text || '(no text)';
+    const tokens = data?.usageMetadata;
+    res.json({ success: true, service: 'gemini', reply: reply.trim(),
+      note: `Model: gemini-1.5-flash · Tokens: ${tokens?.totalTokenCount ?? '?'}` });
+  } catch (e) {
+    res.json({ success: false, service: 'gemini', error: e.message });
+  }
+};
+
+export const testGroq = async (_req, res) => {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return res.json({ success: false, service: 'groq', error: 'GROQ_API_KEY not set' });
+
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 20,
+        messages: [{ role: 'user', content: 'Say "Properly API test OK" and nothing else.' }],
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      return res.json({ success: false, service: 'groq', error: `HTTP ${r.status}: ${err?.error?.message || r.statusText}` });
+    }
+    const data  = await r.json();
+    const reply = data?.choices?.[0]?.message?.content || '(no text)';
+    const usage = data?.usage;
+    res.json({ success: true, service: 'groq', reply: reply.trim(),
+      note: `Model: llama-3.1-8b-instant · Tokens: ${usage?.total_tokens ?? '?'}` });
+  } catch (e) {
+    res.json({ success: false, service: 'groq', error: e.message });
+  }
+};
+
+export const testResend = async (_req, res) => {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return res.json({ success: false, service: 'resend', error: 'RESEND_API_KEY not set' });
+
+  try {
+    // Just hit the /domains endpoint — read-only, no email sent
+    const r = await fetch('https://api.resend.com/domains', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      return res.json({ success: false, service: 'resend', error: `HTTP ${r.status}: ${err?.message || r.statusText}` });
+    }
+    const data    = await r.json();
+    const domains = data?.data?.map(d => `${d.name} (${d.status})`) || [];
+    res.json({ success: true, service: 'resend',
+      note: domains.length ? `Verified domains: ${domains.join(', ')}` : 'Key valid — no verified domains yet (add one at resend.com)' });
+  } catch (e) {
+    res.json({ success: false, service: 'resend', error: e.message });
+  }
+};
+
+export const testStripe = async (_req, res) => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return res.json({ success: false, service: 'stripe', error: 'STRIPE_SECRET_KEY not set' });
+
+  try {
+    const r = await fetch('https://api.stripe.com/v1/balance', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      return res.json({ success: false, service: 'stripe', error: `HTTP ${r.status}: ${err?.error?.message || r.statusText}` });
+    }
+    const data    = await r.json();
+    const mode    = key.startsWith('sk_live') ? '🔴 LIVE' : '🟡 TEST';
+    const balance = data.available?.[0];
+    res.json({ success: true, service: 'stripe', mode,
+      note: `${mode} mode · Available balance: ${balance ? (balance.amount / 100).toFixed(2) + ' ' + balance.currency.toUpperCase() : 'N/A'}` });
+  } catch (e) {
+    res.json({ success: false, service: 'stripe', error: e.message });
+  }
+};
