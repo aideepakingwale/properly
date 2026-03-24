@@ -1,3 +1,19 @@
+/**
+ * @file        auth.controller.js
+ * @description Authentication controller — register, login, email verification, session management
+ * @module      Auth
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Registration creates user only — children added separately via /children endpoints
+ *   - auto-promote runs BEFORE verification check so ADMIN_EMAILS bypass unverified gate
+ *   - backupNow() called post-registration to persist to R2 immediately
+ */
+
 import bcrypt from 'bcryptjs';
 import jwt    from 'jsonwebtoken';
 import { randomBytes } from 'crypto';

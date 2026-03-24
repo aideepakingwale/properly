@@ -1,3 +1,17 @@
+/**
+ * @file        useSpeech.js
+ * @description Web Speech API hook — captures browser speech recognition transcript alongside audio recording
+ * @module      Hooks
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Transcript used as fallback scoring input when Azure STT is unavailable
+ */
+
 import { useRef, useEffect, useCallback } from 'react';
 export function useSpeech() {
   const synth  = useRef(typeof window!=='undefined'?window.speechSynthesis:null);

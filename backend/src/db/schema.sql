@@ -1,3 +1,14 @@
+-- =============================================================
+-- @file        schema.sql
+-- @description SQLite schema — 20 tables covering users, children, stories, AI stories, sessions, shop and achievements
+-- @project     Properly — AI Phonics Tutor
+-- @authors     Deepak Ingwale, Mahima Verma
+-- @copyright   2026 Properly. All rights reserved.
+-- -------------------------------------------------------------
+--   All FK relationships use ON DELETE CASCADE so child data is cleaned up with parent rows
+--   CREATE TABLE IF NOT EXISTS makes schema idempotent — safe to re-run on every startup
+-- =============================================================
+
 -- Properly AI Phonics Tutor — SQLite Schema
 -- Run: node src/db/migrate.js
 

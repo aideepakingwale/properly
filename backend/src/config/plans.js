@@ -1,10 +1,16 @@
 /**
- * Properly — Subscription Plan Definitions
+ * @file        plans.js
+ * @description Subscription plan definitions — feature flags and limits per tier
+ * @module      Config
  *
- * Single source of truth. Imported by:
- *   - subscription.controller.js  (enforcement)
- *   - routes/index.js              (limit middleware)
- *   - pricing page data endpoint
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Plans: free (Seedling), sprout, forest
+ *   - getLimit() resolves plan-specific limits at runtime
  */
 
 export const PLANS = {

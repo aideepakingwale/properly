@@ -1,3 +1,14 @@
+/**
+ * @file        Footer.jsx
+ * @description Site footer component — links to Privacy Policy, Terms of Service and company info
+ * @module      Components
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const APP_VERSION = '2.0.0';

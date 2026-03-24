@@ -1,3 +1,14 @@
+/**
+ * @file        Pricing.jsx
+ * @description Subscription pricing page — plan comparison and Stripe Checkout integration
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

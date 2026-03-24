@@ -1,3 +1,18 @@
+/**
+ * @file        shop.controller.js
+ * @description Gift shop controller — list items, purchase with acorns, owned items per child
+ * @module      Shop
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Purchase deducts acorns atomically and inserts into owned_items
+ *   - Items cannot be purchased twice (UNIQUE constraint on child_id + item_id)
+ */
+
 import getDb from '../db/database.js';
 
 export const getShopItems = (req, res) => {

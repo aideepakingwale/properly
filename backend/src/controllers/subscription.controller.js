@@ -1,12 +1,16 @@
 /**
- * Subscription Controller
- * Handles Stripe Checkout, webhooks, customer portal, and plan status
+ * @file        subscription.controller.js
+ * @description Stripe subscription controller — checkout, webhook handler, portal session
+ * @module      Subscriptions
  *
- * Stripe setup:
- *   1. Create account at stripe.com
- *   2. Get test keys from dashboard.stripe.com/test/apikeys
- *   3. Create products + prices in Stripe dashboard
- *   4. Set STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_SPROUT_MONTHLY, STRIPE_PRICE_FOREST_MONTHLY
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Webhook signature verified with STRIPE_WEBHOOK_SECRET before processing
+ *   - Handles: checkout.session.completed, invoice.paid, customer.subscription.deleted
  */
 
 import getDb   from '../db/database.js';

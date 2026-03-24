@@ -1,3 +1,17 @@
+/**
+ * @file        AuthContext.jsx
+ * @description Admin authentication context — login, logout and session restore with isAdmin check
+ * @module      Admin Auth
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Rejects login if user exists but isAdmin is false — shows specific error message
+ */
+
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 

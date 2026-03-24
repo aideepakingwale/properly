@@ -1,3 +1,18 @@
+/**
+ * @file        pages.jsx
+ * @description Parent-facing dashboard pages — Shop and ParentDash with multi-child selector, progress stats, and KidsManager
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - ParentDash viewingId allows switching which child's stats are displayed without changing the active reader
+ *   - Recent session history shows both curriculum (📚) and AI (✨) story sessions
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 // ── SHOP PAGE ─────────────────────────────────────────────────
 import { useNavigate } from 'react-router-dom';

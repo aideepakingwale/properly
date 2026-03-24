@@ -1,7 +1,18 @@
 /**
- * SetupChild — shown after registration or when user has no children
- * Parent adds their first child here before accessing the app.
+ * @file        SetupChild.jsx
+ * @description First-run child profile wizard — shown after registration when parent has no children yet
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Avatar picker, age, pronouns and phonics phase selector with descriptions
+ *   - On save: calls addChildToState() then navigates to /home
  */
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

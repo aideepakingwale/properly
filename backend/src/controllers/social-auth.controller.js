@@ -1,6 +1,12 @@
 /**
- * Social Auth Controller
- * Handles OAuth callbacks and redirects with JWT token to frontend
+ * @file        social-auth.controller.js
+ * @description OAuth social login controller — Google and Facebook via Passport.js
+ * @module      Auth
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  */
 
 import jwt from 'jsonwebtoken';

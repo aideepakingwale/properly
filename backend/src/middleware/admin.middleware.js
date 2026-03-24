@@ -1,11 +1,19 @@
 /**
- * Admin middleware — verifies authenticated user is an admin.
- * Must be used AFTER authMiddleware.
+ * @file        admin.middleware.js
+ * @description Admin access guard middleware and auto-promotion helper
+ * @module      Middleware
  *
- * To make yourself an admin:
- *   sqlite3 data/properly.db "UPDATE users SET is_admin=1 WHERE email='your@email.com';"
- *   Or set ADMIN_EMAILS env var (comma-separated) to auto-promote on next login.
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - requireAdmin checks users.is_admin=1 in DB
+ *   - autoPromoteAdmins promotes emails listed in ADMIN_EMAILS env var on each login
+ *   - Admin users bypass email verification gate
  */
+
 import getDb from '../db/database.js';
 
 export function requireAdmin(req, res, next) {

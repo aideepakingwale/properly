@@ -1,11 +1,18 @@
 /**
- * API client — Axios with JWT interceptors
+ * @file        api.js
+ * @description Axios HTTP client — base config, JWT interceptor, and typed API namespaces for every backend resource
+ * @module      API Client
  *
- * BASE URL logic:
- *   Local dev  : Vite dev-server proxies /api → localhost:3001  (no env needed)
- *   Render prod: VITE_API_URL is injected at build time, e.g.
- *                https://properly-api.onrender.com/api
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - 401 interceptor only triggers auth:logout for /auth/me and /auth/login — not for resource-level 401s
+ *   - All responses are unwrapped to r.data by the success interceptor
  */
+
 import axios from 'axios';
 
 // __API_URL__ is replaced at build time by Vite define (see vite.config.js)

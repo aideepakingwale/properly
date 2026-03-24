@@ -1,11 +1,17 @@
 /**
- * Progress Controller
+ * @file        progress.controller.js
+ * @description Reading progress controller — session lifecycle (start/page/complete) and progress retrieval for both static and AI stories
+ * @module      Progress
  *
- * Handles reading sessions for BOTH static curriculum stories and AI-generated
- * stories. story_type = 'static' | 'ai' differentiates them in all tables.
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  *
- * Multi-child: all routes use req.child (set by requireChild middleware)
- * which verifies the child belongs to the authenticated parent.
+ * @remarks
+ *   - storyType param ("static"|"ai") routes DB writes to correct table
+ *   - completeSession awards acorns at 90%=full, 70%=75%, 50%=50%, <50%=0
+ *   - checkAndAwardAchievements fires on every session completion
  */
 
 import getDb from '../db/database.js';

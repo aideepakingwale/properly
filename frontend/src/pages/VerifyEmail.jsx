@@ -1,3 +1,14 @@
+/**
+ * @file        VerifyEmail.jsx
+ * @description Email verification page — handles verify token from email link and logs user in
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '../services/api';

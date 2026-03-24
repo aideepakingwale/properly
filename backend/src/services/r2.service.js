@@ -1,24 +1,17 @@
 /**
- * Cloudflare R2 Service
+ * @file        r2.service.js
+ * @description Cloudflare R2 object storage service — database backup/restore and general-purpose put/get/delete/url helpers
+ * @module      R2 Storage
  *
- * R2 is S3-compatible object storage with:
- *   - 10 GB free storage forever
- *   - Zero egress fees (unlike S3)
- *   - Global CDN via Cloudflare Workers / public bucket URL
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  *
- * Used for three things in Properly:
- *   1. SQLite database backup/restore  — persists DB across deploys (free)
- *
- * Setup (5 minutes):
- *   1. dash.cloudflare.com → R2 → Create bucket → name it "properly"
- *   2. R2 → Manage R2 API tokens → Create token (Object Read & Write)
- *   3. Copy: Account ID, Access Key ID, Secret Access Key
- *   4. Add to Render env vars:
- *        R2_ACCOUNT_ID      = abc123...
- *        R2_ACCESS_KEY_ID   = abc123...
- *        R2_SECRET_KEY      = abc123...
- *        R2_BUCKET          = properly
- *        R2_PUBLIC_URL      = https://pub-xxxx.r2.dev  (optional — for public CDN URLs)
+ * @remarks
+ *   - r2BackupDb() performs WAL checkpoint before reading DB file
+ *   - r2RestoreDb() downloads DB to local path on startup
+ *   - Uses @aws-sdk/client-s3 with R2 endpoint override (R2 is S3-compatible)
  */
 
 import { S3Client, PutObjectCommand, GetObjectCommand,

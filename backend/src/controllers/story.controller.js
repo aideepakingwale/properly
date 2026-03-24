@@ -1,3 +1,14 @@
+/**
+ * @file        story.controller.js
+ * @description Curriculum story controller — list and get static phonics stories by phase
+ * @module      Stories
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import getDb from '../db/database.js';
 
 export const getStories = (req, res) => {

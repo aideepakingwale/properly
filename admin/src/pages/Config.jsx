@@ -1,3 +1,19 @@
+/**
+ * @file        Config.jsx
+ * @description Live configuration panel — shows status of all external service keys with one-click Test buttons; R2 backup status and manual trigger
+ * @module      Admin Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Tests run server-side — no API keys are exposed to the browser
+ *   - Azure test checks both TTS (synthesis) and STT (token issue) independently
+ *   - Stripe test hits /v1/balance (read-only) and shows live vs test mode
+ */
+
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 

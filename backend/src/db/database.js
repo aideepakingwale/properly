@@ -1,13 +1,17 @@
 /**
- * Database — SQLite with Cloudflare R2 persistence
+ * @file        database.js
+ * @description SQLite database singleton with Cloudflare R2 backup/restore for persistence across Render deploys
+ * @module      Database
  *
- * STARTUP  → checkpoint WAL → download db/properly.db from R2 → open
- * RUNTIME  → backup every 60s + after every critical write
- * SHUTDOWN → checkpoint + upload on SIGTERM/SIGINT
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  *
- * KEY FIX: WAL checkpoint before every backup.
- * SQLite WAL mode keeps recent writes in .db-wal, NOT the main .db file.
- * Reading the .db file without checkpointing = stale/missing data.
+ * @remarks
+ *   - WAL checkpoint (TRUNCATE) runs before every R2 upload to avoid stale main-file reads
+ *   - backupNow() exported for immediate post-write persistence (e.g. registration)
+ *   - Auto-detects storage mode: R2 > Render Disk > ephemeral /tmp
  */
 
 import { DatabaseSync }                            from 'node:sqlite';

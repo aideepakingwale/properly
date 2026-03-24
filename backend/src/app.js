@@ -1,3 +1,18 @@
+/**
+ * @file        app.js
+ * @description Express application entry point — wires middleware, routes, and starts the HTTP server
+ * @module      Server Bootstrap
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Awaits initDatabase() before listen so DB is ready for first request
+ *   - Rate limiting applied per-service: global 200/15min, AI 30/min, Speech 20/min
+ */
+
 import 'dotenv/config';
 import express       from 'express';
 import cors          from 'cors';

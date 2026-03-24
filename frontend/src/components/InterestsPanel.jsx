@@ -1,7 +1,14 @@
 /**
- * InterestsPanel — Parent sets child's interests
- * These drive theme selection in AI story generation
+ * @file        InterestsPanel.jsx
+ * @description Child interest tag picker — shown in parent dashboard to personalise AI story themes
+ * @module      Components
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  */
+
 import { useState } from 'react';
 import { aiStoryAPI } from '../services/api';
 import { Button, Spinner } from './ui';

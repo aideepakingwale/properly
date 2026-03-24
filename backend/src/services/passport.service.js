@@ -1,13 +1,12 @@
 /**
- * Passport.js OAuth Strategies
+ * @file        passport.service.js
+ * @description Passport.js strategy configuration — Google OAuth 2.0 and Facebook OAuth 2.0
+ * @module      Auth
  *
- * Google OAuth2:
- *   Setup: console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client ID
- *   Redirect URI: https://properly-api.onrender.com/api/auth/google/callback
- *
- * Facebook:
- *   Setup: developers.facebook.com → My Apps → Create App → Facebook Login
- *   Redirect URI: https://properly-api.onrender.com/api/auth/facebook/callback
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  */
 
 import passport        from 'passport';

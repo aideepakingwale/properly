@@ -1,30 +1,16 @@
 /**
- * Email Service — Multi-provider with automatic fallback
+ * @file        email.service.js
+ * @description Email delivery service — verification, welcome, and re-send emails via Resend → Brevo → SMTP fallback chain
+ * @module      Email
  *
- * Provider priority (each is HTTPS-based, works on Render.com):
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  *
- *   1. Resend (recommended — free 3,000 emails/month, HTTPS API)
- *      Setup: resend.com → API Keys → Create → copy to RESEND_API_KEY
- *      Add your domain OR use onboarding@resend.dev for testing
- *
- *   2. Brevo / SendinBlue (free 300 emails/day, HTTPS API)
- *      Setup: brevo.com → SMTP & API → API Keys → Generate
- *      Set EMAIL_PROVIDER=brevo, BREVO_API_KEY=xkeysib-...
- *
- *   3. Nodemailer SMTP (fallback — may timeout on Render free tier)
- *      Works reliably on: paid Render plans, Railway, Fly.io, local dev
- *      Uses Gmail App Password or Brevo SMTP credentials
- *
- * WHY SMTP TIMES OUT ON RENDER FREE TIER:
- *   Render's free tier blocks outbound TCP on ports 25, 465, 587 to
- *   prevent abuse. Use Resend or Brevo API (HTTPS on port 443) instead.
- *
- * QUICKEST FIX (5 minutes):
- *   1. Sign up at resend.com (free)
- *   2. Create an API key
- *   3. Add to Render env vars: RESEND_API_KEY=re_xxxxx
- *   4. Optionally set: EMAIL_FROM=noreply@yourdomain.com
- *      (or leave blank to use the free Resend sandbox address)
+ * @remarks
+ *   - emailAvailable() returns false when no provider is configured — callers skip verification gate
+ *   - All sends are fire-and-forget; failures are logged but never thrown to callers
  */
 
 const APP_VERSION = '2.0.0';

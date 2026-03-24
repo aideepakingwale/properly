@@ -1,3 +1,14 @@
+/**
+ * @file        index.jsx
+ * @description Shared UI primitives — Button, Input, Select, Spinner, AcornPill, Toast used across all pages
+ * @module      UI Components
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useEffect } from 'react';
 
 // ── BUTTON ───────────────────────────────────────────────────

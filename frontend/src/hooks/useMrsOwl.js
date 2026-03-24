@@ -1,3 +1,18 @@
+/**
+ * @file        useMrsOwl.js
+ * @description Mrs Owl TTS hook — plays Azure Neural TTS (en-GB-SoniaNeural) with browser SpeechSynthesis fallback; in-memory cache for repeated phrases
+ * @module      Hooks
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Cache holds up to 40 blob URLs; oldest evicted when full
+ *   - Fallback prefers en-GB female voice from browser voice list
+ */
+
 import { useRef, useCallback } from 'react';
 
 const BASE = (typeof __API_URL__!=='undefined' ? __API_URL__ : null)

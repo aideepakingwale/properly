@@ -1,3 +1,19 @@
+/**
+ * @file        speech.controller.js
+ * @description Speech assessment controller — receives audio, converts to WAV via ffmpeg, submits to Azure Pronunciation Assessment
+ * @module      Speech
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - ffmpeg converts any browser audio (WebM/Opus 48kHz) to WAV PCM 16kHz before Azure submission
+ *   - Falls back to text-comparison scoring when Azure is unavailable
+ *   - Multer stores audio in memory (not disk) — max 10MB per file
+ */
+
 import multer from 'multer';
 import { assessPronunciation, azureAvailable, getAzureSasToken } from '../services/azure-speech.service.js';
 
@@ -139,7 +155,7 @@ export const getSpeechStatus = (req, res) => {
       },
       gemini: {
         available: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your-gemini-api-key-here'),
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         role: 'Mrs. Owl coaching tips (free fallback)',
         freeTier: '15 req/min, 1,500 req/day — completely free',
       },

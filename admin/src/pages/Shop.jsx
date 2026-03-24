@@ -1,3 +1,18 @@
+/**
+ * @file        Shop.jsx
+ * @description Gift shop management — full CRUD for shop items: add, edit cost/emoji/category/sort, delete
+ * @module      Admin Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Item categories: avatar, background, badge, reward, physical
+ *   - ownerCount shown per item so popular items can be identified before deletion
+ */
+
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 

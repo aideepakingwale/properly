@@ -1,8 +1,17 @@
 /**
- * Children (Kids) Management Controller
+ * @file        children.controller.js
+ * @description Children (student profiles) CRUD — list, add, edit, delete with plan-based count limits
+ * @module      Children
  *
- * Parents manage all their children from here.
- * Number of children allowed is gated by subscription plan.
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Plan limits enforced: Seedling/Sprout=1 child, Forest=5
+ *   - Deleting the last child profile is blocked to prevent parent lockout
+ *   - All routes verify child.user_id === authenticated parent via requireChild middleware
  */
 
 import getDb   from '../db/database.js';

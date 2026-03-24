@@ -1,3 +1,18 @@
+/**
+ * @file        Auth.jsx
+ * @description Login and registration page — email/password auth with email verification flow
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Registration collects email + password only — child profiles are added in SetupChild after first login
+ *   - Unverified accounts see a re-send verification option
+ */
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

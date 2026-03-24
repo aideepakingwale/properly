@@ -1,13 +1,18 @@
 /**
- * StoryForest — AI-Generated Personalised Story Library
+ * @file        StoryForest.jsx
+ * @description AI story library component — story cards, batch generation UI, daily limit display and delete flow
+ * @module      Components
  *
- * Features:
- * - Shows AI-generated stories tailored to child's name, phase, and interests
- * - One-tap story generation with theme selector
- * - Shows struggled-word targeting in story cards
- * - Phoneme phase badges on each story
- * - Empty state with quick-generate CTA
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - getAiStories returns { stories: [], summary: {} } — extract .stories before setting state
+ *   - Interests panel feeds child preferences into story generation prompts
  */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aiStoryAPI } from '../services/api';

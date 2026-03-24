@@ -1,10 +1,14 @@
 /**
- * PlanCard + PlansSection
+ * @file        PlanCard.jsx
+ * @description Pricing plan card component — renders plan name, price, features and CTA button
+ * @module      Components
  *
- * Plans are embedded in the frontend so they ALWAYS render
- * even if the API is down or Stripe isn't configured.
- * The API is called only to update "available" and "stripeReady" status.
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  */
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 

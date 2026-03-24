@@ -1,3 +1,20 @@
+/**
+ * @file        ReadingSession.jsx
+ * @description Core reading session page — word-by-word TTS animation, microphone recording, Azure pronunciation assessment and Mrs Owl coaching feedback
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - speakingWordIdx highlights current TTS word at ~380ms/word cadence
+ *   - revealedCount staggers pronunciation score reveal at 180ms/word after assessment
+ *   - Supports both static curriculum stories and AI-generated stories via isAiStory flag
+ *   - Session lifecycle: startSession → submitPage × N → completeSession
+ */
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

@@ -1,3 +1,14 @@
+/**
+ * @file        Stories.jsx
+ * @description Stories overview — curriculum story read-counts/accuracy stats and AI story generation analytics by theme and provider
+ * @module      Admin Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 

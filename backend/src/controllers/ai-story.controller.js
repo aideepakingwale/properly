@@ -1,12 +1,17 @@
 /**
- * AI Story Controller
+ * @file        ai-story.controller.js
+ * @description AI story controller — batch generation, retrieval, progress tracking for personalised stories
+ * @module      AI Stories
  *
- * Architecture:
- *   - generateBatch: Creates 3-5 stories in one AI call from the child's full profile
- *   - Each story stored in ai_stories with profile snapshot + progress columns
- *   - Per-page progress tracked in ai_story_pages
- *   - Reading tracked in ai_story_sessions (separate from static reading_sessions)
- *   - Progress endpoint returns per-story and per-page accuracy
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Batch generation runs asynchronously; stories appear in list as they complete
+ *   - Daily limit of 5 AI stories per child enforced in generateAiStoryBatch
+ *   - Stories are scoped to child_id — cross-child access is rejected by requireChild
  */
 
 import getDb from '../db/database.js';

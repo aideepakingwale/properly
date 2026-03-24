@@ -1,3 +1,14 @@
+/**
+ * @file        SubscriptionSuccess.jsx
+ * @description Post-Stripe-checkout success page — confirms plan upgrade and refreshes session
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Footer from '../components/Footer';

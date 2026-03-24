@@ -1,3 +1,18 @@
+/**
+ * @file        useAudioRecorder.js
+ * @description MediaRecorder hook — starts/stops browser audio recording, returns audio Blob on stop
+ * @module      Hooks
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Prefers audio/webm;codecs=opus for maximum browser compatibility
+ *   - Backend converts WebM → WAV PCM 16kHz via ffmpeg before Azure STT submission
+ */
+
 import { useRef, useState, useCallback } from 'react';
 
 function getMimeType() {

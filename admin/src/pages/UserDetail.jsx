@@ -1,3 +1,14 @@
+/**
+ * @file        UserDetail.jsx
+ * @description User detail and edit page — view a parent's children + progress, change subscription plan, toggle admin, delete account
+ * @module      Admin Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { adminAPI } from '../services/api';

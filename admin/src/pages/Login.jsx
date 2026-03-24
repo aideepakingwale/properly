@@ -1,3 +1,14 @@
+/**
+ * @file        Login.jsx
+ * @description Admin login page — email/password form with contextual error messages for unverified/non-admin accounts
+ * @module      Admin Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

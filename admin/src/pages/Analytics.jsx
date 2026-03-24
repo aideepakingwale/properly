@@ -1,3 +1,14 @@
+/**
+ * @file        Analytics.jsx
+ * @description Platform analytics — 30-day session trend, accuracy distribution buckets, phase breakdown, acorns chart, top readers leaderboard
+ * @module      Admin Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';

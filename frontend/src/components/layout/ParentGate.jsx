@@ -1,3 +1,14 @@
+/**
+ * @file        ParentGate.jsx
+ * @description Parent gate overlay — blocks child-only UI sections behind a maths challenge to prevent accidental access
+ * @module      Components
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useState, useMemo } from 'react';
 import { Modal, Button } from '../ui';
 

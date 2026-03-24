@@ -1,3 +1,19 @@
+/**
+ * @file        AuthContext.jsx
+ * @description Global authentication context — user session, active child selection, multi-child state and auth actions
+ * @module      Auth Context
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - kids (internal) exposed as children in context value to avoid JSX prop name collision
+ *   - switchChild() updates active child and reloads their progress
+ *   - backupNow is NOT called here — handled server-side after critical writes
+ */
+
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authAPI, progressAPI } from '../services/api';
 

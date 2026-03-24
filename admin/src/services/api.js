@@ -1,3 +1,18 @@
+/**
+ * @file        api.js
+ * @description Admin Axios client — auth interceptor, all admin API calls and live test endpoints
+ * @module      Admin API
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - 403 during login attempts is NOT redirected — surface error to login form instead
+ *   - Token stored as admin_token (separate from properly_token used by parent app)
+ */
+
 import axios from 'axios';
 
 const BASE = (typeof __API_URL__ !== 'undefined' && __API_URL__)

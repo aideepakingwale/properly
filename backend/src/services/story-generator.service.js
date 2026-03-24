@@ -1,17 +1,17 @@
 /**
- * AI Story Generator — Batch Personalised Phonics Stories
+ * @file        story-generator.service.js
+ * @description AI story generation service — creates phonics-appropriate stories personalised to child name, age, phase, interests and struggled words
+ * @module      Story Generator
  *
- * Generates 3-5 stories in one AI call using the full student profile:
- *   - name, age, gender (he/she/they pronouns)
- *   - phonics phase (curriculum-aligned difficulty)
- *   - interests (themes, hobbies set by parent)
- *   - struggled words (spaced repetition from past sessions)
- *   - recent story history (avoids repeating)
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  *
- * AI provider waterfall (all free):
- *   1. Google Gemini 1.5 Flash  — free: 1,500 req/day
- *   2. Groq (Llama 3.1 70B)    — free: 14,400 req/day
- *   3. Deterministic fallback   — always works
+ * @remarks
+ *   - Tries Gemini Flash first, falls back to Groq Llama 3.1 on failure
+ *   - Phase-appropriate vocabulary lists constrain word selection per story page
+ *   - Theme rotation prevents repetition across a child's story history
  */
 
 // ── PHONICS CURRICULUM ────────────────────────────────────────
@@ -186,7 +186,7 @@ async function callGemini(systemPrompt, userPrompt) {
   if (!key || key.includes('your-')) return null;
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },

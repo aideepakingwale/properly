@@ -1,3 +1,14 @@
+/**
+ * @file        Layout.jsx
+ * @description Admin shell layout — left navigation sidebar with route links and logged-in user display
+ * @module      Admin Components
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 

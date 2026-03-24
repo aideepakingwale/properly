@@ -1,3 +1,18 @@
+/**
+ * @file        App.jsx
+ * @description Root application router — defines all page routes and authentication guards
+ * @module      Router
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - PrivateRoute redirects to /auth when unauthenticated
+ *   - PrivateRoute redirects to /setup-child when authenticated but no child profiles exist yet
+ */
+
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Landing        from './pages/Landing';

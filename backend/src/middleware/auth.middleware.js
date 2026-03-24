@@ -1,3 +1,19 @@
+/**
+ * @file        auth.middleware.js
+ * @description JWT authentication middleware and per-child ownership guard
+ * @module      Middleware
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - authMiddleware: validates Bearer token, attaches req.user
+ *   - requireChild: validates childId belongs to authenticated parent, attaches req.child
+ *   - optionalAuth: same as authMiddleware but does not reject unauthenticated requests
+ */
+
 import jwt from 'jsonwebtoken';
 import getDb from '../db/database.js';
 

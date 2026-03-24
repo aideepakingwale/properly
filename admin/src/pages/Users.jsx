@@ -1,3 +1,14 @@
+/**
+ * @file        Users.jsx
+ * @description User management list — searchable, filterable table of all registered parent accounts with pagination
+ * @module      Admin Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../services/api';

@@ -1,14 +1,18 @@
 /**
- * Azure Cognitive Services — Speech
- * Free F0 Tier:
- *   - Speech-to-Text:          5 audio hours / month
- *   - Pronunciation Assessment: included in STT free tier
- *   - Neural TTS:              500,000 characters / month
+ * @file        azure-speech.service.js
+ * @description Azure Cognitive Services wrapper — Pronunciation Assessment (STT) and Neural TTS (en-GB-SoniaNeural)
+ * @module      Azure Speech
  *
- * Get a free key: https://portal.azure.com → Create resource → Speech
- * Region recommendations for UK: uksouth or westeurope
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - toWavPcm16k() uses ffmpeg to convert browser WebM/Opus → WAV PCM 16kHz 16-bit mono before Azure STT
+ *   - Free F0 tier: 5 audio hours/month STT, 500K chars/month TTS
+ *   - Azure REST endpoint used (not SDK) for minimal dependency footprint
  */
-
 
 const AZURE_KEY    = process.env.AZURE_SPEECH_KEY;
 const AZURE_REGION = process.env.AZURE_SPEECH_REGION || 'uksouth';

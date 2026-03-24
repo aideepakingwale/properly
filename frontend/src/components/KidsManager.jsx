@@ -1,8 +1,19 @@
 /**
- * KidsManager — Parent's child management panel
- * Add / edit / delete children. Switch active reading child.
- * Shows plan limit and upgrade prompt when limit reached.
+ * @file        KidsManager.jsx
+ * @description Multi-child management component — add, edit, switch and remove child profiles with plan-limit enforcement
+ * @module      Components
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Embedded in ParentDash; fetches fresh list from /children on mount
+ *   - Upgrade nudge shown when plan limit is reached
+ *   - Inline edit form replaces the card row to avoid layout shift
  */
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

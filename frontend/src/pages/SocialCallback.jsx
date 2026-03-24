@@ -1,4 +1,15 @@
 /**
+ * @file        SocialCallback.jsx
+ * @description OAuth social login callback handler — processes Google/Facebook redirect and logs user in
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
+/**
  * SocialCallback — receives token from backend after OAuth success
  * URL: /social-callback?token=...&provider=google|facebook&isNew=0|1
  */

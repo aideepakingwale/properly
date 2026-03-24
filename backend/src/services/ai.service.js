@@ -1,16 +1,17 @@
 /**
- * Mrs. Owl AI Coaching — Multi-Provider (all free)
+ * @file        ai.service.js
+ * @description AI inference service — coaching tips via Gemini Flash → Groq Llama → static cache fallback chain; Neural TTS via Azure → browser fallback
+ * @module      AI Service
  *
- * Provider waterfall — all free, no billing required:
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  *
- *  1. Static phoneme cache  — instant, 30 patterns, zero API cost
- *  2. Google Gemini Flash   — FREE: 15 req/min, 1,500 req/day
- *     Get key: https://aistudio.google.com/app/apikey
- *  3. Groq (Llama 3.1)      — FREE: 30 req/min, 14,400 req/day
- *     Get key: https://console.groq.com/keys
- *  4. Rule-based fallback   — always works, zero API cost
- *
- * Azure Neural TTS for Mrs. Owl's voice — FREE F0: 500K chars/month
+ * @remarks
+ *   - Tip pipeline: (1) static phoneme cache, (2) Gemini Flash, (3) Groq/Llama, (4) rule-based fallback
+ *   - Azure TTS session flag (_azureTtsFailing) suppresses repeated 401 log noise
+ *   - All AI calls are fire-and-forget from the client perspective — errors never block the reading session
  */
 
 import { synthesizeSpeech, azureAvailable } from './azure-speech.service.js';
@@ -68,7 +69,7 @@ async function askGemini(word, sentence, phase) {
   if (!key) return null;
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

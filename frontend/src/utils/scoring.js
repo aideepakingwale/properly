@@ -1,10 +1,16 @@
 /**
- * Text-comparison word scoring — used when Azure Speech is not configured.
- * Azure gives phoneme-level accuracy (0-100 per word).
- * This gives character-overlap accuracy as a fallback.
+ * @file        scoring.js
+ * @description Client-side pronunciation scoring utilities — word colour coding and error badge helpers
+ * @module      Utils
  *
- * Important: common function words ("the", "a", "in", "on", "and" etc.)
- * are often transcribed slightly differently — treated with leniency.
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - getWordColor maps score 0-100 to green/amber/red palette
+ *   - getErrorBadge maps Azure ErrorType to human-readable badge label
  */
 
 // Function words that speech recognition often varies on — give generous floor

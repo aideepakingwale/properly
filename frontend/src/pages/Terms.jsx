@@ -1,3 +1,14 @@
+/**
+ * @file        Terms.jsx
+ * @description Terms of Service page — user agreement and acceptable use policy
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import { useNavigate } from 'react-router-dom';
 import Footer from '../components/Footer';
 

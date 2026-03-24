@@ -1,3 +1,19 @@
+/**
+ * @file        index.js
+ * @description Express router — all REST API routes for auth, children, progress, stories, AI, shop, speech and admin
+ * @module      Routes
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Literal path segments (e.g. /sessions/page) must appear BEFORE param routes (/:id) to avoid Express mis-matching
+ *   - Admin routes all require authMiddleware + requireAdmin
+ *   - Speech routes use uploadMiddleware (multer) before the controller
+ */
+
 import { Router }     from 'express';
 import passport       from 'passport';
 import { register, login, getMe, verifyEmail, resendVerification } from '../controllers/auth.controller.js';

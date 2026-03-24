@@ -1,3 +1,14 @@
+/**
+ * @file        Landing.jsx
+ * @description Marketing landing page — product pitch, feature highlights and call-to-action for sign-up
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ */
+
 import Footer from '../components/Footer';
 import { useNavigate } from 'react-router-dom';
 import { Button, StarBg } from '../components/ui';

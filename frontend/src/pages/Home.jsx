@@ -1,3 +1,18 @@
+/**
+ * @file        Home.jsx
+ * @description Main reading hub — curriculum story list, AI story tab, plan tab, and multi-child switcher
+ * @module      Pages
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Phase-gated curriculum: each story unlocks when the previous one is completed
+ *   - Child switcher dropdown appears only when the parent has 2+ children (Forest plan)
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

@@ -1,3 +1,18 @@
+/**
+ * @file        seed.js
+ * @description Seed data — curriculum stories (Phase 2-6), shop items, and achievements
+ * @module      Database
+ *
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
+ *
+ * @remarks
+ *   - Uses INSERT OR IGNORE so re-running seed is safe (idempotent)
+ *   - Called explicitly by app.js after initDatabase() — not at module import time
+ */
+
 import getDb from './database.js';
 
 const STORIES = [

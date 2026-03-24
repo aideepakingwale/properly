@@ -1,15 +1,17 @@
 /**
- * Admin Controller — full administration API
+ * @file        admin.controller.js
+ * @description Admin REST API — dashboard stats, user management, shop CRUD, analytics, config, and live API key tests
+ * @module      Admin
  *
- * All routes require: authMiddleware + requireAdmin
+ * @project     Properly — AI Phonics Tutor
+ * @authors     Deepak Ingwale, Mahima Verma
+ * @copyright   2026 Properly. All rights reserved.
+ * @license     Proprietary
  *
- * Sections:
- *   Dashboard  — summary stats, recent activity
- *   Users      — list, search, view, update plan, toggle admin, delete
- *   Shop       — CRUD for shop items
- *   Stories    — list curriculum stories + AI story stats
- *   Progress   — per-user/child reading analytics
- *   Config     — runtime feature flags
+ * @remarks
+ *   - All endpoints require authMiddleware + requireAdmin (is_admin=1)
+ *   - Test endpoints (testAzure, testGemini, etc.) call real external APIs server-side — no keys exposed to browser
+ *   - getR2Status performs a live ListObjectsV2 to confirm backup presence
  */
 
 import getDb from '../db/database.js';
@@ -432,7 +434,7 @@ export const testGemini = async (_req, res) => {
 
   try {
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -447,7 +449,7 @@ export const testGemini = async (_req, res) => {
     const reply  = data?.candidates?.[0]?.content?.parts?.[0]?.text || '(no text)';
     const tokens = data?.usageMetadata;
     res.json({ success: true, service: 'gemini', reply: reply.trim(),
-      note: `Model: gemini-1.5-flash · Tokens: ${tokens?.totalTokenCount ?? '?'}` });
+      note: `Model: gemini-2.5-flash · Tokens: ${tokens?.totalTokenCount ?? '?'}` });
   } catch (e) {
     res.json({ success: false, service: 'gemini', error: e.message });
   }
