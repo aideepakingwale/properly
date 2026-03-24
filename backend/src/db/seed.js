@@ -177,4 +177,3 @@ export function seed() {
   console.log(`✅ Seeded ${STORIES.length} stories, ${SHOP_ITEMS.length} shop items, ${ACHIEVEMENTS.length} achievements`);
 }
 
-seed();
