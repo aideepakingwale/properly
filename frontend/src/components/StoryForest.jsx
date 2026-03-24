@@ -71,7 +71,7 @@ function ThemePicker({ selected, onSelect, interests = [] }) {
 function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
   const provider = PROVIDER_BADGES[story.aiProvider] || PROVIDER_BADGES.fallback;
   return (
-    <div style={{ background:'white', borderRadius:22, padding:'16px 18px', boxShadow:'0 6px 24px rgba(0,0,0,0.1)', display:'flex', alignItems:'center', gap:14, border:story.isCompleted?`2px solid ${phaseColor}40`:'2px solid transparent', transition:'transform 0.15s, box-shadow 0.15s', cursor:'pointer', position:'relative' }}
+    <div style={{ background:'white', borderRadius:22, padding:'16px 18px', boxShadow:'0 6px 24px rgba(0,0,0,0.1)', display:'flex', alignItems:'center', gap:14, border:story.status==='completed'?`2px solid ${phaseColor}40`:'2px solid transparent', transition:'transform 0.15s, box-shadow 0.15s', cursor:'pointer', position:'relative' }}
       onClick={() => onPlay(story)}
       onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 32px rgba(0,0,0,0.16)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='0 6px 24px rgba(0,0,0,0.1)'; }}>
@@ -82,9 +82,9 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
       </div>
 
       {/* Cover */}
-      <div style={{ width:64, height:64, borderRadius:18, background:story.isCompleted?'linear-gradient(135deg,#D1FAE5,#6EE7B7)':`linear-gradient(135deg,${phaseColor}20,${phaseColor}10)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, flexShrink:0, position:'relative', border:`1.5px solid ${phaseColor}30` }}>
+      <div style={{ width:64, height:64, borderRadius:18, background:story.status==='completed'?'linear-gradient(135deg,#D1FAE5,#6EE7B7)':`linear-gradient(135deg,${phaseColor}20,${phaseColor}10)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, flexShrink:0, position:'relative', border:`1.5px solid ${phaseColor}30` }}>
         {story.emoji}
-        {story.isCompleted && <div style={{ position:'absolute', bottom:-5, right:-5, background:'#10B981', borderRadius:'50%', width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'white', border:'2.5px solid white', fontWeight:900 }}>✓</div>}
+        {story.status==='completed' && <div style={{ position:'absolute', bottom:-5, right:-5, background:'#10B981', borderRadius:'50%', width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'white', border:'2.5px solid white', fontWeight:900 }}>✓</div>}
       </div>
 
       {/* Info */}
@@ -103,11 +103,11 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
               )}
         </div>
 
-        {/* Target phonemes */}
-        {story.targetPhonemes?.length > 0 && (
-          <div style={{ display:'flex', gap:3, marginTop:5, flexWrap:'wrap' }}>
-            {story.targetPhonemes.slice(0,4).map(ph => (
-              <span key={ph} style={{ background:'#EDE9FE', color:'#5B21B6', borderRadius:5, padding:'1px 6px', fontSize:10, fontWeight:700 }}>{ph}</span>
+        {/* Target phonemes — only show if they look like real phoneme patterns */}
+        {story.targetPhonemes?.filter(ph => ph && ph.length <= 5).slice(0,4).length > 0 && (
+          <div style={{ display:'flex', gap:4, marginTop:5, flexWrap:'wrap' }}>
+            {story.targetPhonemes.filter(ph => ph && ph.length <= 5).slice(0,4).map(ph => (
+              <span key={ph} style={{ background:'#EDE9FE', color:'#5B21B6', borderRadius:5, padding:'2px 7px', fontSize:10, fontWeight:700, letterSpacing:'0.3px' }}>{ph}</span>
             ))}
           </div>
         )}
@@ -120,8 +120,8 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
 
       {/* CTA */}
       <div style={{ flexShrink:0, display:'flex', flexDirection:'column', gap:5, alignItems:'flex-end', paddingRight:2 }}>
-        <div style={{ background:story.isCompleted?`${phaseColor}15`:`linear-gradient(135deg,${phaseColor},${phaseColor}CC)`, color:story.isCompleted?phaseColor:'white', borderRadius:50, padding:'7px 12px', fontSize:11, fontWeight:900, whiteSpace:'nowrap' }}>
-          {story.isCompleted ? '↩ Again' : '▶ Read'}
+        <div style={{ background:story.status==='completed'?`${phaseColor}15`:`linear-gradient(135deg,${phaseColor},${phaseColor}CC)`, color:story.status==='completed'?phaseColor:'white', borderRadius:50, padding:'7px 12px', fontSize:11, fontWeight:900, whiteSpace:'nowrap' }}>
+          {story.status==='completed' ? '↩ Again' : '▶ Read'}
         </div>
         <button onClick={e => { e.stopPropagation(); onDelete(story.id); }}
           style={{ background:'transparent', border:'none', fontSize:14, color:'#D1D5DB', cursor:'pointer', padding:'2px 4px', borderRadius:5 }}

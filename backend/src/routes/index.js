@@ -12,7 +12,6 @@ import { getFeedback, getTTS }                                      from '../ser
 import { assessSpeech, uploadMiddleware, getSpeechToken, getSpeechStatus } from '../controllers/speech.controller.js';
 import {
   generateAiStoryBatch, getAiStories, getAiStory, deleteAiStory,
-  startAiStorySession, submitAiStoryPage, completeAiStorySession,
   getAiStoryProgress, getThemes, getPhaseInfo,
   getInterests, setInterests, recordStruggle, getStruggles, getGenerationStatus
 } from '../controllers/ai-story.controller.js';
@@ -71,10 +70,7 @@ router.get('/children/:childId/ai-stories/progress',          authMiddleware, re
 router.get('/children/:childId/ai-stories/:storyId',          authMiddleware, requireChild, getAiStory);
 router.delete('/children/:childId/ai-stories/:storyId',       authMiddleware, requireChild, deleteAiStory);
 
-// AI Story reading sessions (progress tracking)
-router.post('/children/:childId/ai-stories/:storyId/session',          authMiddleware, requireChild, startAiStorySession);
-router.post('/children/:childId/ai-stories/session/page',              authMiddleware, requireChild, submitAiStoryPage);
-router.post('/children/:childId/ai-stories/session/complete',          authMiddleware, requireChild, completeAiStorySession);
+// AI Story reading sessions handled by unified /sessions routes below
 
 // Child interests & struggle words
 router.get('/children/:childId/interests',                    authMiddleware, requireChild, getInterests);

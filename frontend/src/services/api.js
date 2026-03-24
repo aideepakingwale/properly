@@ -143,11 +143,6 @@ export const aiStoryAPI = {
   // Progress tracking
   progress: (childId) => api.get(`/children/${childId}/ai-stories/progress`),
 
-  // Reading session lifecycle
-  startSession:    (childId, storyId) => api.post(`/children/${childId}/ai-stories/${storyId}/session`),
-  submitPage:      (childId, data) => api.post(`/children/${childId}/ai-stories/session/page`, data),
-  completeSession: (childId, data) => api.post(`/children/${childId}/ai-stories/session/complete`, data),
-
   // Interests
   interests: {
     get: (childId) => api.get(`/children/${childId}/interests`),

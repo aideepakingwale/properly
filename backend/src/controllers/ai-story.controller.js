@@ -36,6 +36,7 @@ function formatStory(story, pages) {
     timesRead:     story.times_read || 0,
     lastReadAt:    story.last_read_at,
     completedAt:   story.completed_at,
+    isAiGenerated: true,
     aiProvider:    story.ai_provider,
     createdAt:     story.created_at,
     pages: pages ? pages.map(p => ({

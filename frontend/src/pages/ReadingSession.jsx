@@ -74,14 +74,24 @@ export default function ReadingSession() {
     (async () => {
       setLoading(true);
       try {
-        const storyLoader = isAiStory && aiChildId
-          ? aiStoryAPI.get(aiChildId, storyId)
+        // Use child.id from context as fallback if URL param missing
+        const resolvedChildId = aiChildId || child?.id;
+        const storyLoader = isAiStory && resolvedChildId
+          ? aiStoryAPI.get(resolvedChildId, storyId)
           : storyAPI.get(storyId);
         const [storyRes, statusRes] = await Promise.allSettled([storyLoader, speechAPI.status()]);
         if (storyRes.status === 'fulfilled' && storyRes.value.success) {
           const s = storyRes.value.data;
-          setStory({ ...s, isAiGenerated: isAiStory });
-        } else { setError('Story not found'); }
+          // Trust isAiGenerated from the server response (backend now always sets it)
+          setStory({ ...s, isAiGenerated: s.isAiGenerated ?? isAiStory });
+        } else {
+          // If AI story load failed, try static as last resort
+          if (isAiStory) {
+            setError('AI story not found — it may have been deleted.');
+          } else {
+            setError('Story not found');
+          }
+        }
         if (statusRes.status === 'fulfilled' && statusRes.value.success) setProviderInfo(statusRes.value.data);
       } catch { setError('Could not load story. Is the server running?'); }
       finally { setLoading(false); }
