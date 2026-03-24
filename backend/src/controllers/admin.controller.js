@@ -310,12 +310,19 @@ export const getAnalytics = (_req, res) => {
 
 // ── CONFIG ─────────────────────────────────────────────────────
 export const getR2Status = async (_req, res) => {
-  const { USE_R2, dbStorageMode } = await import('../db/database.js').then(m => ({
-    USE_R2: m.dbStorageMode === 'r2',
-    dbStorageMode: m.dbStorageMode,
-  }));
+  // Check env vars directly — module-level constants from database.js are
+  // evaluated at startup and cannot be re-read via dynamic import
+  const r2Configured = Boolean(
+    process.env.R2_ACCOUNT_ID    &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_KEY    &&
+    process.env.R2_BUCKET
+  );
 
-  if (!USE_R2) {
+  // Get current storage mode from the exported constant
+  const { dbStorageMode } = await import('../db/database.js');
+
+  if (!r2Configured) {
     return res.json({ success: true, data: {
       configured: false,
       storageMode: dbStorageMode,
@@ -375,7 +382,7 @@ export const getConfig = (_req, res) => {
     gemini:  { key: process.env.GEMINI_API_KEY     ? '***' : null },
     groq:    { key: process.env.GROQ_API_KEY       ? '***' : null },
     resend:  { key: process.env.RESEND_API_KEY     ? '***' : null },
-    r2:      { configured: !!(process.env.R2_ACCOUNT_ID), bucket: process.env.R2_BUCKET || null },
+    r2:      { configured: !!(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_KEY && process.env.R2_BUCKET), bucket: process.env.R2_BUCKET || null },
     stripe:  { configured: !!(process.env.STRIPE_SECRET_KEY) },
     adminEmails: (process.env.ADMIN_EMAILS || '').split(',').filter(Boolean),
     jwtExpiry: process.env.JWT_EXPIRES_IN || '30d',
