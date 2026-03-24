@@ -309,15 +309,43 @@ export const getAnalytics = (_req, res) => {
 };
 
 // ── CONFIG ─────────────────────────────────────────────────────
+export const debugEnv = (_req, res) => {
+  // Shows which R2 env vars are present and their lengths
+  // Helps diagnose "not configured" when vars appear to be set
+  const vars = ['R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_KEY','R2_BUCKET'];
+  const report = {};
+  for (const v of vars) {
+    const val = process.env[v];
+    if (!val) {
+      report[v] = { present: false, value: null };
+    } else {
+      // Show first 4 + last 4 chars so you can verify the value without exposing it fully
+      const trimmed = val.trim();
+      const masked  = trimmed.length > 8
+        ? trimmed.slice(0,4) + '...' + trimmed.slice(-4)
+        : '***';
+      report[v] = {
+        present:      true,
+        length:       trimmed.length,
+        hasWhitespace: val !== trimmed,
+        preview:      masked,
+      };
+    }
+  }
+  const allPresent = vars.every(v => report[v].present);
+  res.json({ success: true, data: { allPresent, vars: report, nodeEnv: process.env.NODE_ENV } });
+};
+
 export const getR2Status = async (_req, res) => {
   // Check env vars directly — module-level constants from database.js are
   // evaluated at startup and cannot be re-read via dynamic import
-  const r2Configured = Boolean(
-    process.env.R2_ACCOUNT_ID    &&
-    process.env.R2_ACCESS_KEY_ID &&
-    process.env.R2_SECRET_KEY    &&
-    process.env.R2_BUCKET
-  );
+  // Trim whitespace — Render dashboard can inject invisible spaces when copy-pasting keys
+  const R2_ACCOUNT_ID    = (process.env.R2_ACCOUNT_ID    || '').trim();
+  const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
+  const R2_SECRET_KEY    = (process.env.R2_SECRET_KEY    || '').trim();
+  const R2_BUCKET        = (process.env.R2_BUCKET        || '').trim();
+
+  const r2Configured = Boolean(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_KEY && R2_BUCKET);
 
   // Get current storage mode from the exported constant
   const { dbStorageMode } = await import('../db/database.js');
@@ -335,13 +363,13 @@ export const getR2Status = async (_req, res) => {
     const { S3Client, HeadBucketCommand, ListObjectsV2Command } = await import('@aws-sdk/client-s3');
     const s3 = new S3Client({
       region:   'auto',
-      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
-        accessKeyId:     process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_KEY,
+        accessKeyId:     R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_KEY,
       },
     });
-    const bucket = process.env.R2_BUCKET;
+    const bucket = R2_BUCKET;
 
     // List objects with db/ prefix to see backup
     const list = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: 'db/' }));

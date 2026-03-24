@@ -33,7 +33,7 @@ import {
 } from '../controllers/ai-story.controller.js';
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
 import { requireAdmin } from '../middleware/admin.middleware.js';
-import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe } from '../controllers/admin.controller.js';
+import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe, debugEnv } from '../controllers/admin.controller.js';
 import { listChildren, addChild, updateChild as updateChildMgmt, deleteChild } from '../controllers/children.controller.js';
 import {
   getPlans, getSubscription, createCheckoutSession,
@@ -167,5 +167,6 @@ router.post('/admin/test/gemini',          authMiddleware, requireAdmin, testGem
 router.post('/admin/test/groq',            authMiddleware, requireAdmin, testGroq);
 router.post('/admin/test/resend',          authMiddleware, requireAdmin, testResend);
 router.post('/admin/test/stripe',          authMiddleware, requireAdmin, testStripe);
+router.get('/admin/debug/env',             authMiddleware, requireAdmin, debugEnv);
 
 export default router;

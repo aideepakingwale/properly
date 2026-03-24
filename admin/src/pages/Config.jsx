@@ -101,6 +101,8 @@ export default function Config() {
   const [r2,        setR2]        = useState(null);
   const [r2Loading, setR2Loading] = useState(true);
   const [backing,   setBacking]   = useState(false);
+  const [debugData, setDebugData] = useState(null);
+  const [debugging, setDebugging] = useState(false);
   const [backupMsg, setBackupMsg] = useState('');
   const [loading,   setLoading]   = useState(true);
   const [testing,   setTesting]   = useState(null);
@@ -121,6 +123,15 @@ export default function Config() {
     } catch (e) {
       setResults(prev => ({ ...prev, [service]: { success:false, error: e.message || 'Request failed' } }));
     } finally { setTesting(null); }
+  };
+
+  const runDebug = async () => {
+    setDebugging(true); setDebugData(null);
+    try {
+      const r = await adminAPI.debugEnv();
+      setDebugData(r.data);
+    } catch (e) { setDebugData({ error: e.message }); }
+    finally { setDebugging(false); }
   };
 
   const triggerBackup = async () => {
@@ -166,8 +177,31 @@ export default function Config() {
               </div>
               {backupMsg && <div style={{ marginTop:10, fontSize:12, fontWeight:600, color: backupMsg.includes('failed')?'var(--danger)':'var(--accent)' }}>{backupMsg}</div>}
               {!r2?.configured && (
-                <div style={{ marginTop:12, padding:'10px 12px', background:'rgba(255,68,68,0.08)', borderRadius:6, fontSize:11, color:'var(--danger)', lineHeight:1.7 }}>
-                  <strong>Required env vars in Render:</strong> R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_KEY, R2_BUCKET=properly
+                <div style={{ marginTop:12 }}>
+                  <div style={{ padding:'10px 12px', background:'rgba(255,68,68,0.08)', borderRadius:6, fontSize:11, color:'var(--danger)', lineHeight:1.7, marginBottom:10 }}>
+                    <strong>Required env vars in Render:</strong> R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_KEY, R2_BUCKET=properly
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={runDebug} disabled={debugging}>
+                    {debugging ? 'Checking...' : '\u1F50D Diagnose — show what server actually sees'}
+                  </button>
+                  {debugData && (
+                    <div style={{ marginTop:10, padding:'12px 14px', background:'var(--bg)', border:'1px solid var(--border2)', borderRadius:6, fontSize:11 }}>
+                      <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>
+                        Server env var report {debugData.allPresent ? '— all 4 present \u2713' : '— missing values \u2717'}
+                      </div>
+                      {debugData.vars && Object.entries(debugData.vars).map(([k, v]) => (
+                        <div key={k} style={{ display:'flex', gap:8, alignItems:'center', marginBottom:5 }}>
+                          <span style={{ color: v.present ? 'var(--accent)' : 'var(--danger)', fontSize:12 }}>{v.present ? '\u2713' : '\u2717'}</span>
+                          <code style={{ color:'var(--accent2)', minWidth:140 }}>{k}</code>
+                          {v.present
+                            ? <span style={{ color:'var(--muted)' }}>{v.length} chars — {v.preview}{v.hasWhitespace ? ' \u26a0 has whitespace!' : ''}</span>
+                            : <span style={{ color:'var(--danger)' }}>NOT SET</span>
+                          }
+                        </div>
+                      ))}
+                      {debugData.error && <div style={{ color:'var(--danger)' }}>{debugData.error}</div>}
+                    </div>
+                  )}
                 </div>
               )}
             </>

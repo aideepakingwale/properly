@@ -22,12 +22,13 @@ import { fileURLToPath }                           from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH   = process.env.DB_PATH || '/tmp/properly.db';
 
-const USE_R2 = Boolean(
-  process.env.R2_ACCOUNT_ID    &&
-  process.env.R2_ACCESS_KEY_ID &&
-  process.env.R2_SECRET_KEY    &&
-  process.env.R2_BUCKET
-);
+// Trim whitespace from env vars — Render dashboard can add invisible spaces on copy-paste
+const _R2_ACCOUNT_ID    = (process.env.R2_ACCOUNT_ID    || '').trim();
+const _R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
+const _R2_SECRET_KEY    = (process.env.R2_SECRET_KEY    || '').trim();
+const _R2_BUCKET        = (process.env.R2_BUCKET        || '').trim();
+
+const USE_R2 = Boolean(_R2_ACCOUNT_ID && _R2_ACCESS_KEY_ID && _R2_SECRET_KEY && _R2_BUCKET);
 const USE_DISK  = !USE_R2 && DB_PATH.startsWith('/data/');
 export const dbStorageMode = USE_R2 ? 'r2' : USE_DISK ? 'render-disk' : 'ephemeral';
 
@@ -42,17 +43,17 @@ async function getS3() {
   const { S3Client } = await import('@aws-sdk/client-s3');
   _s3 = new S3Client({
     region:   'auto',
-    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    endpoint: `https://${_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: {
-      accessKeyId:     process.env.R2_ACCESS_KEY_ID,
-      secretAccessKey: process.env.R2_SECRET_KEY,
+      accessKeyId:     _R2_ACCESS_KEY_ID,
+      secretAccessKey: _R2_SECRET_KEY,
     },
   });
   return _s3;
 }
 
 const R2_KEY    = 'db/properly.db';
-const R2_BUCKET = () => process.env.R2_BUCKET;
+const R2_BUCKET = () => _R2_BUCKET;
 
 // ── R2 OPERATIONS ─────────────────────────────────────────────
 async function r2Upload(buf) {
