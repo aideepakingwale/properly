@@ -54,38 +54,38 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-muted)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
-        <div style={{ maxWidth: 400, width: '100%', background: 'white', borderRadius: 20, padding: '40px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+        <div style={{ maxWidth: 400, width: '100%', background: 'white', borderRadius: 20, padding: '40px 32px', boxShadow: '0 4px 24px var(--dark-8)', textAlign: 'center' }}>
 
           <div style={{ fontSize: 64, marginBottom: 16 }}>{icons[status]}</div>
-          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#1C1917', marginBottom: 10 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 10 }}>
             {titles[status]}
           </h1>
 
           {status === 'verifying' && (
-            <p style={{ color: '#6B7280', fontSize: 15 }}>Please wait while we verify your email address…</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 15 }}>Please wait while we verify your email address…</p>
           )}
 
           {status === 'success' && (
             <>
-              <p style={{ color: '#059669', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{message}</p>
-              <p style={{ color: '#6B7280', fontSize: 13 }}>Taking you to the Phonics Forest now 🌳</p>
+              <p style={{ color: 'var(--text-success)', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{message}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Taking you to the Phonics Forest now 🌳</p>
             </>
           )}
 
           {(status === 'error' || status === 'expired') && (
             <>
-              <p style={{ color: '#6B7280', fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>{message}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>{message}</p>
               <button onClick={() => nav('/auth')} style={{
-                background: '#2D6A4F', color: 'white', border: 'none', borderRadius: 50,
+                background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 50,
                 padding: '12px 28px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 fontFamily: 'var(--font-body)', width: '100%', marginBottom: 12,
               }}>
                 Back to login / register
               </button>
               {status === 'expired' && (
-                <p style={{ fontSize: 12, color: '#9CA3AF' }}>
+                <p style={{ fontSize: 12, color: 'var(--text-light)' }}>
                   You can request a new verification email from the login page.
                 </p>
               )}

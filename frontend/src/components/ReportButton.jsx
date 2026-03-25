@@ -58,27 +58,27 @@ export default function ReportButton({ contentType, contentId, contentTitle, chi
 
   const triggerStyle = variant === 'icon-only'
     ? { background: 'transparent', border: 'none', padding: 6, color: 'rgba(0,0,0,0.25)', fontSize: 15, cursor: 'pointer', borderRadius: 8, transition: 'color 0.15s', lineHeight: 1 }
-    : { display: 'inline-flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 20, padding: '4px 10px', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' };
+    : { display: 'inline-flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--dark-10)', borderRadius: 20, padding: '4px 10px', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' };
 
   return (
     <>
       <button onClick={() => setOpen(true)} style={triggerStyle}
-        onMouseEnter={e => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; }}
-        onMouseLeave={e => { e.currentTarget.style.color = variant === 'icon-only' ? 'rgba(0,0,0,0.25)' : 'var(--text-muted)'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'; }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-danger)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = variant === 'icon-only' ? 'rgba(0,0,0,0.25)' : 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--dark-10)'; }}
         title="Report an issue with this content">
         🚩 {variant !== 'icon-only' && 'Report'}
       </button>
 
       {open && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 24px 64px var(--dark-20)' }}>
 
             {done ? (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-                <div style={{ fontWeight: 800, fontSize: 17, color: '#065F46', marginBottom: 8 }}>Report Submitted!</div>
-                <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6, marginBottom: 20 }}>{done}</div>
-                <button onClick={close} style={{ background: 'var(--violet,#7C3AED)', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 28px', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
+                <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--text-success-dark)', marginBottom: 8 }}>Report Submitted!</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 20 }}>{done}</div>
+                <button onClick={close} style={{ background: 'var(--violet,var(--color-primary))', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 28px', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>
                   Done
                 </button>
               </div>
@@ -86,22 +86,22 @@ export default function ReportButton({ contentType, contentId, contentTitle, chi
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: 17, color: '#1E1B4B' }}>🚩 Report an Issue</div>
-                    {contentTitle && <div style={{ fontSize: 12, color: '#6B7280', marginTop: 3 }}>"{contentTitle}"</div>}
+                    <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--bg-dark-mid)' }}>🚩 Report an Issue</div>
+                    {contentTitle && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>"{contentTitle}"</div>}
                   </div>
-                  <button onClick={close} style={{ color: '#9CA3AF', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
+                  <button onClick={close} style={{ color: 'var(--text-light)', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
                 </div>
 
-                <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 14, background: '#F5F3FF', borderRadius: 10, padding: '10px 12px', lineHeight: 1.6 }}>
-                  💡 If your report helps us improve, you may receive <strong style={{ color: '#7C3AED' }}>bonus story or book credits</strong> as a thank-you!
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14, background: 'var(--bg-primary-light)', borderRadius: 10, padding: '10px 12px', lineHeight: 1.6 }}>
+                  💡 If your report helps us improve, you may receive <strong style={{ color: 'var(--color-primary)' }}>bonus story or book credits</strong> as a thank-you!
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>What's the issue?</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>What's the issue?</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {REASONS.map(r => (
-                      <label key={r.value} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, border: `2px solid ${reason === r.value ? 'var(--violet,#7C3AED)' : '#E5E7EB'}`, background: reason === r.value ? '#F5F3FF' : '#fff', cursor: 'pointer', fontSize: 13, fontWeight: reason === r.value ? 700 : 500 }}>
-                        <input type="radio" name="reason" value={r.value} checked={reason === r.value} onChange={() => setReason(r.value)} style={{ accentColor: '#7C3AED' }} />
+                      <label key={r.value} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, border: `2px solid ${reason === r.value ? 'var(--violet,var(--color-primary))' : 'var(--border)'}`, background: reason === r.value ? 'var(--bg-primary-light)' : '#fff', cursor: 'pointer', fontSize: 13, fontWeight: reason === r.value ? 700 : 500 }}>
+                        <input type="radio" name="reason" value={r.value} checked={reason === r.value} onChange={() => setReason(r.value)} style={{ accentColor: 'var(--color-primary)' }} />
                         {r.label}
                       </label>
                     ))}
@@ -109,19 +109,19 @@ export default function ReportButton({ contentType, contentId, contentTitle, chi
                 </div>
 
                 <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Extra details (optional)</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Extra details (optional)</div>
                   <textarea value={detail} onChange={e => setDetail(e.target.value)} rows={2} placeholder="Tell us more about what went wrong…"
-                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 13, resize: 'none', fontFamily: 'var(--font-body,Nunito)', outline: 'none', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 10, fontSize: 13, resize: 'none', fontFamily: 'var(--font-body,Nunito)', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
 
-                {error && <div style={{ color: '#EF4444', fontSize: 12, marginBottom: 12, fontWeight: 600 }}>{error}</div>}
+                {error && <div style={{ color: 'var(--color-danger)', fontSize: 12, marginBottom: 12, fontWeight: 600 }}>{error}</div>}
 
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={close} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: '1.5px solid #E5E7EB', background: 'transparent', color: '#6B7280', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                  <button onClick={close} style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: '1.5px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                     Cancel
                   </button>
                   <button onClick={submit} disabled={loading || !reason}
-                    style={{ flex: 2, padding: '10px 0', borderRadius: 12, border: 'none', background: loading || !reason ? '#D1D5DB' : 'var(--violet,#7C3AED)', color: '#fff', fontWeight: 800, fontSize: 14, cursor: loading || !reason ? 'default' : 'pointer' }}>
+                    style={{ flex: 2, padding: '10px 0', borderRadius: 12, border: 'none', background: loading || !reason ? 'var(--border-2)' : 'var(--violet,var(--color-primary))', color: '#fff', fontWeight: 800, fontSize: 14, cursor: loading || !reason ? 'default' : 'pointer' }}>
                     {loading ? 'Submitting…' : '🚩 Submit Report'}
                   </button>
                 </div>

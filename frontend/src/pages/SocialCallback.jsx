@@ -62,33 +62,33 @@ export default function SocialCallback() {
   const providerIcon  = searchParams.get('provider') === 'facebook' ? '🟦' : '🔴';
 
   return (
-    <div style={{ minHeight:'100vh', background:'#F9FAFB', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-body)' }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg-muted)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-body)' }}>
       <div style={{ textAlign:'center', maxWidth:340, padding:'0 20px' }}>
 
         {status === 'processing' && (
           <>
             <div style={{ fontSize:72, marginBottom:16, animation:'spin 1.5s linear infinite', display:'inline-block' }}>🦉</div>
-            <h2 style={{ fontSize:20, fontWeight:900, color:'#1C1917', marginBottom:8 }}>
+            <h2 style={{ fontSize:20, fontWeight:900, color:'var(--text)', marginBottom:8 }}>
               Signing you in with {providerLabel}…
             </h2>
-            <p style={{ color:'#6B7280', fontSize:14 }}>Just a moment</p>
+            <p style={{ color:'var(--text-muted)', fontSize:14 }}>Just a moment</p>
           </>
         )}
 
         {status === 'success' && (
           <>
             <div style={{ fontSize:72, marginBottom:16 }}>✅</div>
-            <h2 style={{ fontSize:20, fontWeight:900, color:'#059669', marginBottom:8 }}>Signed in!</h2>
-            <p style={{ color:'#6B7280', fontSize:14 }}>Taking you to the Phonics Forest…</p>
+            <h2 style={{ fontSize:20, fontWeight:900, color:'var(--text-success)', marginBottom:8 }}>Signed in!</h2>
+            <p style={{ color:'var(--text-muted)', fontSize:14 }}>Taking you to the Phonics Forest…</p>
           </>
         )}
 
         {status === 'error' && (
           <>
             <div style={{ fontSize:72, marginBottom:16 }}>❌</div>
-            <h2 style={{ fontSize:20, fontWeight:900, color:'#DC2626', marginBottom:8 }}>Sign-in failed</h2>
-            <p style={{ color:'#6B7280', fontSize:14, marginBottom:20 }}>{message}</p>
-            <button onClick={() => nav('/auth')} style={{ background:'#2D6A4F', color:'white', border:'none', borderRadius:50, padding:'12px 28px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+            <h2 style={{ fontSize:20, fontWeight:900, color:'var(--color-danger-dark)', marginBottom:8 }}>Sign-in failed</h2>
+            <p style={{ color:'var(--text-muted)', fontSize:14, marginBottom:20 }}>{message}</p>
+            <button onClick={() => nav('/auth')} style={{ background:'var(--color-primary)', color:'white', border:'none', borderRadius:50, padding:'12px 28px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
               ← Back to login
             </button>
           </>

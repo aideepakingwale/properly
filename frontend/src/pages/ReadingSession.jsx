@@ -29,9 +29,9 @@ import { AcornPill, Modal, Confetti, ProgressBar, Button, Spinner } from '../com
 function getErrorBadge(errorType) {
   if (!errorType || errorType === 'None') return null;
   const map = {
-    Omission:        { label: 'missed', color: '#DC2626' },
-    Insertion:       { label: 'extra word', color: '#D97706' },
-    Mispronunciation:{ label: 'try again', color: '#DC2626' },
+    Omission:        { label: 'missed', color: 'var(--color-danger-dark)' },
+    Insertion:       { label: 'extra word', color: 'var(--color-accent-dark)' },
+    Mispronunciation:{ label: 'try again', color: 'var(--color-danger-dark)' },
   };
   return map[errorType] || null;
 }
@@ -41,7 +41,7 @@ function ProviderPill({ provider, source }) {
   if (source === 'cache') return null;
   const labels = { gemini: '♊ Gemini', groq: '⚡ Groq/Llama', static: '📚 Cache', rules: '📚 Rules', fallback: '📚 Rules' };
   return (
-    <span style={{ fontSize: 10, background: 'rgba(0,0,0,0.08)', borderRadius: 50, padding: '2px 7px', color: '#6B7280', fontWeight: 600, marginLeft: 6 }}>
+    <span style={{ fontSize: 10, background: 'var(--dark-8)', borderRadius: 50, padding: '2px 7px', color: 'var(--text-muted)', fontWeight: 600, marginLeft: 6 }}>
       {labels[provider] || provider}
     </span>
   );
@@ -291,7 +291,7 @@ export default function ReadingSession() {
 
   const dark = page.isDark;
   const textCol  = dark ? 'rgba(255,255,255,0.92)' : 'var(--text)';
-  const mutedCol = dark ? 'rgba(255,255,255,0.5)'  : 'var(--text-muted)';
+  const mutedCol = dark ? 'var(--overlay-50)'  : 'var(--text-muted)';
   const words     = page.text.trim().split(/\s+/);
   // Last page of an AI story is the moral/lesson page — special gentle display
   const isMoralPage = isAiStory && story?.pages && pageIdx === story.pages.length - 1;
@@ -308,20 +308,20 @@ export default function ReadingSession() {
             <div style={{ fontSize: 72, lineHeight: 1, marginBottom: 8 }}>🎉</div>
             <h2 style={{ fontSize: 26, fontWeight: 900, marginBottom: 4 }}>Story Complete!</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 20 }}>You finished <strong>"{story.title}"</strong>!</p>
-            <div style={{ background: 'linear-gradient(135deg,#FEF3C7,#FDE68A)', borderRadius: 20, padding: '18px 24px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <div style={{ background: 'var(--grad-goal)', borderRadius: 20, padding: '18px 24px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
               <span style={{ fontSize: 48 }}>🌰</span>
               <div>
-                <div style={{ fontSize: 38, fontWeight: 900, color: '#92400E' }}>+{sessionAcorns}</div>
-                <div style={{ fontSize: 13, color: '#B45309', fontWeight: 700 }}>Golden Acorns earned!</div>
-                {storyBonus > 0 && <div style={{ fontSize: 11, color: '#B45309' }}>includes +{storyBonus} story bonus 🌰</div>}
+                <div style={{ fontSize: 38, fontWeight: 900, color: 'var(--text-warning-dark)' }}>+{sessionAcorns}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-accent-dark)', fontWeight: 700 }}>Golden Acorns earned!</div>
+                {storyBonus > 0 && <div style={{ fontSize: 11, color: 'var(--color-accent-dark)' }}>includes +{storyBonus} story bonus 🌰</div>}
               </div>
             </div>
             {newAchievements.map(a => (
-              <div key={a.id} className="animate-pop-in" style={{ background: '#FEF3C7', borderRadius: 16, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10, border: '1.5px solid rgba(245,158,11,0.3)' }}>
+              <div key={a.id} className="animate-pop-in" style={{ background: 'var(--brand-accent-pale)', borderRadius: 16, padding: '12px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10, border: '1.5px solid var(--accent-30)' }}>
                 <span style={{ fontSize: 28 }}>{a.emoji}</span>
                 <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: 900, fontSize: 13, color: '#92400E' }}>🏆 New Achievement!</div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#B45309' }}>{a.title}</div>
+                  <div style={{ fontWeight: 900, fontSize: 13, color: 'var(--text-warning-dark)' }}>🏆 New Achievement!</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-accent-dark)' }}>{a.title}</div>
                 </div>
               </div>
             ))}
@@ -331,12 +331,12 @@ export default function ReadingSession() {
       )}
 
       {/* ── HEADER ── */}
-      <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: dark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`, position: 'sticky', top: 0, zIndex: 20 }}>
-        <button onClick={() => { stop(); nav('/home'); }} style={{ background: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.07)', border: 'none', borderRadius: 50, width: 36, height: 36, fontSize: 17, cursor: 'pointer', color: textCol, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
+      <div style={{ padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: dark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', borderBottom: `1px solid ${dark ? 'var(--overlay-10)' : 'rgba(0,0,0,0.06)'}`, position: 'sticky', top: 0, zIndex: 20 }}>
+        <button onClick={() => { stop(); nav('/home'); }} style={{ background: dark ? 'var(--overlay-12)' : 'rgba(0,0,0,0.07)', border: 'none', borderRadius: 50, width: 36, height: 36, fontSize: 17, cursor: 'pointer', color: textCol, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 900, fontSize: 14, color: textCol }}>{story.emoji} {story.title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', marginTop: 3 }}>
-            {story.pages.map((_, i) => <div key={i} style={{ height: 5, width: i === pageIdx ? 24 : 8, borderRadius: 50, background: i === pageIdx ? '#2D6A4F' : i < pageIdx ? '#86EFAC' : 'rgba(0,0,0,0.15)', transition: 'all 0.3s' }} />)}
+            {story.pages.map((_, i) => <div key={i} style={{ height: 5, width: i === pageIdx ? 24 : 8, borderRadius: 50, background: i === pageIdx ? 'var(--color-accent)' : i < pageIdx ? 'var(--color-primary)' : 'var(--dark-15)', transition: 'all 0.3s' }} />)}
           </div>
         </div>
         <AcornPill count={`+${sessionAcorns}`} />
@@ -349,16 +349,16 @@ export default function ReadingSession() {
         {providerInfo && (
           <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
             {providerInfo.azure?.available && (
-              <span style={{ fontSize: 11, background: '#DBEAFE', color: '#1E40AF', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>☁️ Azure Pronunciation AI</span>
+              <span style={{ fontSize: 11, background: 'var(--bg-info-light)', color: 'var(--color-info)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>☁️ Azure Pronunciation AI</span>
             )}
             {providerInfo.gemini?.available && (
               <span style={{ fontSize: 11, background: '#CCFBF1', color: '#0F766E', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>♊ Gemini (free)</span>
             )}
             {providerInfo.groq?.available && (
-              <span style={{ fontSize: 11, background: '#FFF7ED', color: '#C2410C', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>⚡ Groq/Llama (free)</span>
+              <span style={{ fontSize: 11, background: 'var(--brand-accent-pale)', color: 'var(--brand-pop1)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>⚡ Groq/Llama (free)</span>
             )}
             {!providerInfo.azure?.available && (
-              <span style={{ fontSize: 11, background: '#FEF3C7', color: '#92400E', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>📱 Browser STT mode</span>
+              <span style={{ fontSize: 11, background: 'var(--brand-accent-pale)', color: 'var(--text-warning-dark)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>📱 Browser STT mode</span>
             )}
           </div>
         )}
@@ -372,7 +372,7 @@ export default function ReadingSession() {
         <div className="animate-float" style={{ fontSize: 72, lineHeight: 1, marginBottom: 20, textAlign: 'center' }}>{page.scene}</div>
 
         {/* ── WORD DISPLAY ── */}
-        <div style={{ background: dark ? 'rgba(255,255,255,0.10)' : 'white', backdropFilter: dark ? 'blur(10px)' : 'none', borderRadius: 24, padding: '26px 24px', boxShadow: dark ? 'none' : 'var(--shadow-lg)', width: '100%', marginBottom: 16, border: dark ? '1px solid rgba(255,255,255,0.15)' : 'none', minHeight: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '12px 8px' }}>
+        <div style={{ background: dark ? 'var(--overlay-10)' : 'white', backdropFilter: dark ? 'blur(10px)' : 'none', borderRadius: 24, padding: '26px 24px', boxShadow: dark ? 'none' : 'var(--shadow-lg)', width: '100%', marginBottom: 16, border: dark ? '1px solid var(--overlay-15)' : 'none', minHeight: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '12px 8px' }}>
           {words.map((word, i) => {
             const sc = wordScores[i]?.score ?? null;
             const errorType = wordScores[i]?.errorType;
@@ -396,7 +396,7 @@ export default function ReadingSession() {
                 {/* Score badge — shown above word after reveal */}
                 {showScore && scoreVal !== null && (
                   <span style={{ position: 'absolute', top: -18, fontSize: 10, fontWeight: 900,
-                    color: scoreVal >= 80 ? '#059669' : scoreVal >= 60 ? '#D97706' : '#DC2626',
+                    color: scoreVal >= 80 ? 'var(--text-success)' : scoreVal >= 60 ? 'var(--color-accent-dark)' : 'var(--color-danger-dark)',
                     animation: 'fadeInUp 0.25s ease',
                     whiteSpace: 'nowrap' }}>
                     {Math.round(scoreVal)}%
@@ -404,8 +404,8 @@ export default function ReadingSession() {
                 )}
                 <span style={{
                   fontSize: 'clamp(22px,5vw,32px)', fontWeight: 800,
-                  color: isSpeaking ? '#1E40AF' : revealColors ? revealColors.text : textCol,
-                  background: isSpeaking ? '#DBEAFE' : revealColors ? revealColors.bg : 'transparent',
+                  color: isSpeaking ? 'var(--color-info)' : revealColors ? revealColors.text : textCol,
+                  background: isSpeaking ? 'var(--bg-info-light)' : revealColors ? revealColors.bg : 'transparent',
                   padding: (isSpeaking || revealColors) ? '3px 10px' : '2px 4px',
                   borderRadius: 10,
                   border: isSpeaking ? '2px solid #3B82F6' : revealColors ? `1.5px solid ${revealColors.border}` : 'none',
@@ -446,8 +446,8 @@ export default function ReadingSession() {
               { l: 'Complete', v: azureDetails.completeness },
               { l: 'Prosody', v: azureDetails.prosody },
             ].map(({ l, v }) => (
-              <div key={l} style={{ background: dark ? 'rgba(255,255,255,0.1)' : 'white', borderRadius: 10, padding: '8px 6px', textAlign: 'center', boxShadow: dark ? 'none' : 'var(--shadow-sm)' }}>
-                <div style={{ fontSize: 16, fontWeight: 900, color: v >= 80 ? '#059669' : v >= 60 ? '#D97706' : '#DC2626' }}>{v}<span style={{ fontSize: 10 }}>%</span></div>
+              <div key={l} style={{ background: dark ? 'var(--overlay-10)' : 'white', borderRadius: 10, padding: '8px 6px', textAlign: 'center', boxShadow: dark ? 'none' : 'var(--shadow-sm)' }}>
+                <div style={{ fontSize: 16, fontWeight: 900, color: v >= 80 ? 'var(--text-success)' : v >= 60 ? 'var(--color-accent-dark)' : 'var(--color-danger-dark)' }}>{v}<span style={{ fontSize: 10 }}>%</span></div>
                 <div style={{ fontSize: 9, color: mutedCol, fontWeight: 700, marginTop: 1 }}>{l}</div>
               </div>
             ))}
@@ -457,22 +457,22 @@ export default function ReadingSession() {
         {/* Simple accuracy bar (non-Azure mode) */}
         {overallAcc !== null && !azureDetails && (
           <div className="animate-slide-up" style={{ width: '100%', marginBottom: 12 }}>
-            <ProgressBar value={overallAcc} max={100} height={7} showPct color={overallAcc >= 80 ? '#10B981' : overallAcc >= 60 ? '#F59E0B' : '#EF4444'} label="Accuracy" />
+            <ProgressBar value={overallAcc} max={100} height={7} showPct color={overallAcc >= 80 ? 'var(--color-success)' : overallAcc >= 60 ? 'var(--brand-accent)' : 'var(--color-danger)'} label="Accuracy" />
           </div>
         )}
 
         {/* ── MRS. OWL FEEDBACK ── */}
         {(feedbackData || loadingFb) && (
-          <div className="animate-slide-down" style={{ background: dark ? 'rgba(255,255,255,0.10)' : 'linear-gradient(135deg,#ECFDF5,#D1FAE5)', backdropFilter: dark ? 'blur(10px)' : 'none', borderRadius: 20, padding: '14px 18px', width: '100%', marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 12, border: dark ? '1.5px solid rgba(255,255,255,0.15)' : '2px solid #6EE7B7' }}>
+          <div className="animate-slide-down" style={{ background: dark ? 'var(--overlay-10)' : 'var(--grad-card-active)', backdropFilter: dark ? 'blur(10px)' : 'none', borderRadius: 20, padding: '14px 18px', width: '100%', marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 12, border: dark ? '1.5px solid var(--overlay-15)' : '2px solid var(--brand-primary-light)' }}>
             <span style={{ fontSize: 30, flexShrink: 0, lineHeight: 1 }}>🦉</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 900, fontSize: 10, letterSpacing: '0.5px', color: dark ? 'rgba(255,255,255,0.5)' : '#065F46', marginBottom: 4, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontWeight: 900, fontSize: 10, letterSpacing: '0.5px', color: dark ? 'var(--overlay-50)' : 'var(--text-success-dark)', marginBottom: 4, display: 'flex', alignItems: 'center' }}>
                 MRS. OWL SAYS:
                 {feedbackData && <ProviderPill source={feedbackData.source} provider={feedbackData.provider} />}
               </div>
               {loadingFb
-                ? <div style={{ display: 'flex', gap: 5 }}>{[0,1,2].map(j => <div key={j} style={{ width: 6, height: 6, borderRadius: '50%', background: '#34D399', animation: `float ${0.5+j*0.15}s ease-in-out infinite`, animationDelay: `${j*0.12}s` }} />)}</div>
-                : <p style={{ fontSize: 14, fontWeight: 700, color: dark ? 'rgba(255,255,255,0.85)' : '#065F46', lineHeight: 1.45, margin: 0 }}>{feedbackData?.tip}</p>}
+                ? <div style={{ display: 'flex', gap: 5 }}>{[0,1,2].map(j => <div key={j} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success)', animation: `float ${0.5+j*0.15}s ease-in-out infinite`, animationDelay: `${j*0.12}s` }} />)}</div>
+                : <p style={{ fontSize: 14, fontWeight: 700, color: dark ? 'rgba(255,255,255,0.85)' : 'var(--text-success-dark)', lineHeight: 1.45, margin: 0 }}>{feedbackData?.tip}</p>}
             </div>
             {feedbackData && <button onClick={() => speak(feedbackData.tip)} style={{ background: 'transparent', border: 'none', fontSize: 18, cursor: 'pointer', opacity: 0.7 }}>🔊</button>}
           </div>
@@ -481,7 +481,7 @@ export default function ReadingSession() {
         {/* Colour legend */}
         {wordScores.length > 0 && !feedbackData && !loadingFb && (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 8 }}>
-            {[{ c: '#059669', l: 'Great!' }, { c: '#D97706', l: 'Almost' }, { c: '#DC2626', l: 'Try again' }].map(({ c, l }) => (
+            {[{ c: 'var(--text-success)', l: 'Great!' }, { c: 'var(--color-accent-dark)', l: 'Almost' }, { c: 'var(--color-danger-dark)', l: 'Try again' }].map(({ c, l }) => (
               <span key={l} style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: c, display: 'inline-block' }} /> {l}
               </span>
@@ -490,13 +490,13 @@ export default function ReadingSession() {
         )}
 
         {/* Mic error */}
-        {micError && <p style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13, textAlign: 'center', background: '#FEF2F2', borderRadius: 10, padding: '8px 14px', marginBottom: 8, width: '100%' }}>⚠️ {micError}</p>}
+        {micError && <p style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13, textAlign: 'center', background: 'var(--bg-danger-light)', borderRadius: 10, padding: '8px 14px', marginBottom: 8, width: '100%' }}>⚠️ {micError}</p>}
 
         {/* Moral page banner */}
         {isMoralPage && (
-          <div style={{ width:'100%', background:'linear-gradient(135deg,rgba(245,158,11,0.12),rgba(16,185,129,0.12))', border:'1.5px solid rgba(245,158,11,0.3)', borderRadius:14, padding:'12px 16px', marginBottom:14, textAlign:'center' }}>
+          <div style={{ width:'100%', background:'linear-gradient(135deg,var(--accent-12),var(--primary-12))', border:'1.5px solid var(--accent-30)', borderRadius:14, padding:'12px 16px', marginBottom:14, textAlign:'center' }}>
             <div style={{ fontSize:22, marginBottom:4 }}>🌟</div>
-            <div style={{ fontSize:12, fontWeight:800, color:'#F59E0B', letterSpacing:'0.5px', textTransform:'uppercase' }}>The Moral of the Story</div>
+            <div style={{ fontSize:12, fontWeight:800, color:'var(--brand-accent)', letterSpacing:'0.5px', textTransform:'uppercase' }}>The Moral of the Story</div>
             <div style={{ fontSize:11, color:'var(--muted)', marginTop:3 }}>Read this wise message together</div>
           </div>
         )}
@@ -505,23 +505,23 @@ export default function ReadingSession() {
         {/* ── DEBUG PANEL — only shown when admin has enabled debug mode ── */}
         {debugMode && user?.isAdmin && (
           <div style={{ width:'100%', marginBottom:12 }}>
-            <details style={{ background:'rgba(245,158,11,0.08)', border:'1.5px solid rgba(245,158,11,0.3)', borderRadius:12, padding:'10px 14px' }}>
-              <summary style={{ cursor:'pointer', fontSize:12, fontWeight:700, color:'#F59E0B', userSelect:'none' }}>
+            <details style={{ background:'rgba(245,158,11,0.08)', border:'1.5px solid var(--accent-30)', borderRadius:12, padding:'10px 14px' }}>
+              <summary style={{ cursor:'pointer', fontSize:12, fontWeight:700, color:'var(--brand-accent)', userSelect:'none' }}>
                 🐛 Debug — Azure Pronunciation Assessment {debugInfo ? '(data received)' : '(waiting for assessment…)'}
               </summary>
               {debugInfo ? (
                 <div style={{ marginTop:10, fontSize:11, fontFamily:'monospace' }}>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
-                    <div style={{ background:'rgba(0,0,0,0.2)', borderRadius:6, padding:'8px 10px' }}>
-                      <div style={{ color:'#86EFAC', fontWeight:700, marginBottom:4 }}>REQUEST</div>
-                      <div style={{ color:'rgba(255,255,255,0.7)', lineHeight:1.8 }}>
+                    <div style={{ background:'var(--dark-20)', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ color:'var(--brand-primary-light)', fontWeight:700, marginBottom:4 }}>REQUEST</div>
+                      <div style={{ color:'var(--overlay-70)', lineHeight:1.8 }}>
                         <div>Audio: {debugInfo.audioSizeKb} KB ({debugInfo.audioMime})</div>
                         <div>Original ref: "{debugInfo.originalRefText}"</div>
                         {debugInfo.sanitisedRefText !== debugInfo.originalRefText && (
-                          <div style={{ color:'#FCD34D' }}>Sent to Azure: "{debugInfo.sanitisedRefText}"</div>
+                          <div style={{ color:'var(--color-accent)' }}>Sent to Azure: "{debugInfo.sanitisedRefText}"</div>
                         )}
                         {debugInfo.properNounsReplaced?.length > 0 && (
-                          <div style={{ color:'#86EFAC' }}>
+                          <div style={{ color:'var(--brand-primary-light)' }}>
                             Proper nouns (phonetic): {debugInfo.properNounsReplaced.join(' | ')}
                           </div>
                         )}
@@ -533,9 +533,9 @@ export default function ReadingSession() {
                         </pre>
                       </div>
                     </div>
-                    <div style={{ background:'rgba(0,0,0,0.2)', borderRadius:6, padding:'8px 10px' }}>
-                      <div style={{ color:'#86EFAC', fontWeight:700, marginBottom:4 }}>RESPONSE — NBest[0]</div>
-                      <div style={{ color:'rgba(255,255,255,0.7)', lineHeight:1.8 }}>
+                    <div style={{ background:'var(--dark-20)', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ color:'var(--brand-primary-light)', fontWeight:700, marginBottom:4 }}>RESPONSE — NBest[0]</div>
+                      <div style={{ color:'var(--overlay-70)', lineHeight:1.8 }}>
                         {debugInfo.azureRawResponse?.NBest?.[0] ? (
                           <>
                             <div>RecognizedText: "{debugInfo.azureRawResponse.NBest[0].Display}"</div>
@@ -544,7 +544,7 @@ export default function ReadingSession() {
                             <div style={{ marginTop:6, color:'#FCA5A5' }}>Raw Words ({debugInfo.azureRawResponse.NBest[0].Words?.length}):</div>
                             <div style={{ maxHeight:180, overflow:'auto' }}>
                               {debugInfo.azureRawResponse.NBest[0].Words?.map((w, i) => (
-                                <div key={i} style={{ color: w.PronunciationAssessment?.ErrorType === 'Insertion' ? '#9CA3AF' : w.PronunciationAssessment?.AccuracyScore < 60 ? '#FCA5A5' : '#86EFAC', marginBottom:2 }}>
+                                <div key={i} style={{ color: w.PronunciationAssessment?.ErrorType === 'Insertion' ? 'var(--text-light)' : w.PronunciationAssessment?.AccuracyScore < 60 ? '#FCA5A5' : 'var(--brand-primary-light)', marginBottom:2 }}>
                                   [{w.PronunciationAssessment?.ErrorType || 'None'}] "{w.Word}" → {Math.round(w.PronunciationAssessment?.AccuracyScore ?? 0)}%
                                   {w.PronunciationAssessment?.ErrorType === 'Insertion' ? ' (extra — filtered)' : ''}
                                 </div>
@@ -561,7 +561,7 @@ export default function ReadingSession() {
                   </div>
                 </div>
               ) : (
-                <div style={{ marginTop:8, color:'rgba(255,255,255,0.4)', fontSize:11 }}>Record your voice to see Azure API data here.</div>
+                <div style={{ marginTop:8, color:'var(--overlay-40)', fontSize:11 }}>Record your voice to see Azure API data here.</div>
               )}
             </details>
           </div>
@@ -574,14 +574,14 @@ export default function ReadingSession() {
               pageWords.forEach((_, i) => setTimeout(() => setSpeakingWordIdx(i), i * 380));
               setTimeout(() => setSpeakingWordIdx(-1), pageWords.length * 380 + 500);
               speak(page.text);
-            }} style={{ background: 'rgba(59,130,246,0.1)', border: '1.5px solid rgba(59,130,246,0.25)', borderRadius: 50, padding: '7px 18px', color: '#2563EB', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-body)', marginBottom: 8 }}>
+            }} style={{ background: 'var(--primary-10)', border: '1.5px solid var(--primary-25)', borderRadius: 50, padding: '7px 18px', color: 'var(--color-info)', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-body)', marginBottom: 8 }}>
             🔊 Hear the sentence first
           </button>
         )}
       </div>
 
       {/* ── MIC CONTROLS ── */}
-      <div style={{ padding: '12px 18px 32px', textAlign: 'center', background: dark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`, position: 'sticky', bottom: 0 }}>
+      <div style={{ padding: '12px 18px 32px', textAlign: 'center', background: dark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', borderTop: `1px solid ${dark ? 'var(--overlay-8)' : 'rgba(0,0,0,0.06)'}`, position: 'sticky', bottom: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
           <div style={{ position: 'relative', display: 'inline-flex' }}>
             {isRecording && <>
@@ -590,17 +590,17 @@ export default function ReadingSession() {
             </>}
             <button onClick={handleMic} disabled={assessing}
               className={isRecording ? 'animate-breathe' : ''}
-              style={{ width: 78, height: 78, borderRadius: '50%', border: 'none', background: assessing ? '#9CA3AF' : isRecording ? 'linear-gradient(135deg,#EF4444,#DC2626)' : 'linear-gradient(135deg,#2D6A4F,#1B4332)', color: 'white', fontSize: 30, cursor: assessing ? 'default' : 'pointer', boxShadow: isRecording ? '0 8px 28px rgba(239,68,68,0.5)' : assessing ? 'none' : '0 8px 28px rgba(45,106,79,0.5)', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ width: 78, height: 78, borderRadius: '50%', border: 'none', background: assessing ? 'var(--text-light)' : isRecording ? 'var(--grad-danger)' : 'var(--grad-primary)', color: 'white', fontSize: 30, cursor: assessing ? 'default' : 'pointer', boxShadow: isRecording ? 'var(--shadow-danger)' : assessing ? 'none' : '0 8px 28px rgba(124,58,237,0.5)', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {assessing ? <Spinner size={28} color="white" /> : isRecording ? '⏹' : '🎙️'}
             </button>
           </div>
         </div>
-        <p style={{ fontSize: 13, fontWeight: 700, color: dark ? 'rgba(255,255,255,0.6)' : 'var(--text-muted)' }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: dark ? 'var(--overlay-60)' : 'var(--text-muted)' }}>
           {assessing ? '⚙️ Analysing your reading…'
            : isRecording ? '🔴 Recording… tap to stop'
            : 'Tap 🎙️ and read the sentence aloud!'}
         </p>
-        <p style={{ fontSize: 11, color: dark ? 'rgba(255,255,255,0.25)' : '#D1D5DB', marginTop: 2 }}>
+        <p style={{ fontSize: 11, color: dark ? 'var(--overlay-25)' : 'var(--border-2)', marginTop: 2 }}>
           {providerInfo?.azure?.available ? '☁️ Azure Pronunciation Assessment active' : '📱 Browser mic mode (add Azure key for full scoring)'}
         </p>
 
@@ -610,12 +610,12 @@ export default function ReadingSession() {
           <button
             onClick={() => { stop(); setPageIdx(p => Math.max(0, p - 1)); }}
             disabled={pageIdx === 0 || assessing || isRecording}
-            style={{ background: 'transparent', border: `1.5px solid ${pageIdx === 0 ? 'rgba(0,0,0,0.08)' : dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: pageIdx === 0 ? 'default' : 'pointer', color: pageIdx === 0 ? (dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)') : (dark ? 'rgba(255,255,255,0.7)' : '#374151'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ background: 'transparent', border: `1.5px solid ${pageIdx === 0 ? 'var(--dark-8)' : dark ? 'var(--overlay-20)' : 'var(--dark-15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: pageIdx === 0 ? 'default' : 'pointer', color: pageIdx === 0 ? (dark ? 'var(--overlay-15)' : 'var(--dark-15)') : (dark ? 'var(--overlay-70)' : 'var(--text-secondary)'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             ‹
           </button>
 
           {/* Page indicator */}
-          <span style={{ fontSize: 12, color: dark ? 'rgba(255,255,255,0.45)' : '#6B7280', minWidth: 80, textAlign: 'center', fontWeight: 600 }}>
+          <span style={{ fontSize: 12, color: dark ? 'var(--overlay-45)' : 'var(--text-muted)', minWidth: 80, textAlign: 'center', fontWeight: 600 }}>
             Page {pageIdx + 1} of {story?.pages?.length || '?'}
           </span>
 
@@ -631,7 +631,7 @@ export default function ReadingSession() {
               }
             }}
             disabled={assessing || isRecording}
-            style={{ background: 'transparent', border: `1.5px solid ${dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: assessing || isRecording ? 'default' : 'pointer', color: dark ? 'rgba(255,255,255,0.7)' : '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ background: 'transparent', border: `1.5px solid ${dark ? 'var(--overlay-20)' : 'var(--dark-15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: assessing || isRecording ? 'default' : 'pointer', color: dark ? 'var(--overlay-70)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {story && pageIdx === story.pages.length - 1 ? '🏠' : '›'}
           </button>
         </div>

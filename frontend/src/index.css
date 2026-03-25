@@ -1,95 +1,192 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
+/* ─────────────────────────────────────────────────────────────────────────────
+   PROPERLY — DESIGN SYSTEM v3
+   Theme-ready: change ONLY the "BRAND PALETTE" section below to retheme.
+   Every colour in JSX uses a CSS variable — no hex codes in components.
+   ─────────────────────────────────────────────────────────────────────────── */
 
-/* ─────────────────────────────────────────────────────────────
-   PROPERLY — DESIGN SYSTEM v2
-   Palette: Vibrant, joyful, multicolour — professional but
-   irresistibly kid-friendly. Inspired by LEGO, Duolingo, Notion.
-   Primary: Deep Violet  /  Accent: Sunshine Yellow
-   Pops of Coral, Sky Blue, Mint, Lavender throughout.
-   ───────────────────────────────────────────────────────────── */
-
-/* ── GOOGLE FONTS: add Baloo 2 for display headings ─────────── */
 @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;600;700;800;900&display=swap');
 
 :root {
-  /* ── BRAND CORE ──────────────────────────────────────────── */
-  --violet:        #5B21B6;   /* primary — deep violet */
-  --violet-mid:    #7C3AED;
-  --violet-bright: #8B5CF6;
-  --violet-pale:   #EDE9FE;
 
-  --sunshine:      #FBBF24;   /* accent — sunshine yellow */
-  --sunshine-dark: #D97706;
-  --sunshine-pale: #FEF9C3;
+  /* ═══════════════════════════════════════════════════════════
+     BRAND PALETTE  ← change these 12 lines to retheme the app
+     ═══════════════════════════════════════════════════════════ */
+  --brand-primary:        #7C3AED;   /* violet */
+  --brand-primary-dark:   #5B21B6;
+  --brand-primary-darker: #3730A3;
+  --brand-primary-light:  #8B5CF6;
+  --brand-primary-pale:   #EDE9FE;
+  --brand-accent:         #FBBF24;   /* sunshine yellow */
+  --brand-accent-dark:    #D97706;
+  --brand-accent-pale:    #FEF9C3;
+  --brand-pop1:           #F97316;   /* coral */
+  --brand-pop2:           #0EA5E9;   /* sky blue */
+  --brand-pop3:           #10B981;   /* mint */
+  --brand-pop4:           #F43F5E;   /* rose */
 
-  /* ── RAINBOW ACCENT PALETTE ──────────────────────────────── */
-  --coral:         #F97316;   /* warm orange-red */
-  --coral-pale:    #FFEDD5;
-  --sky:           #0EA5E9;   /* clear blue */
-  --sky-pale:      #E0F2FE;
-  --mint:          #10B981;   /* fresh green */
-  --mint-pale:     #D1FAE5;
-  --rose:          #F43F5E;   /* bright pink */
-  --rose-pale:     #FFE4E6;
-  --lavender:      #A78BFA;   /* soft purple */
-  --lavender-pale: #F5F3FF;
+  /* ═══════════════════════════════════════════════════════════
+     SEMANTIC TOKENS — derived from brand palette
+     These are what JSX references. Don't hardcode hex in JSX.
+     ═══════════════════════════════════════════════════════════ */
 
-  /* ── SEMANTIC ────────────────────────────────────────────── */
-  --success:  #10B981;
-  --warning:  #FBBF24;
-  --danger:   #EF4444;
-  --info:     #0EA5E9;
+  /* Interactive / CTA */
+  --color-primary:            var(--brand-primary);
+  --color-primary-dark:       var(--brand-primary-dark);
+  --color-primary-light:      var(--brand-primary-light);
+  --color-primary-pale:       var(--brand-primary-pale);
+  --color-accent:             var(--brand-accent);
+  --color-accent-dark:        var(--brand-accent-dark);
+  --color-accent-pale:        var(--brand-accent-pale);
+  --color-cta:                var(--brand-pop1);           /* big action buttons */
+  --color-cta-alt:            var(--brand-pop4);           /* secondary CTA */
+  --color-info:               var(--brand-pop2);
+  --color-success:            var(--brand-pop3);
+  --color-warning:            var(--brand-accent);
+  --color-danger:             #EF4444;
+  --color-danger-dark:        #DC2626;
 
-  /* ── NEUTRALS ────────────────────────────────────────────── */
-  --text:        #1E1B4B;   /* deep indigo — warmer than black */
-  --text-muted:  #6B7280;
-  --text-light:  #9CA3AF;
-  --border:      #E5E7EB;
-  --border2:     #D1D5DB;
-  --bg-page:     #FAFAFA;
-  --bg-card:     #FFFFFF;
-  --bg-subtle:   #F8F7FF;   /* very light violet tint */
+  /* Gradients */
+  --grad-primary:             linear-gradient(135deg, var(--brand-primary), var(--brand-pop4));
+  --grad-primary-dark:        linear-gradient(135deg, var(--brand-primary-dark), var(--brand-primary));
+  --grad-accent:              linear-gradient(135deg, var(--brand-accent), var(--brand-pop1));
+  --grad-cta:                 linear-gradient(135deg, var(--brand-pop1), var(--brand-pop4));
+  --grad-info:                linear-gradient(135deg, var(--brand-pop2), var(--brand-primary));
+  --grad-success:             linear-gradient(135deg, var(--brand-pop3), var(--brand-pop2));
+  --grad-hero:                linear-gradient(135deg, var(--brand-primary-dark) 0%, var(--brand-primary) 60%, var(--brand-pop4) 100%);
+  --grad-hero-dark:           linear-gradient(180deg, #0F0A2E 0%, #1E1B4B 20%, var(--brand-primary-darker) 45%, var(--brand-primary) 70%, var(--brand-primary-light) 88%, var(--brand-primary-pale) 100%);
+  --grad-header:              linear-gradient(135deg, #1E1B4B, #4C1D95, var(--brand-primary));
+  --grad-card-active:         linear-gradient(135deg, var(--brand-primary-pale), var(--brand-accent-pale));
+  --grad-goal:                linear-gradient(135deg, var(--brand-accent-pale), #FDE68A);
+  --grad-mic-idle:            linear-gradient(135deg, var(--brand-primary), var(--brand-pop4));
+  --grad-mic-recording:       linear-gradient(135deg, var(--color-danger), var(--color-danger-dark));
+  --grad-danger:              linear-gradient(135deg, var(--color-danger), var(--color-danger-dark));
 
-  /* ── GRADIENTS ───────────────────────────────────────────── */
-  --grad-hero:    linear-gradient(135deg, #4C1D95 0%, #7C3AED 50%, #EC4899 100%);
-  --grad-card:    linear-gradient(145deg, #FFFFFF, #F8F7FF);
-  --grad-sunshine:linear-gradient(135deg, #FBBF24, #F97316);
-  --grad-sky:     linear-gradient(135deg, #0EA5E9, #6366F1);
-  --grad-mint:    linear-gradient(135deg, #10B981, #0EA5E9);
-  --grad-coral:   linear-gradient(135deg, #F97316, #F43F5E);
+  /* Backgrounds */
+  --bg-page:                  #FAFAFA;
+  --bg-card:                  #FFFFFF;
+  --bg-subtle:                #F8F7FF;
+  --bg-dark:                  #0F0A2E;
+  --bg-dark-mid:              #1E1B4B;
+  --bg-muted:                 #F9FAFB;
+  --bg-success-light:         #D1FAE5;
+  --bg-warning-light:         var(--brand-accent-pale);
+  --bg-danger-light:          #FEE2E2;
+  --bg-info-light:            #DBEAFE;
+  --bg-primary-light:         var(--brand-primary-pale);
 
-  /* ── RADIUS ──────────────────────────────────────────────── */
-  --radius-sm: 8px;
-  --radius:    14px;
-  --radius-lg: 22px;
-  --radius-xl: 32px;
+  /* Borders */
+  --border:                   #E5E7EB;
+  --border-2:                 #D1D5DB;
+  --border-primary:           var(--brand-primary);
+  --border-primary-light:     #DDD6FE;
+  --border-accent:            var(--brand-accent);
+  --border-success:           #6EE7B7;
+  --border-warning:           rgba(245, 158, 11, 0.3);
 
-  /* ── SHADOWS ─────────────────────────────────────────────── */
-  --shadow-sm: 0 1px 4px rgba(91,33,182,0.07);
-  --shadow:    0 4px 16px rgba(91,33,182,0.1);
-  --shadow-lg: 0 8px 32px rgba(91,33,182,0.14);
-  --shadow-xl: 0 16px 48px rgba(91,33,182,0.2);
-  --shadow-colour: 0 8px 24px rgba(124,58,237,0.25);
+  /* Text */
+  --text:                     #1E1B4B;
+  --text-secondary:           #374151;
+  --text-muted:               #6B7280;
+  --text-light:               #9CA3AF;
+  --text-on-primary:          #FFFFFF;
+  --text-on-accent:           #1E1B4B;
+  --text-on-dark:             #FFFFFF;
+  --text-success:             #059669;
+  --text-success-dark:        #065F46;
+  --text-warning:             var(--brand-accent-dark);
+  --text-warning-dark:        #92400E;
+  --text-danger:              #EF4444;
+  --text-info:                #2563EB;
+  --text-primary:             var(--brand-primary);
+  --text-accent:              var(--brand-accent);
+  --text-pop1:                var(--brand-pop1);
+  --text-pop2:                var(--brand-pop2);
+  --text-pop3:                var(--brand-pop3);
 
-  /* ── TYPOGRAPHY ──────────────────────────────────────────── */
-  --font-body:    'Nunito', sans-serif;
-  --font-display: 'Baloo 2', 'Fredoka One', cursive;
+  /* Overlays — white/dark at different opacities */
+  --overlay-4:                rgba(255, 255, 255, 0.04);
+  --overlay-5:                rgba(255, 255, 255, 0.05);
+  --overlay-6:                rgba(255, 255, 255, 0.06);
+  --overlay-8:                rgba(255, 255, 255, 0.08);
+  --overlay-10:               rgba(255, 255, 255, 0.10);
+  --overlay-12:               rgba(255, 255, 255, 0.12);
+  --overlay-15:               rgba(255, 255, 255, 0.15);
+  --overlay-20:               rgba(255, 255, 255, 0.20);
+  --overlay-25:               rgba(255, 255, 255, 0.25);
+  --overlay-30:               rgba(255, 255, 255, 0.30);
+  --overlay-35:               rgba(255, 255, 255, 0.35);
+  --overlay-40:               rgba(255, 255, 255, 0.40);
+  --overlay-45:               rgba(255, 255, 255, 0.45);
+  --overlay-50:               rgba(255, 255, 255, 0.50);
+  --overlay-60:               rgba(255, 255, 255, 0.60);
+  --overlay-70:               rgba(255, 255, 255, 0.70);
+  --overlay-80:               rgba(255, 255, 255, 0.80);
+  --dark-8:                   rgba(0, 0, 0, 0.08);
+  --dark-10:                  rgba(0, 0, 0, 0.10);
+  --dark-15:                  rgba(0, 0, 0, 0.15);
+  --dark-20:                  rgba(0, 0, 0, 0.20);
 
-  /* Legacy aliases kept for backward compat */
-  --forest-darkest: #2E1065;
-  --forest-dark:    #3B0764;
-  --forest-mid:     #5B21B6;
-  --forest-light:   #7C3AED;
-  --forest-bright:  #A78BFA;
-  --forest-pale:    #EDE9FE;
-  --acorn:          #FBBF24;
-  --acorn-light:    #FEF9C3;
-  --acorn-dark:     #92400E;
-  --red:    #EF4444;
-  --green:  #10B981;
-  --amber:  #FBBF24;
-  --blue:   #3B82F6;
-  --purple: #7C3AED;
+  /* Primary colour with opacity — for backgrounds, borders, shadows */
+  --primary-5:                rgba(124, 58, 237, 0.05);
+  --primary-7:                rgba(124, 58, 237, 0.07);
+  --primary-10:               rgba(124, 58, 237, 0.10);
+  --primary-12:               rgba(124, 58, 237, 0.12);
+  --primary-14:               rgba(124, 58, 237, 0.14);
+  --primary-20:               rgba(124, 58, 237, 0.20);
+  --primary-25:               rgba(124, 58, 237, 0.25);
+  --primary-35:               rgba(124, 58, 237, 0.35);
+  --primary-40:               rgba(124, 58, 237, 0.40);
+
+  /* Accent with opacity */
+  --accent-12:                rgba(245, 158, 11, 0.12);
+  --accent-30:                rgba(245, 158, 11, 0.30);
+
+  /* Shadows */
+  --shadow-sm:                0 1px 4px var(--primary-7);
+  --shadow:                   0 4px 16px var(--primary-10);
+  --shadow-lg:                0 8px 32px var(--primary-14);
+  --shadow-xl:                0 16px 48px var(--primary-20);
+  --shadow-primary:           0 8px 24px var(--primary-25);
+  --shadow-accent:            0 8px 24px rgba(251, 191, 36, 0.35);
+  --shadow-danger:            0 8px 28px rgba(239, 68, 68, 0.5);
+
+  /* Radius */
+  --radius-sm:                8px;
+  --radius:                   14px;
+  --radius-lg:                22px;
+  --radius-xl:                32px;
+  --radius-full:              9999px;
+
+  /* Typography */
+  --font-body:                'Nunito', sans-serif;
+  --font-display:             'Baloo 2', 'Fredoka One', cursive;
+
+  /* Legacy aliases — keep for backward compat with any remaining uses */
+  --forest-darkest:           #2E1065;
+  --forest-dark:              var(--bg-dark-mid);
+  --forest-mid:               var(--brand-primary-dark);
+  --forest-light:             var(--brand-primary);
+  --forest-bright:            var(--brand-primary-light);
+  --forest-pale:              var(--brand-primary-pale);
+  --acorn:                    var(--brand-accent);
+  --acorn-light:              var(--brand-accent-pale);
+  --acorn-dark:               #92400E;
+  --red:                      var(--color-danger);
+  --green:                    var(--color-success);
+  --amber:                    var(--brand-accent);
+  --blue:                     var(--color-info);
+  --purple:                   var(--brand-primary);
+  --violet:                   var(--brand-primary);
+  --violet-mid:               var(--brand-primary);
+  --violet-bright:            var(--brand-primary-light);
+  --violet-pale:              var(--brand-primary-pale);
+  --sunshine:                 var(--brand-accent);
+  --sunshine-dark:            var(--brand-accent-dark);
+  --sunshine-pale:            var(--brand-accent-pale);
+  --coral:                    var(--brand-pop1);
+  --sky:                      var(--brand-pop2);
+  --mint:                     var(--brand-pop3);
+  --rose:                     var(--brand-pop4);
 }
 
 /* ── RESETS ─────────────────────────────────────────────────── */
@@ -108,7 +205,7 @@ button:active { transform: scale(0.97); }
 input, select, textarea { font-family: var(--font-body); }
 a { color: inherit; text-decoration: none; }
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.2); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--primary-20); border-radius: 2px; }
 
 /* ── STORY PAGE BACKGROUND CLASSES ─────────────────────────── */
 .bg-warm   { background: linear-gradient(160deg, #FFFBEB, #FEF3C7) !important; }
@@ -133,19 +230,18 @@ a { color: inherit; text-decoration: none; }
 @keyframes popIn     { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.15) rotate(3deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
 @keyframes shimmer   { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 @keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-@keyframes rainbow   { 0%{filter:hue-rotate(0deg)} 100%{filter:hue-rotate(360deg)} }
 @keyframes wiggle    { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-4deg)} 75%{transform:rotate(4deg)} }
 
-.animate-float     { animation: float 3s ease-in-out infinite; }
-.animate-float-slow{ animation: floatSlow 4s ease-in-out infinite; }
-.animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-.animate-slide-up  { animation: slideUp 0.35s ease forwards; }
-.animate-slide-down{ animation: slideDown 0.3s ease forwards; }
-.animate-fade-in   { animation: fadeIn 0.3s ease forwards; }
-.animate-breathe   { animation: breathe 2s ease-in-out infinite; }
-.animate-pop-in    { animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-.animate-spin      { animation: spin 1s linear infinite; }
-.animate-wiggle    { animation: wiggle 0.4s ease-in-out; }
+.animate-float      { animation: float 3s ease-in-out infinite; }
+.animate-float-slow { animation: floatSlow 4s ease-in-out infinite; }
+.animate-bounce-in  { animation: bounceIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+.animate-slide-up   { animation: slideUp 0.35s ease forwards; }
+.animate-slide-down { animation: slideDown 0.3s ease forwards; }
+.animate-fade-in    { animation: fadeIn 0.3s ease forwards; }
+.animate-breathe    { animation: breathe 2s ease-in-out infinite; }
+.animate-pop-in     { animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+.animate-spin       { animation: spin 1s linear infinite; }
+.animate-wiggle     { animation: wiggle 0.4s ease-in-out; }
 
 /* ── UTILITIES ──────────────────────────────────────────────── */
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }

@@ -37,8 +37,8 @@ const THEME_META = {
 
 const PROVIDER_BADGES = {
   gemini:   { label:'Gemini AI',    color:'#0F766E', bg:'#CCFBF1' },  // free
-  groq:     { label:'Groq / Llama', color:'#F97316', bg:'#FFF7ED' },  // free
-  fallback: { label:'Built-in',     color:'#92400E', bg:'#FEF3C7' },  // always free
+  groq:     { label:'Groq / Llama', color:'var(--brand-pop1)', bg:'var(--brand-accent-pale)' },  // free
+  fallback: { label:'Built-in',     color:'var(--text-warning-dark)', bg:'var(--brand-accent-pale)' },  // always free
 };
 
 // ── THEME PICKER ──────────────────────────────────────────────
@@ -61,10 +61,10 @@ function ThemePicker({ selected, onSelect, interests = [] }) {
         const isMatch = normInts.some(i => i.includes(key) || key.includes(i));
         return (
           <button key={key} onClick={() => onSelect(key)}
-            style={{ padding:'7px 12px', borderRadius:50, border:`2px solid ${selected===key?'#2D6A4F':'#E5E7EB'}`, background:selected===key?'#F0FDF4':'white', color:selected===key?'#2D6A4F':'#6B7280', fontSize:12, fontWeight:selected===key?800:600, cursor:'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', gap:5, transition:'all 0.15s', position:'relative' }}>
+            style={{ padding:'7px 12px', borderRadius:50, border:`2px solid ${selected===key?'var(--color-primary)':'var(--border)'}`, background:selected===key?'var(--color-primary)':'white', color:selected===key?'white':'var(--text-muted)', fontSize:12, fontWeight:selected===key?800:600, cursor:'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', gap:5, transition:'all 0.15s', position:'relative' }}>
             <span style={{ fontSize:14 }}>{meta.emoji}</span>
             {meta.label}
-            {isMatch && <span style={{ position:'absolute', top:-4, right:-4, width:10, height:10, borderRadius:'50%', background:'#F59E0B', border:'2px solid white' }} />}
+            {isMatch && <span style={{ position:'absolute', top:-4, right:-4, width:10, height:10, borderRadius:'50%', background:'var(--brand-accent)', border:'2px solid white' }} />}
           </button>
         );
       })}
@@ -76,10 +76,10 @@ function ThemePicker({ selected, onSelect, interests = [] }) {
 function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
   const provider = PROVIDER_BADGES[story.aiProvider] || PROVIDER_BADGES.fallback;
   return (
-    <div style={{ background:'white', borderRadius:22, padding:'16px 18px', boxShadow:'0 6px 24px rgba(0,0,0,0.1)', display:'flex', alignItems:'center', gap:14, border:story.status==='completed'?`2px solid ${phaseColor}40`:'2px solid transparent', transition:'transform 0.15s, box-shadow 0.15s', cursor:'pointer', position:'relative' }}
+    <div style={{ background:'white', borderRadius:22, padding:'16px 18px', boxShadow:'0 6px 24px var(--dark-10)', display:'flex', alignItems:'center', gap:14, border:story.status==='completed'?`2px solid ${phaseColor}40`:'2px solid transparent', transition:'transform 0.15s, box-shadow 0.15s', cursor:'pointer', position:'relative' }}
       onClick={() => onPlay(story)}
       onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 32px rgba(0,0,0,0.16)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='0 6px 24px rgba(0,0,0,0.1)'; }}>
+      onMouseLeave={e => { e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='0 6px 24px var(--dark-10)'; }}>
 
       {/* AI badge — top right */}
       <div style={{ position:'absolute', top:10, right:10, background:provider.bg, color:provider.color, borderRadius:50, padding:'2px 8px', fontSize:9, fontWeight:800 }}>
@@ -87,22 +87,22 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
       </div>
 
       {/* Cover */}
-      <div style={{ width:64, height:64, borderRadius:18, background:story.status==='completed'?'linear-gradient(135deg,#D1FAE5,#6EE7B7)':`linear-gradient(135deg,${phaseColor}20,${phaseColor}10)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, flexShrink:0, position:'relative', border:`1.5px solid ${phaseColor}30` }}>
+      <div style={{ width:64, height:64, borderRadius:18, background:story.status==='completed'?'var(--grad-card-active)':`linear-gradient(135deg,${phaseColor}20,${phaseColor}10)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, flexShrink:0, position:'relative', border:`1.5px solid ${phaseColor}30` }}>
         {story.emoji}
-        {story.status==='completed' && <div style={{ position:'absolute', bottom:-5, right:-5, background:'#10B981', borderRadius:'50%', width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'white', border:'2.5px solid white', fontWeight:900 }}>✓</div>}
+        {story.status==='completed' && <div style={{ position:'absolute', bottom:-5, right:-5, background:'var(--color-success)', borderRadius:'50%', width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'white', border:'2.5px solid white', fontWeight:900 }}>✓</div>}
       </div>
 
       {/* Info */}
       <div style={{ flex:1, minWidth:0, paddingRight:24 }}>
-        <div style={{ fontWeight:900, fontSize:15, color:'#1C1917', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{story.title}</div>
+        <div style={{ fontWeight:900, fontSize:15, color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{story.title}</div>
 
         <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:3, flexWrap:'wrap' }}>
           <span style={{ fontSize:12, background:`${phaseColor}15`, color:phaseColor, borderRadius:50, padding:'2px 8px', fontWeight:700 }}>
             Phase {story.phase}
           </span>
-          {story.theme && <span style={{ fontSize:11, color:'#9CA3AF', fontWeight:600 }}>{THEME_META[story.theme]?.emoji} {story.theme}</span>}
+          {story.theme && <span style={{ fontSize:11, color:'var(--text-light)', fontWeight:600 }}>{THEME_META[story.theme]?.emoji} {story.theme}</span>}
               {story.status && story.status !== 'unread' && (
-                <span style={{ fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:50, background: story.status === 'completed' ? '#D1FAE5' : '#FEF3C7', color: story.status === 'completed' ? '#065F46' : '#92400E' }}>
+                <span style={{ fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:50, background: story.status === 'completed' ? 'var(--bg-success-light)' : 'var(--brand-accent-pale)', color: story.status === 'completed' ? 'var(--text-success-dark)' : 'var(--text-warning-dark)' }}>
                   {story.status === 'completed' ? 'done' : 'reading'}
                 </span>
               )}
@@ -112,14 +112,14 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
         {story.targetPhonemes?.filter(ph => ph && ph.length <= 5).slice(0,4).length > 0 && (
           <div style={{ display:'flex', gap:4, marginTop:5, flexWrap:'wrap' }}>
             {story.targetPhonemes.filter(ph => ph && ph.length <= 5).slice(0,4).map(ph => (
-              <span key={ph} style={{ background:'#EDE9FE', color:'#5B21B6', borderRadius:5, padding:'2px 7px', fontSize:10, fontWeight:700, letterSpacing:'0.3px' }}>{ph}</span>
+              <span key={ph} style={{ background:'var(--color-primary-pale)', color:'var(--color-primary-dark)', borderRadius:5, padding:'2px 7px', fontSize:10, fontWeight:700, letterSpacing:'0.3px' }}>{ph}</span>
             ))}
           </div>
         )}
 
         <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:5 }}>
           <AcornPill count={`+${story.acorns}`} />
-          <span style={{ fontSize:11, color:'#D1D5DB' }}>· {story.pageCount} pages</span>
+          <span style={{ fontSize:11, color:'var(--border-2)' }}>· {story.pageCount} pages</span>
         </div>
       </div>
 
@@ -129,7 +129,7 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
           {story.status==='completed' ? '↩ Again' : '▶ Read'}
         </div>
         <button onClick={e => { e.stopPropagation(); onDelete(story.id); }}
-          style={{ background:'transparent', border:'none', fontSize:14, color:'#D1D5DB', cursor:'pointer', padding:'2px 4px', borderRadius:5 }}
+          style={{ background:'transparent', border:'none', fontSize:14, color:'var(--border-2)', cursor:'pointer', padding:'2px 4px', borderRadius:5 }}
           title="Remove story">🗑</button>
       </div>
     </div>
@@ -158,11 +158,11 @@ function GeneratingCard({ childName, theme }) {
   }, []);
 
   return (
-    <div style={{ background:'linear-gradient(135deg,#1B4332,#2D6A4F)', borderRadius:22, padding:'20px 22px', textAlign:'center', border:'2px solid rgba(255,255,255,0.1)' }}>
+    <div style={{ background:'var(--grad-cta)', borderRadius:22, padding:'20px 22px', textAlign:'center', border:'2px solid var(--overlay-10)' }}>
       <div style={{ fontSize:48, marginBottom:10 }}>{THEME_META[theme]?.emoji || '📖'}</div>
       <div style={{ color:'white', fontWeight:800, fontSize:14, marginBottom:4 }}>{msgs[msgIdx]}{dots}</div>
-      <div style={{ color:'rgba(255,255,255,0.5)', fontSize:11, marginBottom:12 }}>AI is crafting your personalised story</div>
-      <div style={{ display:'flex', justifyContent:'center' }}><Spinner color="rgba(255,255,255,0.7)" size={24} /></div>
+      <div style={{ color:'var(--overlay-50)', fontSize:11, marginBottom:12 }}>AI is crafting your personalised story</div>
+      <div style={{ display:'flex', justifyContent:'center' }}><Spinner color="var(--overlay-70)" size={24} /></div>
     </div>
   );
 }
@@ -251,18 +251,18 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
       {/* ── SECTION HEADER ── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <div>
-          <p style={{ color:'rgba(255,255,255,0.5)', fontSize:11, fontWeight:800, letterSpacing:'0.8px' }}>✨ YOUR AI STORIES</p>
-          <p style={{ color:'rgba(255,255,255,0.35)', fontSize:10, marginTop:1 }}>
+          <p style={{ color:'var(--overlay-50)', fontSize:11, fontWeight:800, letterSpacing:'0.8px' }}>✨ YOUR AI STORIES</p>
+          <p style={{ color:'var(--overlay-35)', fontSize:10, marginTop:1 }}>
             Personalised for {child?.name} · Phase {child?.phase}
           </p>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           {/* Daily counter */}
-          <span style={{ fontSize:10, color:dailyLeft>0?'rgba(255,255,255,0.4)':'#F87171', fontWeight:600 }}>
+          <span style={{ fontSize:10, color:dailyLeft>0?'var(--overlay-40)':'#F87171', fontWeight:600 }}>
             {dailyLeft}/5 today
           </span>
           <button onClick={() => setShowGenerator(s => !s)} disabled={generating || dailyLeft<=0}
-            style={{ background:dailyLeft>0?`linear-gradient(135deg,${phaseColor},${phaseColor}CC)`:'rgba(255,255,255,0.08)', border:'none', borderRadius:50, padding:'7px 14px', color:dailyLeft>0?'white':'rgba(255,255,255,0.3)', fontWeight:800, fontSize:12, cursor:dailyLeft>0?'pointer':'default', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', gap:5, boxShadow:dailyLeft>0?`0 4px 14px ${phaseColor}60`:'none' }}>
+            style={{ background:dailyLeft>0?`linear-gradient(135deg,${phaseColor},${phaseColor}CC)`:'var(--overlay-8)', border:'none', borderRadius:50, padding:'7px 14px', color:dailyLeft>0?'white':'var(--overlay-30)', fontWeight:800, fontSize:12, cursor:dailyLeft>0?'pointer':'default', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', gap:5, boxShadow:dailyLeft>0?`0 4px 14px ${phaseColor}60`:'none' }}>
             ✨ {generating ? 'Creating…' : 'New Story'}
           </button>
         </div>
@@ -271,11 +271,11 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
       {/* ── AI PROVIDER CHIP ── */}
       {providerInfo && (
         <div style={{ marginBottom:10, display:'flex', gap:5, flexWrap:'wrap' }}>
-          <span style={{ fontSize:10, background:providerInfo.gemini?'rgba(20,184,166,0.2)':providerInfo.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo.gemini?'#0F766E':providerInfo.groq?'#C2410C':'#FCD34D', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
+          <span style={{ fontSize:10, background:providerInfo.gemini?'rgba(20,184,166,0.2)':providerInfo.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo.gemini?'#0F766E':providerInfo.groq?'var(--brand-pop1)':'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
             {providerInfo.gemini ? '♊ Gemini AI (free)' : providerInfo.groq ? '⚡ Groq/Llama (free)' : '📚 Built-in templates'}
           </span>
           {interests.length > 0 && (
-            <span style={{ fontSize:10, background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.5)', borderRadius:50, padding:'3px 9px', fontWeight:600 }}>
+            <span style={{ fontSize:10, background:'var(--overlay-8)', color:'var(--overlay-50)', borderRadius:50, padding:'3px 9px', fontWeight:600 }}>
               🎯 Matched to: {interests.slice(0,2).join(', ')}
             </span>
           )}
@@ -284,15 +284,15 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
 
       {/* ── THEME GENERATOR PANEL ── */}
       {showGenerator && !generating && (
-        <div className="animate-slide-down" style={{ background:'rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', borderRadius:20, padding:'16px', marginBottom:14, border:'1px solid rgba(255,255,255,0.12)' }}>
+        <div className="animate-slide-down" style={{ background:'var(--overlay-8)', backdropFilter:'blur(10px)', borderRadius:20, padding:'16px', marginBottom:14, border:'1px solid var(--overlay-12)' }}>
           <p style={{ color:'white', fontWeight:800, fontSize:13, marginBottom:3 }}>Choose a story theme</p>
-          <p style={{ color:'rgba(255,255,255,0.45)', fontSize:11, marginBottom:12 }}>
+          <p style={{ color:'var(--overlay-45)', fontSize:11, marginBottom:12 }}>
             AI will write a phonics-perfect story just for {child?.name}
             {interests.length > 0 && ` (⭐ = matches ${child?.name}'s interests)`}
           </p>
           <ThemePicker selected={selectedTheme} onSelect={setSelectedTheme} interests={interests} />
           <div style={{ display:'flex', gap:8 }}>
-            <button onClick={() => setShowGenerator(false)} style={{ flex:1, padding:'10px', borderRadius:50, background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.7)', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)' }}>Cancel</button>
+            <button onClick={() => setShowGenerator(false)} style={{ flex:1, padding:'10px', borderRadius:50, background:'var(--overlay-8)', border:'1.5px solid var(--overlay-15)', color:'var(--overlay-70)', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)' }}>Cancel</button>
             <button onClick={handleGenerate} style={{ flex:2, padding:'10px', borderRadius:50, background:`linear-gradient(135deg,${phaseColor},${phaseColor}CC)`, border:'none', color:'white', fontWeight:900, fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)', boxShadow:`0 4px 14px ${phaseColor}50` }}>
               ✨ Generate "{THEME_META[selectedTheme]?.label}" Story
             </button>
@@ -311,10 +311,10 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
       {generating && <GeneratingCard childName={child?.name} theme={selectedTheme} />}
 
       {!generating && aiStories.length === 0 && (
-        <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:20, padding:'28px 20px', textAlign:'center', border:'1.5px dashed rgba(255,255,255,0.15)' }}>
+        <div style={{ background:'var(--overlay-6)', borderRadius:20, padding:'28px 20px', textAlign:'center', border:'1.5px dashed var(--overlay-15)' }}>
           <div style={{ fontSize:52, marginBottom:12 }}>✨</div>
           <p style={{ color:'white', fontWeight:800, fontSize:15, marginBottom:6 }}>No AI stories yet!</p>
-          <p style={{ color:'rgba(255,255,255,0.45)', fontSize:12, marginBottom:16, lineHeight:1.5 }}>
+          <p style={{ color:'var(--overlay-45)', fontSize:12, marginBottom:16, lineHeight:1.5 }}>
             Tap "New Story" to generate a personalised phonics story<br />just for {child?.name} — targeting their exact Phase {child?.phase} sounds.
           </p>
           <button onClick={() => setShowGenerator(true)} style={{ background:`linear-gradient(135deg,${phaseColor},${phaseColor}BB)`, border:'none', borderRadius:50, padding:'10px 22px', color:'white', fontWeight:800, fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)' }}>

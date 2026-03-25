@@ -74,7 +74,7 @@ export function computeAccuracy(scores) {
 
 export function getWordColor(score) {
   if (score === null || score === undefined) return null;
-  if (score >= 80) return { text:'#059669', bg:'rgba(5,150,105,0.10)',  border:'rgba(5,150,105,0.25)' };
-  if (score >= 60) return { text:'#D97706', bg:'rgba(217,119,6,0.10)', border:'rgba(217,119,6,0.25)' };
-  return           { text:'#DC2626', bg:'rgba(220,38,38,0.10)',  border:'rgba(220,38,38,0.25)' };
+  if (score >= 80) return { text:'var(--text-success)', bg:'rgba(5,150,105,0.10)',  border:'rgba(5,150,105,0.25)' };
+  if (score >= 60) return { text:'var(--color-accent-dark)', bg:'rgba(217,119,6,0.10)', border:'rgba(217,119,6,0.25)' };
+  return           { text:'var(--color-danger-dark)', bg:'rgba(220,38,38,0.10)',  border:'rgba(220,38,38,0.25)' };
 }

@@ -19,12 +19,12 @@ const UPDATED = '22 March 2025';
 export default function Terms() {
   const nav = useNavigate();
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'var(--font-body)', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ background: 'white', borderBottom: '1px solid #E5E7EB', padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 0, color: '#6B7280' }}>←</button>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-muted)', fontFamily: 'var(--font-body)', display: 'flex', flexDirection: 'column' }}>
+      <header style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={() => nav(-1)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 0, color: 'var(--text-muted)' }}>←</button>
         <span style={{ fontSize: 16 }}>🦉</span>
-        <span style={{ fontWeight: 800, fontSize: 15, color: '#1C1917' }}>Terms &amp; Conditions</span>
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9CA3AF' }}>v{APP_VERSION} · Updated {UPDATED}</span>
+        <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>Terms &amp; Conditions</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-light)' }}>v{APP_VERSION} · Updated {UPDATED}</span>
       </header>
 
       <main style={{ flex: 1, maxWidth: 720, margin: '0 auto', padding: '36px 24px', width: '100%' }}>
@@ -93,7 +93,7 @@ export default function Terms() {
           <p>Deepak Ingwale, Properly AI Phonics Tutor</p>
         </Section>
 
-        <p style={{ fontSize: 13, color: '#9CA3AF', marginTop: 36 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 36 }}>
           © {year} Deepak Ingwale · Properly v{APP_VERSION} · Last updated {UPDATED}
         </p>
       </main>
@@ -114,14 +114,14 @@ function Section({ title, children }) {
 function Style() {
   return (
     <style>{`
-      h1 { font-size: 26px; font-weight: 900; color: #1C1917; margin: 0 0 8px; }
-      .lead { font-size: 15px; color: #44403C; margin-bottom: 28px; line-height: 1.7; }
-      h2 { font-size: 17px; font-weight: 800; color: #1C1917; margin: 0 0 10px; }
-      p { font-size: 14px; color: #44403C; line-height: 1.75; margin: 0 0 10px; }
+      h1 { font-size: 26px; font-weight: 900; color: var(--text); margin: 0 0 8px; }
+      .lead { font-size: 15px; color: var(--text-secondary); margin-bottom: 28px; line-height: 1.7; }
+      h2 { font-size: 17px; font-weight: 800; color: var(--text); margin: 0 0 10px; }
+      p { font-size: 14px; color: var(--text-secondary); line-height: 1.75; margin: 0 0 10px; }
       ul { padding-left: 20px; margin: 0 0 10px; }
-      li { font-size: 14px; color: #44403C; line-height: 1.75; margin-bottom: 4px; }
-      a { color: #2D6A4F; }
-      strong { color: #1C1917; }
+      li { font-size: 14px; color: var(--text-secondary); line-height: 1.75; margin-bottom: 4px; }
+      a { color: var(--color-primary); }
+      strong { color: var(--text); }
     `}</style>
   );
 }

@@ -25,7 +25,7 @@ const STATIC_PLANS = [
     emoji:       '🌱',
     price:       0,
     tagline:     'Get started free',
-    color:       '#059669',
+    color:       'var(--text-success)',
     recommended: false,
     features: [
       '3 curriculum phonics stories',
@@ -48,7 +48,7 @@ const STATIC_PLANS = [
     emoji:       '🌿',
     price:       3.99,
     tagline:     'Most popular',
-    color:       '#2D6A4F',
+    color:       'var(--color-primary)',
     recommended: true,
     features: [
       'All 14 curriculum stories',
@@ -70,7 +70,7 @@ const STATIC_PLANS = [
     emoji:       '🌳',
     price:       6.99,
     tagline:     'For families',
-    color:       '#1B4332',
+    color:       'var(--brand-primary-darker)',
     recommended: false,
     features: [
       'Everything in Sprout',
@@ -88,16 +88,16 @@ const STATIC_PLANS = [
 export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = false }) {
   const isCurrent   = currentPlan && plan.id === currentPlan;
   const isDowngrade = currentPlan && currentPlan !== 'free' && plan.id === 'free';
-  const color       = plan.color || '#2D6A4F';
+  const color       = plan.color || 'var(--color-primary)';
 
-  const cardBg     = dark ? 'rgba(255,255,255,0.07)' : 'white';
+  const cardBg     = dark ? 'var(--overlay-7)' : 'white';
   const cardBorder = plan.recommended
     ? `2.5px solid ${color}`
-    : dark ? '1.5px solid rgba(255,255,255,0.12)' : '1.5px solid #E5E7EB';
-  const textPrimary   = dark ? 'white'                  : '#1C1917';
-  const textMuted     = dark ? 'rgba(255,255,255,0.3)'  : '#9CA3AF';
-  const checkColor    = dark ? 'rgba(82,183,136,0.9)'   : color;
-  const crossColor    = dark ? 'rgba(255,255,255,0.18)' : '#D1D5DB';
+    : dark ? '1.5px solid var(--overlay-12)' : '1.5px solid var(--border)';
+  const textPrimary   = dark ? 'white'                  : 'var(--text)';
+  const textMuted     = dark ? 'var(--overlay-30)'  : 'var(--text-light)';
+  const checkColor    = dark ? 'rgba(167,139,250,0.9)'   : color;
+  const crossColor    = dark ? 'rgba(255,255,255,0.18)' : 'var(--border-2)';
 
   return (
     <div
@@ -133,7 +133,7 @@ export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = 
           }
         </div>
         {plan.price > 0 && (
-          <p style={{ fontSize: 11, color: '#10B981', fontWeight: 700, margin: '2px 0 14px', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <p style={{ fontSize: 11, color: 'var(--color-success)', fontWeight: 700, margin: '2px 0 14px', display: 'flex', alignItems: 'center', gap: 4 }}>
             🎁 7-day free trial included
           </p>
         )}
@@ -154,14 +154,14 @@ export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = 
         )}
 
         {/* Divider */}
-        <div style={{ borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : '#F3F4F6'}`, marginBottom: 14 }} />
+        <div style={{ borderTop: `1px solid ${dark ? 'var(--overlay-10)' : 'var(--bg-subtle)'}`, marginBottom: 14 }} />
 
         {/* Features */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(plan.features || []).map(f => (
             <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13 }}>
               <span style={{ color: checkColor, flexShrink: 0, marginTop: 1, fontWeight: 700 }}>✓</span>
-              <span style={{ color: dark ? 'rgba(255,255,255,0.78)' : '#374151', lineHeight: 1.45 }}>{f}</span>
+              <span style={{ color: dark ? 'rgba(255,255,255,0.78)' : 'var(--text-secondary)', lineHeight: 1.45 }}>{f}</span>
             </div>
           ))}
           {(plan.notIncluded || []).map(f => (

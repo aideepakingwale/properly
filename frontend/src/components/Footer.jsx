@@ -21,9 +21,9 @@ export default function Footer({ dark = false }) {
     loc.pathname.startsWith('/verify') || loc.pathname.startsWith('/privacy') ||
     loc.pathname.startsWith('/terms');
 
-  const textColor  = dark ? 'rgba(255,255,255,0.35)' : '#9CA3AF';
-  const linkColor  = dark ? 'rgba(255,255,255,0.5)'  : '#6B7280';
-  const borderColor= dark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
+  const textColor  = dark ? 'var(--overlay-35)' : 'var(--text-light)';
+  const linkColor  = dark ? 'var(--overlay-50)'  : 'var(--text-muted)';
+  const borderColor= dark ? 'var(--overlay-8)' : 'var(--border)';
 
   return (
     <footer style={{
@@ -37,7 +37,7 @@ export default function Footer({ dark = false }) {
         <span style={{ fontSize: 12, color: textColor, fontWeight: 600 }}>
           Properly — AI Phonics Tutor
         </span>
-        <span style={{ fontSize: 11, color: textColor, background: dark ? 'rgba(255,255,255,0.07)' : '#F3F4F6', borderRadius: 50, padding: '1px 7px' }}>
+        <span style={{ fontSize: 11, color: textColor, background: dark ? 'var(--overlay-7)' : 'var(--bg-subtle)', borderRadius: 50, padding: '1px 7px' }}>
           v{APP_VERSION}
         </span>
       </div>

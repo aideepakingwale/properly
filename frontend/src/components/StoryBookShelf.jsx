@@ -23,11 +23,11 @@ import ReportButton from './ReportButton';
 // ── BOOK CARD ─────────────────────────────────────────────────
 function BookCard({ book, onOpen }) {
   const statusColour = {
-    ready:      '#10B981',
-    generating: '#F59E0B',
-    pending:    '#6B7280',
-    error:      '#EF4444',
-  }[book.status] || '#6B7280';
+    ready:      'var(--color-success)',
+    generating: 'var(--brand-accent)',
+    pending:    'var(--text-muted)',
+    error:      'var(--color-danger)',
+  }[book.status] || 'var(--text-muted)';
 
   const statusLabel = {
     ready:      '✅ Ready',
@@ -43,11 +43,11 @@ function BookCard({ book, onOpen }) {
       transition: 'transform 0.15s, box-shadow 0.15s',
     }}
       onClick={() => book.status === 'ready' && onOpen(book)}
-      onMouseEnter={e => { if (book.status === 'ready') { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)'; }}}
+      onMouseEnter={e => { if (book.status === 'ready') { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px var(--dark-20)'; }}}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
     >
       {/* Cover */}
-      <div style={{ height: 180, background: 'linear-gradient(135deg,#2D6A4F,#52B788)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+      <div style={{ height: 180, background: 'var(--grad-primary-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         {book.coverSignedUrl
           ? <img src={book.coverSignedUrl} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span style={{ fontSize: 56 }}>📖</span>
@@ -121,22 +121,22 @@ function FlipbookViewer({ book, onClose }) {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, width: '100%', maxWidth: 760, padding: '0 16px' }}>
-        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 14 }}>← Back</button>
+        <button onClick={onClose} style={{ background: 'var(--overlay-10)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 14 }}>← Back</button>
         <div style={{ flex: 1, color: '#fff', fontWeight: 700, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bookData.title}</div>
         {isReady && bookData.pdfSignedUrl && (
           <a href={bookData.pdfSignedUrl} download target="_blank" rel="noreferrer"
-            style={{ background: '#10B981', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+            style={{ background: 'var(--color-success)', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
             ⬇ Download PDF
           </a>
         )}
         {isReady && !bookData.print_ordered && (
           <button onClick={() => setShowOrder(true)}
-            style={{ background: '#F59E0B', color: '#000', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            style={{ background: 'var(--brand-accent)', color: '#000', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
             🖨 Order Print
           </button>
         )}
         {bookData.print_ordered && (
-          <span style={{ background: '#6B7280', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 13 }}>🖨 Print Ordered</span>
+          <span style={{ background: 'var(--text-muted)', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 13 }}>🖨 Print Ordered</span>
         )}
       </div>
 
@@ -152,7 +152,7 @@ function FlipbookViewer({ book, onClose }) {
               : bookData.status === 'generating' ? 'Creating your beautiful book…' : 'Book queued for generation…'}
           </div>
           {bookData.status !== 'error' && (
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>
+            <div style={{ fontSize: 14, color: 'var(--overlay-60)', marginTop: 8 }}>
               Generating AI illustrations for each page. This takes about 30–60 seconds.
             </div>
           )}
@@ -167,13 +167,13 @@ function FlipbookViewer({ book, onClose }) {
           <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', width: '100%', maxWidth: 680 }}>
             {pageIdx === -1 ? (
               // Cover
-              <div style={{ background: 'linear-gradient(135deg,#1E3A5F,#2D6A4F)', padding: 40, textAlign: 'center', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: 'var(--grad-primary-dark)', padding: 40, textAlign: 'center', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 {bookData.coverSignedUrl
                   ? <img src={bookData.coverSignedUrl} alt="cover" style={{ maxWidth: 300, maxHeight: 250, borderRadius: 12, marginBottom: 24 }} />
                   : <div style={{ fontSize: 80, marginBottom: 24 }}>📖</div>
                 }
                 <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{bookData.title}</div>
-                <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.7)' }}>Tap → to start reading</div>
+                <div style={{ fontSize: 16, color: 'var(--overlay-70)' }}>Tap → to start reading</div>
               </div>
             ) : currentPage ? (
               // Story page
@@ -192,10 +192,10 @@ function FlipbookViewer({ book, onClose }) {
               </div>
             ) : (
               // Back cover
-              <div style={{ background: '#2D6A4F', padding: 40, textAlign: 'center', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: 'var(--color-primary)', padding: 40, textAlign: 'center', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ fontSize: 72, marginBottom: 16 }}>🌟</div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 8 }}>The End!</div>
-                <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)' }}>What a brilliant reader you are!</div>
+                <div style={{ fontSize: 16, color: 'var(--overlay-80)' }}>What a brilliant reader you are!</div>
               </div>
             )}
           </div>
@@ -204,17 +204,17 @@ function FlipbookViewer({ book, onClose }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 20 }}>
             <button onClick={() => setPageIdx(p => Math.max(-1, p - 1))}
               disabled={pageIdx === -1}
-              style={{ background: pageIdx > -1 ? '#2D6A4F' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 10, width: 48, height: 48, fontSize: 22, cursor: pageIdx > -1 ? 'pointer' : 'default' }}>
+              style={{ background: pageIdx > -1 ? 'var(--color-primary)' : 'var(--overlay-10)', color: '#fff', border: 'none', borderRadius: 10, width: 48, height: 48, fontSize: 22, cursor: pageIdx > -1 ? 'pointer' : 'default' }}>
               ‹
             </button>
-            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, minWidth: 100, textAlign: 'center' }}>
+            <div style={{ color: 'var(--overlay-70)', fontSize: 14, minWidth: 100, textAlign: 'center' }}>
               {pageIdx === -1 ? 'Cover'
                 : pageIdx >= totalPages ? 'The End'
                 : `Page ${pageIdx + 1} of ${totalPages}`}
             </div>
             <button onClick={() => setPageIdx(p => Math.min(totalPages, p + 1))}
               disabled={pageIdx >= totalPages}
-              style={{ background: pageIdx < totalPages ? '#2D6A4F' : 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 10, width: 48, height: 48, fontSize: 22, cursor: pageIdx < totalPages ? 'pointer' : 'default' }}>
+              style={{ background: pageIdx < totalPages ? 'var(--color-primary)' : 'var(--overlay-10)', color: '#fff', border: 'none', borderRadius: 10, width: 48, height: 48, fontSize: 22, cursor: pageIdx < totalPages ? 'pointer' : 'default' }}>
               ›
             </button>
           </div>
@@ -223,7 +223,7 @@ function FlipbookViewer({ book, onClose }) {
           <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
             {[-1, ...Array(totalPages).fill(0).map((_, i) => i), totalPages].map((p, dotIdx) => (
               <button key={dotIdx} onClick={() => setPageIdx(p)}
-                style={{ width: pageIdx === p ? 20 : 8, height: 8, borderRadius: 4, border: 'none', background: pageIdx === p ? '#10B981' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'all 0.2s', padding: 0 }} />
+                style={{ width: pageIdx === p ? 20 : 8, height: 8, borderRadius: 4, border: 'none', background: pageIdx === p ? 'var(--color-success)' : 'var(--overlay-30)', cursor: 'pointer', transition: 'all 0.2s', padding: 0 }} />
             ))}
           </div>
         </div>
@@ -237,7 +237,7 @@ function FlipbookViewer({ book, onClose }) {
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>Your story will be professionally printed and shipped in 5–7 business days.</div>
 
             {orderMsg ? (
-              <div style={{ padding: 16, background: orderMsg.startsWith('🎉') ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', borderRadius: 8, color: orderMsg.startsWith('🎉') ? '#10B981' : '#EF4444', fontWeight: 600, marginBottom: 16 }}>
+              <div style={{ padding: 16, background: orderMsg.startsWith('🎉') ? 'var(--primary-10)' : 'rgba(239,68,68,0.1)', borderRadius: 8, color: orderMsg.startsWith('🎉') ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 600, marginBottom: 16 }}>
                 {orderMsg}
               </div>
             ) : (
@@ -259,7 +259,7 @@ function FlipbookViewer({ book, onClose }) {
               </button>
               {!orderMsg && (
                 <button onClick={submitOrder} disabled={ordering}
-                  style={{ flex: 2, padding: '10px 0', borderRadius: 8, border: 'none', background: '#F59E0B', color: '#000', cursor: 'pointer', fontWeight: 700, fontSize: 15 }}>
+                  style={{ flex: 2, padding: '10px 0', borderRadius: 8, border: 'none', background: 'var(--brand-accent)', color: '#000', cursor: 'pointer', fontWeight: 700, fontSize: 15 }}>
                   {ordering ? 'Placing order…' : 'Place Order →'}
                 </button>
               )}
@@ -373,7 +373,7 @@ export default function StoryBookShelf({ child }) {
               ))}
             </select>
             <button onClick={handleCreateBook} disabled={creating || !selectedStory || credits === 0}
-              style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: '#2D6A4F', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14, opacity: (creating || !selectedStory) ? 0.6 : 1 }}>
+              style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14, opacity: (creating || !selectedStory) ? 0.6 : 1 }}>
               {creating ? '⏳ Creating…' : '✨ Create Book (1 credit)'}
             </button>
           </div>

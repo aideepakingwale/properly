@@ -32,7 +32,7 @@ export default function ParentGate({ onPass, onClose }) {
         <div style={{ fontSize: 52 }}>👨‍👩‍👧</div>
         <h3 style={{ fontSize: 20, fontWeight: 900, marginTop: 10, marginBottom: 6 }}>Parents Only!</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 18 }}>Solve this maths problem to enter the dashboard:</p>
-        <div style={{ background: '#F0FDF4', borderRadius: 16, padding: '16px 22px', marginBottom: 14, fontSize: 28, fontWeight: 900, border: '2px solid #BBF7D0' }}>
+        <div style={{ background: 'var(--bg-primary-light)', borderRadius: 16, padding: '16px 22px', marginBottom: 14, fontSize: 28, fontWeight: 900, border: '2px solid var(--border-primary-light)' }}>
           What is {a} × {b}?
         </div>
         <input

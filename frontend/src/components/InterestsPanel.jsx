@@ -69,7 +69,7 @@ export default function InterestsPanel({ childId, childName, initialInterests = 
           const active = selected.has(i.id);
           return (
             <button key={i.id} onClick={() => toggle(i.id)}
-              style={{ padding:'8px 14px', borderRadius:50, border:`2px solid ${active?'#2D6A4F':'#E5E7EB'}`, background:active?'#F0FDF4':'#FAFAF9', color:active?'#2D6A4F':'#6B7280', fontSize:13, fontWeight:active?800:600, cursor:'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', gap:5, transition:'all 0.15s', opacity:!active&&selected.size>=5?0.4:1 }}>
+              style={{ padding:'8px 14px', borderRadius:50, border:`2px solid ${active?'var(--color-accent)':'var(--border)'}`, background:active?'var(--grad-accent)':'var(--bg-muted)', color:active?'white':'var(--text-muted)', fontSize:13, fontWeight:active?800:600, cursor:'pointer', fontFamily:'var(--font-body)', display:'flex', alignItems:'center', gap:5, transition:'all 0.15s', opacity:!active&&selected.size>=5?0.4:1 }}>
               <span style={{ fontSize:16 }}>{i.emoji}</span>
               {i.label}
             </button>
@@ -78,16 +78,16 @@ export default function InterestsPanel({ childId, childName, initialInterests = 
       </div>
 
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <p style={{ fontSize:12, color:'#9CA3AF' }}>{selected.size}/5 selected</p>
+        <p style={{ fontSize:12, color:'var(--text-light)' }}>{selected.size}/5 selected</p>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          {saved && <span style={{ color:'#10B981', fontWeight:700, fontSize:13 }}>✓ Saved!</span>}
+          {saved && <span style={{ color:'var(--color-success)', fontWeight:700, fontSize:13 }}>✓ Saved!</span>}
           <Button onClick={save} disabled={saving} size="sm">
             {saving ? <><Spinner size={14} color="white" /> Saving…</> : 'Save Interests'}
           </Button>
         </div>
       </div>
 
-      <p style={{ fontSize:11, color:'#D1D5DB', marginTop:10 }}>
+      <p style={{ fontSize:11, color:'var(--border-2)', marginTop:10 }}>
         💡 These are used to personalise AI stories. The starred (⭐) theme in the story generator will match {childName}'s interests.
       </p>
     </div>
