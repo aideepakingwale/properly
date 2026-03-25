@@ -510,8 +510,8 @@ export default function ReadingSession() {
                           <div style={{ color:'#FCD34D' }}>Sent to Azure: "{debugInfo.sanitisedRefText}"</div>
                         )}
                         {debugInfo.properNounsReplaced?.length > 0 && (
-                          <div style={{ color:'#FCD34D' }}>
-                            Proper nouns replaced: {debugInfo.properNounsReplaced.join(', ')} → "yes" (scored at 85)
+                          <div style={{ color:'#86EFAC' }}>
+                            Proper nouns (phonetic): {debugInfo.properNounsReplaced.join(' | ')}
                           </div>
                         )}
                         <div>Region: {debugInfo.endpoint?.split('.')[0]?.replace('https://', '')}</div>

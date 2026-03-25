@@ -18,6 +18,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import KidsManager from '../components/KidsManager';
+import StoryBookShelf from '../components/StoryBookShelf';
 import { shopAPI, progressAPI, aiStoryAPI } from '../services/api';
 import { Button, AcornPill, Spinner, Toast } from '../components/ui';
 import { useToast } from '../hooks/useToast';
@@ -331,6 +332,13 @@ export function ParentDash() {
         </div>
       )}
       {child && <InterestsPanel childId={child.id} childName={child.name} initialInterests={[]} onSaved={() => {}}/>}
+      {/* ── STORY BOOKS ────────────────────────────────────── */}
+      {child && (
+        <div style={{ background: 'white', borderRadius: 20, padding: 22, boxShadow: 'var(--shadow-sm)', marginBottom: 20 }}>
+          <StoryBookShelf child={child} />
+        </div>
+      )}
+
       <div style={{ marginTop: 28 }}>
         <KidsManager />
       </div>

@@ -136,6 +136,15 @@ export const speechAPI = {
 export default api;
 
 // ── AI STORY GENERATION ───────────────────────────────────────
+export const bookAPI = {
+  getCredits: ()                   => api.get('/books/credits'),
+  listForChild: (childId)          => api.get(`/books/child/${childId}`),
+  getBook: (bookId)                => api.get(`/books/${bookId}`),
+  createBook: (aiStoryId, childId) => api.post('/books', { aiStoryId, childId }),
+  deleteBook: (bookId)             => api.delete(`/books/${bookId}`),
+  orderPrint: (bookId, address)    => api.post(`/books/${bookId}/order-print`, address),
+};
+
 export const aiStoryAPI = {
   // Batch generation — generates 3-5 stories in one AI call
   generateBatch: (childId, opts) => api.post(`/children/${childId}/ai-stories/batch`, opts),

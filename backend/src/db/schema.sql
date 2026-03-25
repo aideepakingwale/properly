@@ -322,3 +322,53 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value      TEXT NOT NULL,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ── STORY BOOKS ──────────────────────────────────────────────────────────────
+-- Book credits per user (1 free on registration, more purchasable)
+CREATE TABLE IF NOT EXISTS book_credits (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  credits     INTEGER NOT NULL DEFAULT 0,
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Generated books tied to a child + AI story
+CREATE TABLE IF NOT EXISTS story_books (
+  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  child_id      TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  ai_story_id   TEXT NOT NULL REFERENCES ai_stories(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL DEFAULT '',
+  status        TEXT NOT NULL DEFAULT 'pending',
+  -- status: pending | generating | ready | error
+  pdf_r2_key    TEXT,          -- R2 key for the PDF file
+  cover_r2_key  TEXT,          -- R2 key for cover image
+  page_count    INTEGER DEFAULT 0,
+  print_ordered INTEGER NOT NULL DEFAULT 0,
+  print_address TEXT,          -- JSON shipping address if print ordered
+  error_msg     TEXT,          -- if status=error
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Individual pages of a generated book (image + text per page)
+CREATE TABLE IF NOT EXISTS story_book_pages (
+  id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  book_id      TEXT NOT NULL REFERENCES story_books(id) ON DELETE CASCADE,
+  page_num     INTEGER NOT NULL,
+  text         TEXT NOT NULL DEFAULT '',
+  image_prompt TEXT NOT NULL DEFAULT '',
+  image_r2_key TEXT,           -- R2 key for the generated image
+  image_url    TEXT,           -- Pollinations URL (fallback if R2 not set)
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Book credit transactions (audit trail)
+CREATE TABLE IF NOT EXISTS book_credit_transactions (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  delta       INTEGER NOT NULL,   -- +N credit added, -1 credit used
+  reason      TEXT NOT NULL,      -- 'registration_free', 'admin_grant', 'purchase', 'book_generated'
+  admin_id    TEXT,               -- set when admin granted
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);

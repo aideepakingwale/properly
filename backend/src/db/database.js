@@ -261,6 +261,39 @@ function migrate(db) {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, completed_at DATETIME
   )`);
 
+
+  // ── BOOK FEATURE MIGRATION ────────────────────────────────
+  db.exec(`CREATE TABLE IF NOT EXISTS book_credits (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    credits INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS story_books (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+    ai_story_id TEXT NOT NULL REFERENCES ai_stories(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    pdf_r2_key TEXT, cover_r2_key TEXT, page_count INTEGER DEFAULT 0,
+    print_ordered INTEGER NOT NULL DEFAULT 0, print_address TEXT, error_msg TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS story_book_pages (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    book_id TEXT NOT NULL REFERENCES story_books(id) ON DELETE CASCADE,
+    page_num INTEGER NOT NULL, text TEXT NOT NULL DEFAULT '',
+    image_prompt TEXT NOT NULL DEFAULT '', image_r2_key TEXT, image_url TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS book_credit_transactions (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    delta INTEGER NOT NULL, reason TEXT NOT NULL, admin_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   console.log('✅ Migrations complete');
 }
 

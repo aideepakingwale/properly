@@ -34,6 +34,8 @@ import {
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
 import getDb from '../db/database.js';
 import { requireAdmin } from '../middleware/admin.middleware.js';
+import { getUserCredits, listBooks, getBook, createBook, deleteBook, orderPrint } from '../controllers/book.controller.js';
+import { adminListBooks, adminAddCredits, adminGetCredits } from '../controllers/book.controller.js';
 import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe, debugEnv, getDebugMode, setDebugMode } from '../controllers/admin.controller.js';
 import { listChildren, addChild, updateChild as updateChildMgmt, deleteChild } from '../controllers/children.controller.js';
 import {
@@ -144,6 +146,19 @@ router.get('/debug-mode', (_req, res) => {
     res.json({ success: true, data: { enabled: s?.value === 'true' } });
   } catch { res.json({ success: true, data: { enabled: false } }); }
 });
+
+// ── BOOK ROUTES ──────────────────────────────────────────────
+router.get('/books/credits',                    authMiddleware, getUserCredits);
+router.get('/books/child/:childId',             authMiddleware, listBooks);
+router.post('/books',                           authMiddleware, createBook);
+router.get('/books/:bookId',                    authMiddleware, getBook);
+router.delete('/books/:bookId',                 authMiddleware, deleteBook);
+router.post('/books/:bookId/order-print',       authMiddleware, orderPrint);
+
+// ── ADMIN BOOK ROUTES ─────────────────────────────────────────
+router.get('/admin/books',                      authMiddleware, requireAdmin, adminListBooks);
+router.get('/admin/books/credits',              authMiddleware, requireAdmin, adminGetCredits);
+router.post('/admin/users/:userId/credits',     authMiddleware, requireAdmin, adminAddCredits);
 
 router.get('/health', (_req, res) => res.json({
   status:   'ok',

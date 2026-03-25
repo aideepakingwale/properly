@@ -64,6 +64,11 @@ export const register = async (req, res) => {
       token: verifyToken,
     });
 
+    // Grant 1 free book credit to every new user
+    db.prepare(`INSERT INTO book_credits (user_id, credits) VALUES (?,1)`).run(userId);
+    db.prepare(`INSERT INTO book_credit_transactions (user_id, delta, reason)
+                VALUES (?,1,'registration_free')`).run(userId);
+
     // Backup immediately after registration — don't wait 60s
     backupNow().catch(() => {});
 

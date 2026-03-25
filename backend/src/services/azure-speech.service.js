@@ -9,15 +9,23 @@
  * @license     Proprietary
  *
  * @remarks
- *   - Proper nouns (names like "Devansh") are replaced with "yes" before sending to Azure
- *     because Azure's en-GB model does not have phoneme models for Indian/uncommon names.
- *     Those positions receive a fixed score of 85 so children are never penalised for
- *     correctly saying their own name. All other words receive real Azure phoneme scores.
- *   - EnableProsodyAssessment is NOT sent for en-GB — it only works with en-US and
- *     actively degrades word-level accuracy scores when used with other locales.
- *   - Word alignment uses simple index mapping after stripping Insertion words (extra
- *     words the child said beyond the reference text). Azure's Words array, with
- *     EnableMiscue=true, is already ordered to match the reference text.
+ *   PROPER NOUN STRATEGY:
+ *   Azure's en-GB STT model does not recognise uncommon/non-English names (e.g. "Devansh").
+ *   It breaks them into junk fragments ("D", "De", "Dev") marked as Insertions, making all
+ *   subsequent word scores wrong. Simply skipping names with a fixed score is not acceptable
+ *   because children SHOULD be trained on pronouncing their own name correctly.
+ *
+ *   Solution — phonetic transcription:
+ *   1. Detect proper nouns in the reference text (capital-letter, non-common words)
+ *   2. Ask Gemini to provide a phonetic English spelling Azure en-GB can recognise
+ *      (e.g. "Devansh" -> "deh-vaansh" -> simplified to "devaan sh" for Azure)
+ *   3. Cache results in app_settings DB table (key: phonetic:WORD) to avoid repeated API calls
+ *   4. Send phonetic version to Azure — Azure now hears real sounds and scores them
+ *   5. Map Azure's phoneme scores back to the original word name in the response
+ *   This way children receive real phonics feedback on their name, not a fake score.
+ *
+ *   EnableProsodyAssessment is NOT sent for en-GB — only works with en-US.
+ *   Word alignment uses azPtr (sequential pointer) to stay in sync after Insertions.
  */
 
 const AZURE_KEY    = (process.env.AZURE_SPEECH_KEY    || '').trim();
@@ -41,6 +49,91 @@ function isProperNoun(word) {
   if (clean.length < 3) return false;
   if (!/^[A-Z]/.test(clean)) return false;
   return !COMMON_CAPS.has(clean.toLowerCase());
+}
+
+// ── PHONETIC SPELLING CACHE + LOOKUP ─────────────────────────
+// In-memory cache (also persisted to DB) for phonetic spellings of proper nouns.
+// Avoids calling Gemini on every assessment for the same name.
+const _phoneticCache = {};   // word -> phonetic spelling
+
+/**
+ * Get a phonetic English spelling of a proper noun that Azure en-GB can recognise.
+ * Example: "Devansh" -> "devaan sh", "Priya" -> "preeya", "Rohan" -> "rohan"
+ *
+ * Strategy:
+ *   1. In-memory cache (instant)
+ *   2. DB cache (app_settings key: phonetic:WORD) - persists across restarts
+ *   3. Gemini API - generates phonetic spelling, result cached
+ *   4. Fallback - lowercase the word (Azure may still manage basic sounds)
+ *
+ * @param {string} word - Proper noun to transcribe (no punctuation)
+ * @returns {string} Phonetic spelling safe for Azure en-GB reference text
+ */
+async function getPhoneticSpelling(word) {
+  const cacheKey = word.toLowerCase();
+
+  // 1. In-memory cache
+  if (_phoneticCache[cacheKey]) return _phoneticCache[cacheKey];
+
+  // 2. DB cache
+  try {
+    const { getDb } = await import('../db/database.js');
+    const db      = getDb();
+    const row     = db.prepare("SELECT value FROM app_settings WHERE key=?")
+                      .get(`phonetic:${cacheKey}`);
+    if (row?.value) {
+      _phoneticCache[cacheKey] = row.value;
+      return row.value;
+    }
+  } catch {}
+
+  // 3. Gemini — generate phonetic spelling
+  const geminiKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (geminiKey && geminiKey !== 'your-gemini-api-key-here') {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text:
+              `Give ONLY a simple phonetic English spelling of the name "${word}" that a British English speech recogniser would understand. ` +
+              `Write it as plain English syllables a child could read aloud (no IPA, no hyphens, no spaces between syllables, lowercase). ` +
+              `Examples: "Priya" -> "preeya", "Devansh" -> "devaansh", "Rohan" -> "rohan", "Aisha" -> "aysha", "Mohammed" -> "mohammad". ` +
+              `Reply with ONLY the phonetic spelling, nothing else.`
+            }] }],
+            generationConfig: { maxOutputTokens: 20, temperature: 0.1 },
+          }),
+        }
+      );
+      if (res.ok) {
+        const data    = await res.json();
+        const phonetic = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '')
+          .trim().toLowerCase().replace(/[^a-z\s]/g, '').trim();
+        if (phonetic && phonetic.length > 1) {
+          // Cache in memory and DB
+          _phoneticCache[cacheKey] = phonetic;
+          try {
+            const { getDb } = await import('../db/database.js');
+            getDb().prepare(
+              `INSERT INTO app_settings (key, value, updated_at) VALUES (?,?,CURRENT_TIMESTAMP)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`
+            ).run(`phonetic:${cacheKey}`, phonetic);
+          } catch {}
+          console.log(`[Azure] Phonetic: "${word}" -> "${phonetic}" (cached)`);
+          return phonetic;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Azure] Phonetic lookup failed for "${word}":`, e.message);
+    }
+  }
+
+  // 4. Fallback — lowercase; Azure may handle simple cases
+  const fallback = word.toLowerCase();
+  _phoneticCache[cacheKey] = fallback;
+  return fallback;
 }
 
 export function azureAvailable() {
@@ -84,20 +177,20 @@ async function toWavPcm16k(inputBuffer, inputMime) {
 export async function assessPronunciation(audioBuffer, referenceText, mimeType = 'audio/wav') {
   if (!azureAvailable()) throw new Error('Azure Speech not configured');
 
-  // ── Step 1: Pre-process reference text ──────────────────────
-  // Replace proper nouns with "yes" before sending to Azure.
-  // Azure's en-GB model lacks phoneme models for names like "Devansh" and produces
-  // garbage recognition (D, De, Dev...) that breaks alignment for all subsequent words.
-  // We score proper noun positions separately with a lenient fixed score.
+  // ── Step 1: Pre-process reference text — phonetic transcription ───
+  // Azure en-GB cannot recognise uncommon names (e.g. "Devansh" → "D","De","Dev" garbage).
+  // We replace each proper noun with a phonetic English approximation that Azure CAN recognise,
+  // so it scores the real sounds. The original name is shown in the UI.
+  // Phonetic spellings are cached in DB (key: phonetic:WORD) to avoid repeated Gemini calls.
   const refWords = referenceText.trim().split(/\s+/);
-  const properNounMap = {};  // index → original word
-  const sanitisedWords = refWords.map((w, i) => {
-    if (isProperNoun(w)) {
-      properNounMap[i] = w;
-      return 'yes';  // Azure knows "yes" reliably
-    }
-    return w;
-  });
+  const properNounMap = {};  // index → { original, phonetic }
+  const sanitisedWords = await Promise.all(refWords.map(async (w, i) => {
+    if (!isProperNoun(w)) return w;
+    const clean    = w.replace(/[.,!?;:'"]/g, '');
+    const phonetic = await getPhoneticSpelling(clean);
+    properNounMap[i] = { original: w, phonetic };
+    return phonetic;
+  }));
   const sanitisedText = sanitisedWords.join(' ');
 
   // ── Step 2: Convert audio ────────────────────────────────────
@@ -149,7 +242,8 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
     audioMime:          'audio/wav',
     originalRefText:    referenceText,
     sanitisedRefText:   sanitisedText,
-    properNounsReplaced: Object.values(properNounMap),
+    properNounsReplaced: Object.entries(properNounMap).map(([i,v]) => `${v.original} -> "${v.phonetic}"`),
+    properNounMap,
     pronConfig,
     azureRawResponse:   result,
   };
@@ -180,32 +274,57 @@ function parseAzureResult(result, sanitised, original, properNounMap) {
   const pa       = nBest.PronunciationAssessment || {};
   const allWords = nBest.Words || [];
 
-  // Strip Insertion words — child said extra words not in reference.
-  // These consume array slots and break index alignment if kept.
+  // Strip Insertion words (words child said that are not in the reference text).
+  // Example: child says "Devansh" where we put "yes" -> Azure marks "Devansh" as Insertion.
   const aligned = allWords.filter(w =>
     (w.PronunciationAssessment?.ErrorType || 'None') !== 'Insertion'
   );
 
-  // Map sanitised reference words → Azure scores by index (1:1 after insertions removed)
+  // Sequential pointer into aligned[] - MUST advance for every reference word
+  // including proper noun slots (which map to "yes" in the sanitised text).
+  //
+  // THE BUG THIS FIXES:
+  // Using aligned[i] directly was wrong because:
+  //   - We send "yes saves the town" but child says "Devansh saves the town"
+  //   - Azure marks "Devansh" as Insertion (stripped from aligned)
+  //   - aligned = [{yes:score}, {saves:score}, {the:score}, {town:score}]
+  //   - proper noun at i=0 skips the i=0 check, so next word i=1 ("saves")
+  //     reads aligned[1] = {saves} which HAPPENS to be correct here.
+  //   - BUT if there is more than one proper noun, or proper noun is not at 0,
+  //     the i and azPtr diverge and every word after gets the wrong score.
+  //
+  // CORRECT: azPtr advances for every reference word regardless of whether
+  // it is a proper noun, because "yes" IS in aligned (Azure always returns
+  // a result for every reference word, even if the child said something else).
+  let azPtr = 0;
+
   const wordScores = original.map((origWord, i) => {
 
-    // Proper noun slot — Azure assessed "yes" here, ignore that score.
-    // Give a lenient fixed score so child isn't penalised for their name.
     if (properNounMap[i]) {
+      // Proper noun: Azure scored the PHONETIC SPELLING at this slot.
+      // Consume real Azure result so child gets genuine phonics feedback on their name.
+      const az       = aligned[azPtr++];
+      const rawScore = az ? Math.round(az.PronunciationAssessment?.AccuracyScore ?? 0) : 0;
+      const errType  = az ? (az.PronunciationAssessment?.ErrorType || 'None') : 'Omission';
       return {
         word:        origWord,
-        score:       85,
-        rawScore:    85,
-        errorType:   'None',
+        score:       rawScore,
+        rawScore,
+        errorType:   errType,
         isProperNoun: true,
-        note:        'Proper noun — scored leniently (Azure cannot assess names)',
-        phonemes:    [],
+        phonetic:    properNounMap[i]?.phonetic,
+        note:        `Assessed via phonetic spelling "${properNounMap[i]?.phonetic}"`,
+        phonemes: (az?.Phonemes || []).map(p => ({
+          phoneme: p.Phoneme,
+          score:   Math.round(p.PronunciationAssessment?.AccuracyScore ?? 0),
+        })),
       };
     }
 
-    const az = aligned[i];
+    // Regular reference word - consume the next Azure result via azPtr
+    const az = aligned[azPtr++];
     if (!az) {
-      // No Azure word at this position — child omitted it
+      // Azure returned no word here - child omitted it
       return { word: origWord, score: 0, rawScore: 0, errorType: 'Omission', phonemes: [] };
     }
 
@@ -213,7 +332,7 @@ function parseAzureResult(result, sanitised, original, properNounMap) {
     const errorType = az.PronunciationAssessment?.ErrorType || 'None';
 
     return {
-      word:      origWord,          // always show original reference word in UI
+      word:      origWord,
       score:     rawScore,
       rawScore,
       errorType,
@@ -223,12 +342,9 @@ function parseAzureResult(result, sanitised, original, properNounMap) {
       })),
     };
   });
-
-  // Overall scores — exclude proper noun positions from accuracy calculation
-  // so names don't inflate/deflate the real phonics score
-  const scorableWords = wordScores.filter(w => !w.isProperNoun);
-  const overallAccuracy = scorableWords.length
-    ? Math.round(scorableWords.reduce((s, w) => s + w.score, 0) / scorableWords.length)
+  // Overall accuracy — include ALL words (proper nouns now have real phonetic scores)
+  const overallAccuracy = wordScores.length
+    ? Math.round(wordScores.reduce((s, w) => s + w.score, 0) / wordScores.length)
     : Math.round(pa.AccuracyScore ?? 0);
 
   return {
