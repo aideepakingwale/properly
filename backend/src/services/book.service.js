@@ -18,7 +18,7 @@
  */
 
 import { getDb }                        from '../db/database.js';
-import { r2Put, r2GetSignedUrl, r2Available } from './r2.service.js';
+import { r2Put, r2Url, r2Available } from './r2.service.js';
 import { randomBytes }                  from 'crypto';
 
 // Pollinations.ai — completely free, no API key required, no account needed.
