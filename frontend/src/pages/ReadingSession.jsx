@@ -603,6 +603,38 @@ export default function ReadingSession() {
         <p style={{ fontSize: 11, color: dark ? 'rgba(255,255,255,0.25)' : '#D1D5DB', marginTop: 2 }}>
           {providerInfo?.azure?.available ? '☁️ Azure Pronunciation Assessment active' : '📱 Browser mic mode (add Azure key for full scoring)'}
         </p>
+
+        {/* ── PAGE NAVIGATION — always visible so child can move freely ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
+          {/* Previous page */}
+          <button
+            onClick={() => { stop(); setPageIdx(p => Math.max(0, p - 1)); }}
+            disabled={pageIdx === 0 || assessing || isRecording}
+            style={{ background: 'transparent', border: `1.5px solid ${pageIdx === 0 ? 'rgba(0,0,0,0.08)' : dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: pageIdx === 0 ? 'default' : 'pointer', color: pageIdx === 0 ? (dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)') : (dark ? 'rgba(255,255,255,0.7)' : '#374151'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            ‹
+          </button>
+
+          {/* Page indicator */}
+          <span style={{ fontSize: 12, color: dark ? 'rgba(255,255,255,0.45)' : '#6B7280', minWidth: 80, textAlign: 'center', fontWeight: 600 }}>
+            Page {pageIdx + 1} of {story?.pages?.length || '?'}
+          </span>
+
+          {/* Next page */}
+          <button
+            onClick={() => {
+              stop();
+              if (story && pageIdx < story.pages.length - 1) {
+                setPageIdx(p => p + 1);
+              } else if (story && pageIdx === story.pages.length - 1) {
+                // Allow completing from nav button too
+                nav('/home');
+              }
+            }}
+            disabled={assessing || isRecording}
+            style={{ background: 'transparent', border: `1.5px solid ${dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: assessing || isRecording ? 'default' : 'pointer', color: dark ? 'rgba(255,255,255,0.7)' : '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {story && pageIdx === story.pages.length - 1 ? '🏠' : '›'}
+          </button>
+        </div>
       </div>
     </div>
   );

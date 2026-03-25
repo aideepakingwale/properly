@@ -61,17 +61,31 @@ export const getBook = async (req, res) => {
 
   const pages = db.prepare('SELECT * FROM story_book_pages WHERE book_id=? ORDER BY page_num').all(book.id);
 
-  // Generate signed URLs for images and PDF from R2
-  if (r2Available()) {
-    for (const page of pages) {
-      if (page.image_r2_key) {
+  // Generate signed URLs for R2 keys, or pass through direct URLs
+  const isUrl = (v) => v && (v.startsWith('http://') || v.startsWith('https://'));
+
+  for (const page of pages) {
+    if (page.image_r2_key) {
+      if (isUrl(page.image_r2_key)) {
+        page.imageSignedUrl = page.image_r2_key;   // already a URL
+      } else if (r2Available()) {
         try { page.imageSignedUrl = await r2Url(page.image_r2_key, 3600); } catch {}
       }
     }
-    if (book.pdf_r2_key) {
-      try { book.pdfSignedUrl   = await r2Url(book.pdf_r2_key,   3600); } catch {}
+    // Always surface image_url as the final fallback
+    if (!page.imageSignedUrl && page.image_url) {
+      page.imageSignedUrl = page.image_url;
     }
-    if (book.cover_r2_key) {
+  }
+
+  if (book.pdf_r2_key && !isUrl(book.pdf_r2_key) && r2Available()) {
+    try { book.pdfSignedUrl = await r2Url(book.pdf_r2_key, 3600); } catch {}
+  }
+
+  if (book.cover_r2_key) {
+    if (isUrl(book.cover_r2_key)) {
+      book.coverSignedUrl = book.cover_r2_key;    // already a URL
+    } else if (r2Available()) {
       try { book.coverSignedUrl = await r2Url(book.cover_r2_key, 3600); } catch {}
     }
   }
@@ -124,8 +138,11 @@ export const createBook = (req, res) => {
                 VALUES (?,?,?,?)`).run(bookId, page.page_index, page.text, page.text);
   }
 
-  // Start async generation (non-blocking)
-  generateBook(bookId).catch(e => console.error('[Book] Async generation error:', e.message));
+  // Defer generation to next event loop tick so HTTP response is fully sent first
+  // Without this, Node.js may not flush the response until the first async operation yields
+  setImmediate(() => {
+    generateBook(bookId).catch(e => console.error('[Book] Async generation error:', e.message));
+  });
 
   res.json({ success: true, data: { bookId, status: 'pending', message: 'Book generation started! Check back in ~30 seconds.' } });
 };

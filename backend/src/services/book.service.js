@@ -227,16 +227,27 @@ export async function generateBook(bookId) {
     const coverPrompt = `enchanted forest book cover, title "${story.title || childName + "'s Story"}", magical adventure, children book art`;
     console.log(`[Book] Generating cover image for book ${bookId}…`);
 
+    // Store cover URL immediately so viewer can show it right away
+    const coverImgUrl = `${POLL_BASE}/${encodeURIComponent(coverPrompt + ', children book cover art')}?width=800&height=600&seed=1&model=flux&enhance=false`;
+    db.prepare(`UPDATE story_books SET cover_r2_key=? WHERE id=?`).run(null, bookId);  // clear old key first
+
     let coverBuf = null;
     try {
       coverBuf = await generatePageImage(coverPrompt, childName, 1);
-      if (r2Available()) {
+      if (r2Available() && coverBuf) {
         const coverKey = `books/${bookId}/cover.png`;
         await r2Put(coverKey, coverBuf, 'image/png');
         db.prepare(`UPDATE story_books SET cover_r2_key=? WHERE id=?`).run(coverKey, bookId);
+        console.log(`[Book] Cover cached in R2`);
+      } else {
+        // Store Pollinations URL as cover fallback
+        db.prepare(`UPDATE story_books SET cover_r2_key=? WHERE id=?`).run(coverImgUrl, bookId);
+        console.log(`[Book] Cover URL stored as fallback`);
       }
     } catch (e) {
-      console.warn(`[Book] Cover image failed:`, e.message);
+      // Still store the URL fallback so viewer shows something
+      db.prepare(`UPDATE story_books SET cover_r2_key=? WHERE id=?`).run(coverImgUrl, bookId);
+      console.warn(`[Book] Cover buffer failed, using URL fallback: ${e.message}`);
     }
     imageBuffers.push(coverBuf);   // index 0 = cover
 
@@ -247,25 +258,28 @@ export async function generateBook(bookId) {
       const seed     = parseInt(bookId.slice(0, 8), 16) + i;   // deterministic per book+page
 
       console.log(`[Book] Generating image for page ${i + 1}/${pages.length}…`);
+      // Store the Pollinations URL immediately — viewer can load directly from this URL
+      // even if the server-side buffer fetch fails. URL is deterministic via seed.
+      const imgUrl = `${POLL_BASE}/${encodeURIComponent(buildImagePrompt(page.text, childName, story.title))}?width=800&height=600&seed=${seed}&model=flux&enhance=false`;
+      db.prepare(`UPDATE story_book_pages SET image_url=? WHERE book_id=? AND page_num=?`)
+        .run(imgUrl, bookId, page.page_index);
+
+      // Try to also cache in R2 for faster/persistent delivery
       let imgBuf = null;
       try {
         imgBuf = await generatePageImage(prompt, childName, seed);
 
-        // Upload image to R2
-        if (r2Available()) {
+        if (r2Available() && imgBuf) {
           const imgKey = `books/${bookId}/page_${i + 1}.png`;
           await r2Put(imgKey, imgBuf, 'image/png');
           db.prepare(`UPDATE story_book_pages SET image_r2_key=? WHERE book_id=? AND page_num=?`)
             .run(imgKey, bookId, page.page_index);
+          console.log(`[Book] Page ${i + 1} image cached in R2`);
+        } else {
+          console.log(`[Book] Page ${i + 1} image URL stored (no R2 cache)`);
         }
-
-        // Also store the Pollinations URL as fallback
-        const imgUrl = `${POLL_BASE}/${encodeURIComponent(buildImagePrompt(page.text, childName, story.title))}?width=800&height=600&seed=${seed}&model=flux&enhance=false`;
-        db.prepare(`UPDATE story_book_pages SET image_url=? WHERE book_id=? AND page_num=?`)
-          .run(imgUrl, bookId, page.page_index);
-
       } catch (e) {
-        console.warn(`[Book] Page ${i + 1} image failed:`, e.message);
+        console.warn(`[Book] Page ${i + 1} image buffer failed (URL still saved): ${e.message}`);
       }
 
       imageBuffers.push(imgBuf);   // index i+1 = page i

@@ -308,8 +308,9 @@ export default function StoryBookShelf({ child }) {
         // Reload books list
         const br = await bookAPI.listForChild(child.id);
         if (br.success) setBooks(br.data);
-        // Poll the new book for status updates
-        setViewing(r.data);
+        // Fetch full book object so viewer has id + pages for polling
+        const bookRes = await bookAPI.getBook(r.data.bookId);
+        setViewing(bookRes.success ? bookRes.data : { id: r.data.bookId, status: 'pending', title: '', pages: [] });
       } else if (r.noCredits) {
         setCreateMsg('❌ No book credits remaining. Ask your admin to add more, or purchase additional credits.');
       }

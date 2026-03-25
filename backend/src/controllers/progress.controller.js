@@ -212,7 +212,7 @@ export const getProgress = (req, res) => {
 
   // Achievements earned
   const earnedAchievements = db.prepare(`
-    SELECT ea.achievement_id, ea.earned_at, a.name, a.emoji, a.description
+    SELECT ea.achievement_id, ea.earned_at, a.title as name, a.emoji, a.description
     FROM earned_achievements ea JOIN achievements a ON a.id=ea.achievement_id
     WHERE ea.child_id=? ORDER BY ea.earned_at DESC
   `).all(child.id);
