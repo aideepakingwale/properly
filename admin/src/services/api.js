@@ -72,7 +72,8 @@ export const adminAPI = {
     gemini: () => api.post('/admin/test/gemini'),
     groq:   () => api.post('/admin/test/groq'),
     resend: () => api.post('/admin/test/resend'),
-    stripe: () => api.post('/admin/test/stripe'),
+    stripe:       () => api.post('/admin/test/stripe'),
+    pollinations: () => api.post('/admin/test/pollinations'),
   },
 };
 

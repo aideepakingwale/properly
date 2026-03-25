@@ -25,13 +25,22 @@ export default function UserDetail() {
   const [plan, setPlan]       = useState('free');
   const [isAdmin, setIsAdmin] = useState(false);
   const [msg, setMsg]         = useState('');
+  const [credits, setCredits]   = useState(null);   // current book credits
+  const [creditAmt, setCreditAmt] = useState(1);
+  const [creditReason, setCreditReason] = useState('admin_grant');
+  const [addingCredit, setAddingCredit] = useState(false);
+  const [creditMsg, setCreditMsg] = useState('');
 
   useEffect(() => {
-    adminAPI.user(id).then(r => {
+    Promise.all([adminAPI.user(id), adminAPI.bookCredits()]).then(([r, cr]) => {
       if (r.success) {
         setData(r.data);
         setPlan(r.data.subscription?.plan || 'free');
         setIsAdmin(r.data.user.isAdmin);
+      }
+      if (cr.success) {
+        const userCredit = cr.data.find(u => u.id === id);
+        setCredits(userCredit?.credits ?? 0);
       }
     }).finally(() => setLoading(false));
   }, [id]);
@@ -44,6 +53,19 @@ export default function UserDetail() {
       setTimeout(() => setMsg(''), 2000);
     } catch(e) { setMsg('Error: ' + e.message); }
     finally { setSaving(false); }
+  };
+
+  const addCredit = async () => {
+    setAddingCredit(true); setCreditMsg('');
+    try {
+      const r = await adminAPI.addBookCredits(id, creditAmt, creditReason);
+      if (r.success) {
+        setCredits(r.data.newTotal);
+        setCreditMsg('✅ ' + r.data.message);
+        setTimeout(() => setCreditMsg(''), 3000);
+      }
+    } catch(e) { setCreditMsg('❌ ' + (e.message || 'Failed')); }
+    finally { setAddingCredit(false); }
   };
 
   const deleteUser = async () => {
@@ -114,6 +136,53 @@ export default function UserDetail() {
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
           {msg && <div style={{ fontSize:12, color: msg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)', textAlign:'center' }}>{msg}</div>}
+
+          {/* ── Book Credits ── */}
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:18 }}>
+            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:12 }}>Book Credits</div>
+
+            {/* Current balance */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+              <span style={{ fontSize:13, color:'var(--muted)' }}>Current balance</span>
+              <span style={{ fontSize:22, fontWeight:800, color: credits > 0 ? 'var(--accent)' : 'var(--danger)' }}>
+                {credits === null ? '…' : credits}
+              </span>
+            </div>
+
+            {/* Add credits form */}
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:10, color:'var(--muted)', marginBottom:3 }}>Credits to add</div>
+                  <input
+                    type="number" min={1} max={50} value={creditAmt}
+                    onChange={e => setCreditAmt(Math.max(1, Math.min(50, parseInt(e.target.value)||1)))}
+                    style={{ width:'100%', padding:'7px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:14, boxSizing:'border-box' }}
+                  />
+                </div>
+                <div style={{ flex:2 }}>
+                  <div style={{ fontSize:10, color:'var(--muted)', marginBottom:3 }}>Reason</div>
+                  <select value={creditReason} onChange={e => setCreditReason(e.target.value)}
+                    style={{ width:'100%', padding:'7px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:12 }}>
+                    <option value="admin_grant">Admin Grant</option>
+                    <option value="compensation">Compensation</option>
+                    <option value="promotion">Promotion / Campaign</option>
+                    <option value="purchase">Manual Purchase</option>
+                    <option value="free_trial">Free Trial</option>
+                  </select>
+                </div>
+              </div>
+              <button onClick={addCredit} disabled={addingCredit}
+                style={{ padding:'8px 0', borderRadius:7, border:'none', background:'var(--accent)', color:'#000', fontWeight:800, fontSize:13, cursor:'pointer', opacity: addingCredit ? 0.6 : 1 }}>
+                {addingCredit ? 'Adding…' : `+ Add ${creditAmt} Credit${creditAmt !== 1 ? 's' : ''}`}
+              </button>
+              {creditMsg && (
+                <div style={{ fontSize:11, fontWeight:700, color: creditMsg.startsWith('✅') ? 'var(--accent)' : 'var(--danger)', textAlign:'center' }}>
+                  {creditMsg}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Right: children + sessions */}

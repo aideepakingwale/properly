@@ -287,9 +287,12 @@ export default function StoryBookShelf({ child }) {
     }).catch(() => {}).finally(() => setLoading(false));
 
     // Load AI stories for this child to pick from
-    import('../services/api').then(({ aiAPI }) => {
-      aiAPI.getStories(child.id).then(r => {
-        if (r.success) setStories((r.data.stories || []).filter(s => s.status === 'unread' || s.times_read > 0));
+    import('../services/api').then(({ aiStoryAPI }) => {
+      aiStoryAPI.list(child.id).then(r => {
+        // aiStoryAPI.list returns { stories: [] } — show all available stories
+        // Response shape: { data: { stories: [], summary: {} } }
+        const list = r.data?.stories || [];
+        setStories(list);
       }).catch(() => {});
     });
   }, [child?.id]);
@@ -355,8 +358,12 @@ export default function StoryBookShelf({ child }) {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <select value={selectedStory} onChange={e => setSelectedStory(e.target.value)}
               style={{ flex: 1, minWidth: 200, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 13 }}>
-              <option value="">— Select an AI story —</option>
-              {stories.map(s => <option key={s.id} value={s.id}>{s.title || 'Untitled Story'}</option>)}
+              <option value="">— Select an AI story ({stories.length} available) —</option>
+              {stories.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.title || 'Untitled Story'} {s.times_read > 0 ? `(read ${s.times_read}×)` : '(unread)'}
+                </option>
+              ))}
             </select>
             <button onClick={handleCreateBook} disabled={creating || !selectedStory || credits === 0}
               style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: '#2D6A4F', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14, opacity: (creating || !selectedStory) ? 0.6 : 1 }}>

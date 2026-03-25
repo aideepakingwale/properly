@@ -21,6 +21,11 @@ import { getDb }                        from '../db/database.js';
 import { r2Put, r2GetSignedUrl, r2Available } from './r2.service.js';
 import { randomBytes }                  from 'crypto';
 
+// Pollinations.ai — completely free, no API key required, no account needed.
+// Docs: https://pollinations.ai
+// safe=true  enables kid-safe content filtering (required for children's app)
+// nologo=true removes the Pollinations watermark
+// model=flux  uses the best free model for illustrations
 const POLL_BASE = 'https://image.pollinations.ai/prompt';
 
 // ── IMAGE GENERATION (Pollinations.ai) ───────────────────────
@@ -37,11 +42,21 @@ export async function generatePageImage(prompt, childName, seed = 42) {
   const stylePrefix = 'cute kawaii watercolour children book illustration, bright pastel colours, friendly characters, no text, safe for kids,';
   const fullPrompt  = `${stylePrefix} ${prompt}, featuring a child named ${childName}`;
   const encoded     = encodeURIComponent(fullPrompt);
-  const url         = `${POLL_BASE}/${encoded}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+  const url = `${POLL_BASE}/${encoded}?width=800&height=600&nologo=true&safe=true&seed=${seed}&model=flux`;
+  console.log(`[Book] Pollinations request: ${url.slice(0, 100)}…`);
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-  if (!res.ok) throw new Error(`Pollinations error: ${res.status}`);
-
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(45000),   // 45s — Pollinations can be slow on first request
+    headers: { 'Accept': 'image/png,image/jpeg,image/*' },
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => res.statusText);
+    throw new Error(`Pollinations HTTP ${res.status}: ${errText}`);
+  }
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('image')) {
+    throw new Error(`Pollinations returned non-image: ${contentType}`);
+  }
   const arrayBuf = await res.arrayBuffer();
   return Buffer.from(arrayBuf);
 }

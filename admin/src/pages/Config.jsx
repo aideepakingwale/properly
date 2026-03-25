@@ -283,6 +283,9 @@ export default function Config() {
           <ServiceRow label="Resend" value={cfg.resend.key} configured={!!cfg.resend.key}
             note="Email verification + welcome emails — free 3,000/month · resend.com"
             testKey="resend" onTest={runTest} testing={testing} results={results} />
+          <ServiceRow label="Pollinations.ai (Book Images)" configured={true}
+            note="Free AI image generation for story books — no API key required · pollinations.ai"
+            testKey="pollinations" onTest={runTest} testing={testing} results={results} />
         </div>
       </section>
 

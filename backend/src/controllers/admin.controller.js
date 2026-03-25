@@ -570,6 +570,26 @@ export const testResend = async (_req, res) => {
   }
 };
 
+export const testPollinations = async (_req, res) => {
+  // Pollinations.ai is free and needs no API key — just test connectivity
+  try {
+    const prompt = encodeURIComponent('simple colourful star, children book illustration');
+    const url    = `https://image.pollinations.ai/prompt/${prompt}?width=64&height=64&nologo=true&safe=true&seed=1&model=flux`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(30000), headers: { Accept: 'image/*' } });
+    if (!r.ok) {
+      return res.json({ success: false, service: 'pollinations', error: `HTTP ${r.status}` });
+    }
+    const ct   = r.headers.get('content-type') || '';
+    const size = r.headers.get('content-length') || '?';
+    if (!ct.includes('image')) {
+      return res.json({ success: false, service: 'pollinations', error: `Unexpected content-type: ${ct}` });
+    }
+    res.json({ success: true, service: 'pollinations', note: `Image returned (${size} bytes, ${ct}) — no API key needed ✅` });
+  } catch (e) {
+    res.json({ success: false, service: 'pollinations', error: e.message });
+  }
+};
+
 export const testStripe = async (_req, res) => {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return res.json({ success: false, service: 'stripe', error: 'STRIPE_SECRET_KEY not set' });
