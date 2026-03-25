@@ -35,9 +35,9 @@ import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
 import getDb from '../db/database.js';
 import { requireAdmin } from '../middleware/admin.middleware.js';
 import { submitReport, myReports, adminListReports, adminReviewReport } from '../controllers/report.controller.js';
-import { getUserCredits, listBooks, getBook, createBook, deleteBook, orderPrint } from '../controllers/book.controller.js';
-import { adminListBooks, adminAddCredits, adminGetCredits } from '../controllers/book.controller.js';
-import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe, testPollinations, debugEnv, getDebugMode, setDebugMode } from '../controllers/admin.controller.js';
+import { getUserCredits, listBooks, getBook, createBook, deleteBook, orderPrint, getBookDebug, retryBook } from '../controllers/book.controller.js';
+import { adminListBooks, adminAddCredits, adminGetCredits, getBookLogs } from '../controllers/book.controller.js';
+import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe, testPollinations, testAudioPipeline, debugEnv, getDebugMode, setDebugMode } from '../controllers/admin.controller.js';
 import { listChildren, addChild, updateChild as updateChildMgmt, deleteChild } from '../controllers/children.controller.js';
 import {
   getPlans, getSubscription, createCheckoutSession,
@@ -160,10 +160,13 @@ router.get('/books/child/:childId',             authMiddleware, listBooks);
 router.post('/books',                           authMiddleware, createBook);
 router.get('/books/:bookId',                    authMiddleware, getBook);
 router.delete('/books/:bookId',                 authMiddleware, deleteBook);
+router.get('/books/:bookId/debug',              authMiddleware, requireAdmin, getBookDebug);
+router.post('/books/:bookId/retry',             authMiddleware, retryBook);
 router.post('/books/:bookId/order-print',       authMiddleware, orderPrint);
 
 // ── ADMIN BOOK ROUTES ─────────────────────────────────────────
 router.get('/admin/books',                      authMiddleware, requireAdmin, adminListBooks);
+router.get('/admin/books/:bookId/logs',          authMiddleware, requireAdmin, getBookLogs);
 router.get('/admin/books/credits',              authMiddleware, requireAdmin, adminGetCredits);
 router.post('/admin/users/:userId/credits',     authMiddleware, requireAdmin, adminAddCredits);
 
@@ -200,6 +203,7 @@ router.post('/admin/test/groq',            authMiddleware, requireAdmin, testGro
 router.post('/admin/test/resend',          authMiddleware, requireAdmin, testResend);
 router.post('/admin/test/stripe',          authMiddleware, requireAdmin, testStripe);
 router.post('/admin/test/pollinations',     authMiddleware, requireAdmin, testPollinations);
+router.post('/admin/test/audio-pipeline',   authMiddleware, requireAdmin, testAudioPipeline);
 router.get('/admin/debug/env',             authMiddleware, requireAdmin, debugEnv);
 router.get('/admin/debug-mode',            authMiddleware, requireAdmin, getDebugMode);
 router.post('/admin/debug-mode',           authMiddleware, requireAdmin, setDebugMode);

@@ -1,3 +1,16 @@
+
+// ── ADMIN: GET BOOK GENERATION LOGS ──────────────────────────
+export const getBookLogs = (req, res) => {
+  const db   = getDb();
+  const book = db.prepare('SELECT id, title, status, error_msg, generation_log, generation_progress, created_at, updated_at FROM story_books WHERE id=?').get(req.params.bookId);
+  if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
+
+  let logs = [];
+  try { logs = JSON.parse(book.generation_log || '[]'); } catch {}
+
+  res.json({ success: true, data: { ...book, logs } });
+};
+
 /**
  * @file        book.controller.js
  * @description Story book controller — create books, manage credits, serve PDF/images, order print
@@ -16,7 +29,7 @@
  */
 
 import getDb             from '../db/database.js';
-import { generateBook }  from '../services/book.service.js';
+import { generateBook, getBookDebugLog }  from '../services/book.service.js';
 import { r2Url, r2Available } from '../services/r2.service.js';
 
 // ── CREDIT HELPERS ────────────────────────────────────────────
@@ -157,6 +170,31 @@ function randomHex() {
   return id.slice(0,8)+'-'+id.slice(8,12)+'-'+id.slice(12,16)+'-'+id.slice(16,20)+'-'+id.slice(20);
 }
 
+// ── RETRY FAILED BOOK ────────────────────────────────────────
+export const retryBook = (req, res) => {
+  const db     = getDb();
+  const userId = req.user.userId;
+  const { bookId } = req.params;
+
+  const book = db.prepare(`
+    SELECT sb.* FROM story_books sb
+    JOIN children c ON c.id = sb.child_id
+    WHERE sb.id=? AND c.user_id=?
+  `).get(bookId, userId);
+
+  if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
+  if (book.status === 'ready') return res.json({ success: true, data: { message: 'Book already ready' } });
+
+  // Reset to pending and re-trigger generation
+  db.prepare(`UPDATE story_books SET status='pending', error_msg=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(bookId);
+
+  setImmediate(() => {
+    generateBook(bookId).catch(e => console.error('[Book] Retry error:', e.message));
+  });
+
+  res.json({ success: true, data: { bookId, status: 'pending', message: 'Retrying book generation…' } });
+};
+
 // ── DELETE BOOK ───────────────────────────────────────────────
 export const deleteBook = (req, res) => {
   const db = getDb();
@@ -195,6 +233,16 @@ export const orderPrint = (req, res) => {
       orderRef: `BOOK-${bookId.slice(0, 8).toUpperCase()}`,
     },
   });
+};
+
+// ── DEBUG LOG (admin only) ────────────────────────────────────
+export const getBookDebug = (req, res) => {
+  try {
+    const data = getBookDebugLog(req.params.bookId);
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 // ── ADMIN: GET ALL BOOKS ──────────────────────────────────────

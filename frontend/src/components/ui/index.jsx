@@ -157,7 +157,7 @@ export function StarBg({ count = 12, color = 'var(--overlay-60)' }) {
 // ── CONFETTI ─────────────────────────────────────────────────
 export function Confetti({ active }) {
   if (!active) return null;
-  const colors = ['var(--brand-accent)', 'var(--color-success)', 'var(--color-info)', 'var(--color-danger)', 'var(--color-primary-light)', '#EC4899'];
+  const colors = ['var(--brand-accent)', 'var(--color-success)', 'var(--color-info)', 'var(--color-danger)', 'var(--color-primary-light)', 'var(--brand-pop4)'];
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', pointerEvents: 'none', zIndex: 600 }}>
       {Array.from({ length: 24 }, (_, i) => (

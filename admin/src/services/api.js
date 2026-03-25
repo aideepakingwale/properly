@@ -62,7 +62,9 @@ export const adminAPI = {
   r2Status:   ()             => api.get('/admin/r2-status'),
   reports:    (status)       => api.get('/admin/reports', { params: { status } }),
   reviewReport: (id, body)   => api.post(`/admin/reports/${id}/review`, body),
+  bookDebugLog: (bookId)     => api.get(`/books/${bookId}/debug`),
   books:        ()           => api.get('/admin/books'),
+  bookLogs:     (bookId)     => api.get(`/admin/books/${bookId}/logs`),
   bookCredits:()             => api.get('/admin/books/credits'),
   addBookCredits: (userId, credits, reason) => api.post(`/admin/users/${userId}/credits`, { credits, reason }),
   triggerBackup: ()          => api.post('/admin/r2-backup'),
@@ -75,7 +77,8 @@ export const adminAPI = {
     groq:   () => api.post('/admin/test/groq'),
     resend: () => api.post('/admin/test/resend'),
     stripe:       () => api.post('/admin/test/stripe'),
-    pollinations: () => api.post('/admin/test/pollinations'),
+    pollinations:    () => api.post('/admin/test/pollinations'),
+    audioPipeline:   () => api.post('/admin/test/audio-pipeline'),
   },
 };
 

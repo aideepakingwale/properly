@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import KidsManager from '../components/KidsManager';
 import StoryBookShelf from '../components/StoryBookShelf';
-import { shopAPI, progressAPI, aiStoryAPI } from '../services/api';
+import { shopAPI, progressAPI, aiStoryAPI, reportAPI, bookAPI } from '../services/api';
 import { Button, AcornPill, Spinner, Toast } from '../components/ui';
 import { useToast } from '../hooks/useToast';
 import InterestsPanel from '../components/InterestsPanel.jsx';
@@ -195,6 +195,16 @@ export function ParentDash() {
   const [gf, setGf]             = useState({ title: '', cost: '', emoji: '🎁' });
   const { toast, showToast, hideToast } = useToast();
   const [savingPhase, setSavingPhase] = useState(false);
+  const [dashTab, setDashTab]         = useState('progress');  // progress | books | reports | settings
+  const [myReports, setMyReports]     = useState([]);
+  const [reportsLoaded, setReportsLoaded] = useState(false);
+  const [bookCredits, setBookCredits] = useState(null);
+
+  const loadReports = () => {
+    if (reportsLoaded) return;
+    reportAPI.myReports().then(r => { if (r.success) { setMyReports(r.data); setReportsLoaded(true); }}).catch(() => {});
+    bookAPI.getCredits().then(r => { if (r.success) setBookCredits(r.data.credits); }).catch(() => {});
+  };
 
   if (!child) return null;
   const done = progress?.completedStories || [];
@@ -264,7 +274,32 @@ export function ParentDash() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 660, margin: '0 auto', padding: '22px 18px' }}>
+      <div style={{ maxWidth: 660, margin: '0 auto', padding: '16px 18px' }}>
+
+        {/* ── TAB NAV ───────────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: 3, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 4, marginBottom: 20, boxShadow: 'var(--shadow-sm)' }}>
+          {[
+            { k:'progress', icon:'📈', label:'Progress' },
+            { k:'books',    icon:'📚', label:`Books${bookCredits !== null ? ` (${bookCredits})` : ''}` },
+            { k:'reports',  icon:'🚩', label:`My Reports${myReports.length ? ` (${myReports.length})` : ''}` },
+            { k:'settings', icon:'⚙️', label:'Settings' },
+          ].map(({ k, icon, label }) => (
+            <button key={k} onClick={() => { setDashTab(k); if (k==='reports' || k==='books') loadReports(); }}
+              style={{ flex:1, padding:'8px 2px', borderRadius:11, border:'none',
+                background: dashTab===k ? 'var(--grad-primary)' : 'transparent',
+                color: dashTab===k ? '#fff' : 'var(--text-muted)',
+                fontWeight: dashTab===k ? 800 : 600, fontSize: 11,
+                cursor:'pointer', fontFamily:'var(--font-body)', transition:'all 0.2s',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
+              <span style={{ fontSize: 14 }}>{icon}</span>
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* ── PROGRESS TAB ──────────────────────────────────────── */}
+        {dashTab === 'progress' && <>
+
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 22 }}>
           {stats.map(s => (
@@ -331,17 +366,64 @@ export function ParentDash() {
           </div>
         </div>
       )}
-      {child && <InterestsPanel childId={child.id} childName={child.name} initialInterests={[]} onSaved={() => {}}/>}
-      {/* ── STORY BOOKS ────────────────────────────────────── */}
-      {child && (
+      </> /* end progress tab */ }
+
+      {/* ── BOOKS TAB ─────────────────────────────────────────── */}
+      {dashTab === 'books' && child && (
         <div style={{ background: 'white', borderRadius: 20, padding: 22, boxShadow: 'var(--shadow-sm)', marginBottom: 20 }}>
           <StoryBookShelf child={child} />
         </div>
       )}
 
-      <div style={{ marginTop: 28 }}>
-        <KidsManager />
-      </div>
+      {/* ── REPORTS TAB ───────────────────────────────────────── */}
+      {dashTab === 'reports' && (
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+            Reports you've submitted about AI stories or books. Valid reports may earn you <strong style={{ color: 'var(--color-primary)' }}>bonus credits</strong>!
+          </div>
+          {myReports.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>🚩</div>
+              <div style={{ fontSize: 14 }}>No reports submitted yet.</div>
+              <div style={{ fontSize: 12, marginTop: 6 }}>Use the 🚩 flag button on any AI story or book to report an issue.</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {myReports.map(r => {
+                const statusColour = r.status==='credited' ? 'var(--color-success)' : r.status==='dismissed' ? 'var(--text-muted)' : 'var(--brand-accent)';
+                const statusLabel  = r.status==='credited' ? '✅ Credited' : r.status==='dismissed' ? 'Dismissed' : '⏳ Pending';
+                return (
+                  <div key={r.id} style={{ background: 'white', borderRadius: 14, padding: '14px 16px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{r.content_title || r.content_type}</div>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: statusColour, background: r.status==='pending' ? 'var(--brand-accent-pale)' : r.status==='credited' ? 'var(--bg-success-light)' : 'var(--bg-subtle)', borderRadius: 20, padding: '2px 10px' }}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {r.reason.replace(/_/g,' ')} · {new Date(r.created_at).toLocaleDateString('en-GB')}
+                    </div>
+                    {r.credits_awarded > 0 && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-success)', fontWeight: 700 }}>
+                        🎁 +{r.credits_awarded} {r.credit_type} credit{r.credits_awarded !== 1 ? 's' : ''} awarded!
+                        {r.admin_note && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> — "{r.admin_note}"</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SETTINGS TAB ──────────────────────────────────────── */}
+      {dashTab === 'settings' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {child && <InterestsPanel childId={child.id} childName={child.name} initialInterests={[]} onSaved={() => {}}/>}
+          <div style={{ marginTop: 4 }}>
+            <KidsManager />
+          </div>
 
       {/* Custom goal */}
         <div style={{ background: 'white', borderRadius: 20, padding: 22, boxShadow: 'var(--shadow-sm)', marginBottom: 16 }}>
@@ -387,14 +469,16 @@ export function ParentDash() {
             <span style={{ fontSize: 22, flexShrink: 0 }}>🔒</span>
             <div>
               <div style={{ fontWeight: 900, fontSize: 13, color: 'var(--text-success-dark)', marginBottom: 4 }}>Privacy & GDPR</div>
-              <p style={{ fontSize: 12, color: '#047857', lineHeight: 1.55 }}>No audio is ever recorded or stored. Speech recognition uses your browser's built-in engine only. All child data is stored securely on your device and our server — never sold or shared. GDPR-K compliant.</p>
+              <p style={{ fontSize: 12, color: 'var(--text-success-dark)', lineHeight: 1.55 }}>No audio is ever recorded or stored. Speech recognition uses your browser's built-in engine only. All child data is stored securely on your device and our server — never sold or shared. GDPR-K compliant.</p>
             </div>
           </div>
         </div>
 
-        <div style={{ textAlign: 'center' }}>
-          <button onClick={() => { logout(); nav('/'); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-body)', padding: 10 }}>Sign out of Properly</button>
-        </div>
+          <div style={{ textAlign: 'center', marginTop: 8 }}>
+            <button onClick={() => { logout(); nav('/'); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-body)', padding: 10 }}>Sign out of Properly</button>
+          </div>
+        </div>  {/* end settings tab content */}
+      )}  {/* end settings tab */}
       </div>
       {toast && <Toast message={toast.message} emoji={toast.emoji} onHide={hideToast} />}
     </div>

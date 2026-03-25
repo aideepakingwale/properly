@@ -141,6 +141,27 @@
   --accent-12:                rgba(245, 158, 11, 0.12);
   --accent-30:                rgba(245, 158, 11, 0.30);
 
+
+
+  /* Story page cycling backgrounds (4 rotating) */
+  --page-bg-1:  #F0FFF4;
+  --page-bg-2:  #FFF9F0;
+  --page-bg-3:  #F0F4FF;
+  --page-bg-4:  #FFF0F9;
+
+  /* Misc remaining */
+  --text-parchment:     #C4B5A0;   /* muted text on light parchment backgrounds */
+  --danger-muted:       #F87171;   /* red text when slightly muted (quota warnings) */
+  --bg-danger-muted:    #FEE2E2;   /* danger-tinted background */
+  --brand-indigo-light: #818CF8;   /* indigo light — top of hero gradient */
+  --story-text-dark:    #1E3A5F;   /* deep navy for story text on light pages */
+
+  /* Functional / provider colours */
+  --danger-light:        #FCA5A5;   /* red text on dark bg */
+  --provider-gemini:     #0F766E;   /* Gemini teal */
+  --provider-gemini-bg:  #CCFBF1;
+  --debug-text:          #93C5FD;   /* debug panel blue-tinted text on dark bg */
+
   /* Shadows */
   --shadow-sm:                0 1px 4px var(--primary-7);
   --shadow:                   0 4px 16px var(--primary-10);

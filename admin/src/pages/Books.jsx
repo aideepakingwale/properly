@@ -25,6 +25,10 @@ export default function BooksAdmin() {
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState('books');
   const [expanded, setExpanded] = useState(null);
+  const [debugLog, setDebugLog]   = useState(null);
+  const [loadingDebug, setLoadingDebug] = useState(false);
+  const [logs,     setLogs]     = useState(null);    // generation log for expanded book
+  const [logsLoading, setLogsLoading] = useState(false);
   const [adding,   setAdding]   = useState(null);   // userId being credited
   const [addForm,  setAddForm]  = useState({ credits: 1, reason: 'admin_grant' });
   const [addMsg,   setAddMsg]   = useState('');
@@ -38,6 +42,25 @@ export default function BooksAdmin() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const fetchLogs = async (bookId) => {
+    if (expanded === bookId && logs) { setExpanded(null); setLogs(null); return; }
+    setExpanded(bookId);
+    setLogsLoading(true);
+    try {
+      const r = await adminAPI.bookLogs(bookId);
+      if (r.success) setLogs(r.data);
+    } catch {} finally { setLogsLoading(false); }
+  };
+
+  const loadDebug = async (bookId) => {
+    setDebugLog(null); setLoadingDebug(true);
+    try {
+      const r = await adminAPI.bookDebugLog(bookId);
+      if (r.success) setDebugLog(r.data);
+    } catch (e) { setDebugLog({ error: e.message }); }
+    finally { setLoadingDebug(false); }
+  };
 
   const submitCredits = async (userId) => {
     setAddMsg('');
@@ -122,7 +145,7 @@ export default function BooksAdmin() {
               {books.map(b => (
                 <>
                   <tr key={b.id} style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
-                    onClick={() => setExpanded(expanded === b.id ? null : b.id)}>
+                    onClick={() => fetchLogs(b.id)}>
                     <td style={{ padding: '11px 14px', fontWeight: 600, color: 'var(--text)' }}>
                       {b.title || b.story_title || 'Untitled'}
                     </td>
@@ -139,19 +162,43 @@ export default function BooksAdmin() {
                   </tr>
                   {expanded === b.id && (
                     <tr key={b.id + '-exp'}>
-                      <td colSpan={7} style={{ padding: '14px 18px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: 12, lineHeight: 2, color: 'var(--muted)' }}>
-                          <div><strong style={{ color: 'var(--text)' }}>Book ID:</strong> {b.id}</div>
-                          <div><strong style={{ color: 'var(--text)' }}>Story ID:</strong> {b.ai_story_id}</div>
-                          {b.pdf_r2_key && <div><strong style={{ color: 'var(--text)' }}>PDF Key:</strong> {b.pdf_r2_key}</div>}
-                          {b.error_msg  && <div style={{ color: 'var(--danger)' }}><strong>Error:</strong> {b.error_msg}</div>}
-                          {b.print_ordered && b.print_address && (
-                            <div>
-                              <strong style={{ color: 'var(--text)' }}>Print Address:</strong>{' '}
-                              {(() => { try { const a = JSON.parse(b.print_address); return `${a.name}, ${a.address1}, ${a.city}, ${a.postcode}, ${a.country}`; } catch { return b.print_address; } })()}
+                      <td colSpan={7} style={{ padding: '16px 18px', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                        {logsLoading ? (
+                          <div style={{ color: 'var(--muted)', fontSize: 12 }}>Loading generation logs…</div>
+                        ) : logs && logs.id === b.id ? (
+                          <div>
+                            {/* Basic info */}
+                            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10, fontFamily: 'var(--font-mono)' }}>
+                              ID: {b.id} | Story: {b.ai_story_id}
+                              {b.error_msg && <span style={{ color: 'var(--danger)', marginLeft: 12 }}>❌ {b.error_msg}</span>}
                             </div>
-                          )}
-                        </div>
+
+                            {/* Generation log steps */}
+                            <div style={{ fontSize: 11, fontFamily: 'monospace' }}>
+                              <div style={{ fontWeight: 700, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Generation Log</div>
+                              {(logs.logs || []).length === 0 ? (
+                                <div style={{ color: 'var(--muted)' }}>No log entries yet</div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                  {(logs.logs || []).map((entry, i) => (
+                                    <div key={i} style={{
+                                      display: 'grid', gridTemplateColumns: '120px 32px 1fr 120px', gap: 8, alignItems: 'start',
+                                      padding: '4px 8px', borderRadius: 5,
+                                      background: entry.status === 'error' ? 'rgba(239,68,68,0.08)' : entry.status === 'warn' ? 'rgba(245,158,11,0.06)' : 'rgba(16,185,129,0.05)'
+                                    }}>
+                                      <span style={{ color: 'var(--accent2)', fontWeight: 600 }}>{entry.step}</span>
+                                      <span>{entry.status === 'ok' ? '✅' : entry.status === 'warn' ? '⚠️' : '❌'}</span>
+                                      <span style={{ color: entry.status === 'error' ? 'var(--danger)' : 'var(--text)', wordBreak: 'break-all' }}>{entry.detail}</span>
+                                      <span style={{ color: 'var(--muted)', fontSize: 10, textAlign: 'right' }}>{new Date(entry.ts).toLocaleTimeString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ color: 'var(--muted)', fontSize: 12 }}>Click row to load generation logs</div>
+                        )}
                       </td>
                     </tr>
                   )}

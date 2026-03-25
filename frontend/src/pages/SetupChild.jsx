@@ -150,7 +150,7 @@ export default function SetupChild({ onDone }) {
               </p>
             </div>
 
-            {err && <p style={{ fontSize:13, color:'#FCA5A5', fontWeight:600, marginBottom:12, textAlign:'center' }}>{err}</p>}
+            {err && <p style={{ fontSize:13, color:'var(--danger-light)', fontWeight:600, marginBottom:12, textAlign:'center' }}>{err}</p>}
 
             <button onClick={handleAdd} disabled={saving} style={{ width:'100%', padding:'13px', borderRadius:50, border:'none', background:'var(--grad-accent)', color:'white', fontWeight:800, fontSize:15, cursor:'pointer', fontFamily:'var(--font-body)' }}>
               {saving ? '…' : `Add ${f.name.trim() || 'child'} to the Forest 🌳`}

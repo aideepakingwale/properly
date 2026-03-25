@@ -29,7 +29,7 @@ services:
     plan: free              # Change to starter ($7/mo) for Option B (Render Disk)
 
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: apt-get install -y ffmpeg 2>/dev/null || true && npm install
     startCommand: npm start
 
     # OPTION B — Render Disk (uncomment + upgrade to Starter plan)

@@ -148,7 +148,7 @@ function FlipbookViewer({ book, onClose }) {
           </div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>
             {bookData.status === 'error'
-              ? 'Generation failed: ' + (bookData.error_msg || 'unknown error')
+              ? '❌ ' + (bookData.error_msg || 'Generation failed — please try again')
               : bookData.status === 'generating' ? 'Creating your beautiful book…' : 'Book queued for generation…'}
           </div>
           {bookData.status !== 'error' && (
@@ -184,8 +184,8 @@ function FlipbookViewer({ book, onClose }) {
                     onError={e => { e.target.style.display = 'none'; }}
                   />
                 )}
-                <div style={{ padding: '20px 28px 24px', background: ['#F0FFF4','#FFF9F0','#F0F4FF','#FFF0F9'][pageIdx % 4] }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#1E3A5F', lineHeight: 1.5, textAlign: 'center' }}>
+                <div style={{ padding: '20px 28px 24px', background: ['var(--page-bg-1)','var(--page-bg-2)','var(--page-bg-3)','var(--page-bg-4)'][pageIdx % 4] }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--story-text-dark)', lineHeight: 1.5, textAlign: 'center' }}>
                     {currentPage.text}
                   </div>
                 </div>

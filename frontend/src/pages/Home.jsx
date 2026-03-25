@@ -28,7 +28,7 @@ const PHASE_META = {
   3:{ color:'var(--color-info)', bg:'var(--bg-info-light)', label:'Digraphs'   },
   4:{ color:'var(--color-primary-light)', bg:'var(--color-primary-pale)', label:'Blends'     },
   5:{ color:'var(--brand-accent)', bg:'var(--brand-accent-pale)', label:'Split Digraphs' },
-  6:{ color:'var(--color-danger)', bg:'#FEE2E2', label:'Prefixes/Suffixes' },
+  6:{ color:'var(--color-danger)', bg:'var(--bg-danger-muted)', label:'Prefixes/Suffixes' },
 };
 
 export default function Home() {
@@ -72,7 +72,7 @@ export default function Home() {
   }, [nav, child?.id]);
 
   return (
-    <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,var(--bg-dark) 0%,var(--bg-dark-mid) 15%,var(--brand-primary-darker) 40%,var(--color-primary) 65%,#818CF8 85%,var(--color-primary-pale) 100%)', position:'relative', overflow:'hidden' }}>
+    <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,var(--bg-dark) 0%,var(--bg-dark-mid) 15%,var(--brand-primary-darker) 40%,var(--color-primary) 65%,var(--brand-indigo-light) 85%,var(--color-primary-pale) 100%)', position:'relative', overflow:'hidden' }}>
       <StarBg count={14}/>
       {['🌲','🌳','🌲','🌿','🍃','🌲','🌳'].map((t,i)=>(
         <div key={i} style={{ position:'fixed', fontSize:20+i*3, opacity:0.07, top:i%2===0?`${10+i*11}%`:undefined, bottom:i%2!==0?`${i*9}%`:undefined, left:i%3===0?`${i*4}%`:undefined, right:i%3===2?`${i*3}%`:undefined, pointerEvents:'none', animation:`floatSlow ${3+i*0.5}s ease-in-out infinite`, animationDelay:`${i*0.4}s` }}>{t}</div>
@@ -89,7 +89,7 @@ export default function Home() {
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-            {(child?.streak||1)>=2 && <div style={{ background:'rgba(239,68,68,0.15)', border:'1.5px solid rgba(239,68,68,0.3)', borderRadius:50, padding:'4px 10px', color:'#FCA5A5', fontWeight:800, fontSize:12 }}>🔥{child.streak}</div>}
+            {(child?.streak||1)>=2 && <div style={{ background:'rgba(239,68,68,0.15)', border:'1.5px solid rgba(239,68,68,0.3)', borderRadius:50, padding:'4px 10px', color:'var(--danger-light)', fontWeight:800, fontSize:12 }}>🔥{child.streak}</div>}
             <button onClick={() => nav('/shop')} style={{ background:'var(--accent-12)', border:'1.5px solid var(--accent-30)', borderRadius:50, padding:'5px 12px', color:'var(--color-accent)', fontWeight:800, fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)' }}>🌰 {child?.acorns||0}</button>
             <button onClick={() => nav('/pricing')} style={{ background:'var(--primary-25)', border:'1.5px solid rgba(124,58,237,0.5)', borderRadius:50, padding:'5px 10px', color:'var(--brand-primary-light)', fontWeight:800, fontSize:11, cursor:'pointer', fontFamily:'var(--font-body)' }}>⭐ Plans</button>
             <button onClick={() => nav('/trophies')} style={{ background:'var(--overlay-7)', border:'1.5px solid var(--overlay-15)', borderRadius:50, padding:'5px 10px', color:'var(--overlay-70)', fontWeight:700, fontSize:11, cursor:'pointer', fontFamily:'var(--font-body)' }}>🏆</button>

@@ -167,7 +167,7 @@ export function PlanCard({ plan, currentPlan = null, onUpgrade, loading, dark = 
           {(plan.notIncluded || []).map(f => (
             <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13 }}>
               <span style={{ color: crossColor, flexShrink: 0, marginTop: 1 }}>✗</span>
-              <span style={{ color: dark ? 'rgba(255,255,255,0.22)' : '#C4B5A0', lineHeight: 1.45 }}>{f}</span>
+              <span style={{ color: dark ? 'rgba(255,255,255,0.22)' : 'var(--text-parchment)', lineHeight: 1.45 }}>{f}</span>
             </div>
           ))}
         </div>

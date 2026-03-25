@@ -596,6 +596,72 @@ export const testPollinations = async (_req, res) => {
   }
 };
 
+
+export const testAudioPipeline = async (_req, res) => {
+  const results = {};
+
+  // 1. Check ffmpeg
+  try {
+    const { execFileSync } = await import('child_process');
+    const out = execFileSync('ffmpeg', ['-version'], { stdio: 'pipe', timeout: 5000 }).toString();
+    results.ffmpeg = { ok: true, version: out.split('\n')[0].slice(0, 80) };
+  } catch (e) {
+    results.ffmpeg = { ok: false, error: e.message, fix: 'Add "apt-get install -y ffmpeg" to Render build command' };
+  }
+
+  // 2. Check Azure key
+  const key = (process.env.AZURE_SPEECH_KEY || '').trim();
+  results.azureKey = {
+    ok: Boolean(key && !key.includes('your-')),
+    length: key.length,
+    preview: key ? key.slice(0,4) + '****' + key.slice(-4) : 'NOT SET',
+    fix: key ? null : 'Set AZURE_SPEECH_KEY in Render environment variables',
+  };
+
+  // 3. Check Azure region
+  const region = (process.env.AZURE_SPEECH_REGION || 'uksouth').trim();
+  results.azureRegion = { ok: true, value: region };
+
+  // 4. Test Azure connectivity (HEAD request — no audio needed)
+  if (results.azureKey.ok) {
+    try {
+      const r = await fetch(
+        `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-GB`,
+        {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': key,
+            'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
+            'Pronunciation-Assessment': Buffer.from(JSON.stringify({
+              ReferenceText: 'hello', GradingSystem: 'HundredMark',
+              Granularity: 'Phoneme', EnableMiscue: true, PhonemeAlphabet: 'IPA',
+            })).toString('base64'),
+          },
+          body: Buffer.alloc(3200),  // 0.1s of silence — should get NoMatch not auth error
+          signal: AbortSignal.timeout(10000),
+        }
+      );
+      const body = await r.text().catch(() => '');
+      // 400 with NoMatch/InitialSilenceTimeout = key works, just no speech in silence
+      // 401/403 = bad key
+      if (r.status === 401) {
+        results.azureConnectivity = { ok: false, status: 401, error: 'Unauthorized — AZURE_SPEECH_KEY is invalid or expired' };
+      } else if (r.status === 403) {
+        results.azureConnectivity = { ok: false, status: 403, error: 'Forbidden — check key permissions and region' };
+      } else {
+        results.azureConnectivity = { ok: true, status: r.status, note: 'Key accepted by Azure (silence returned NoMatch — that is expected)' };
+      }
+    } catch (e) {
+      results.azureConnectivity = { ok: false, error: e.message };
+    }
+  } else {
+    results.azureConnectivity = { ok: false, skipped: true, reason: 'No Azure key configured' };
+  }
+
+  const allOk = results.ffmpeg.ok && results.azureKey.ok && results.azureConnectivity?.ok;
+  res.json({ success: true, data: { allOk, results } });
+};
+
 export const testStripe = async (_req, res) => {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return res.json({ success: false, service: 'stripe', error: 'STRIPE_SECRET_KEY not set' });

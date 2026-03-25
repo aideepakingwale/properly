@@ -174,11 +174,18 @@ export default function ReadingSession() {
       }
       updateChildLocally({ wordsRead: (child?.wordsRead || 0) + page.text.split(/\s+/).length });
 
-      // 2. Identify worst word for coaching
-      // Only fire feedback when Azure actually assessed the audio (not text-comparison fallback)
-      // Text-comparison gives every word 75-100% which isn't meaningful for coaching
+      // 2. Handle no-assessment case (Azure not configured, no browser transcript)
+      if (assessRes.data?.noAssessment) {
+        setFeedbackData({
+          tip: "I couldn't hear you clearly! Make sure your microphone is allowed and try speaking clearly. 🎙️",
+          source: 'fallback', provider: 'rules',
+        });
+        return;
+      }
+
+      // 3. Identify worst word for coaching
       const isRealAssessment = source === 'azure' || azureAssessed;
-      const threshold = isRealAssessment ? 70 : 40; // stricter threshold for fallback scoring
+      const threshold = isRealAssessment ? 70 : 50;
       const poor = wordScores.filter(w => w.score < threshold);
       if (poor.length > 0) {
         const worst = [...poor].sort((a, b) => a.score - b.score)[0];
@@ -263,7 +270,7 @@ export default function ReadingSession() {
     if (isRecording) {
       stopRec();                          // stop Web Speech recognition
       const blob = await stopRecording(); // stop MediaRecorder, get audio blob
-      if (blob && blob.size > 1000) {
+      if (blob && blob.size > 300) {  // 300 bytes minimum — even 0.5s of audio is valid
         await processAudio(blob, transcriptRef.current);
         transcriptRef.current = null;
       } else {
@@ -352,7 +359,7 @@ export default function ReadingSession() {
               <span style={{ fontSize: 11, background: 'var(--bg-info-light)', color: 'var(--color-info)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>☁️ Azure Pronunciation AI</span>
             )}
             {providerInfo.gemini?.available && (
-              <span style={{ fontSize: 11, background: '#CCFBF1', color: '#0F766E', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>♊ Gemini (free)</span>
+              <span style={{ fontSize: 11, background: 'var(--provider-gemini-bg)', color: 'var(--provider-gemini)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>♊ Gemini (free)</span>
             )}
             {providerInfo.groq?.available && (
               <span style={{ fontSize: 11, background: 'var(--brand-accent-pale)', color: 'var(--brand-pop1)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>⚡ Groq/Llama (free)</span>
@@ -408,7 +415,7 @@ export default function ReadingSession() {
                   background: isSpeaking ? 'var(--bg-info-light)' : revealColors ? revealColors.bg : 'transparent',
                   padding: (isSpeaking || revealColors) ? '3px 10px' : '2px 4px',
                   borderRadius: 10,
-                  border: isSpeaking ? '2px solid #3B82F6' : revealColors ? `1.5px solid ${revealColors.border}` : 'none',
+                  border: isSpeaking ? '2px solid var(--color-info)' : revealColors ? `1.5px solid ${revealColors.border}` : 'none',
                   boxShadow: isSpeaking ? '0 0 12px rgba(59,130,246,0.4)' : 'none',
                   transition: 'all 0.25s ease',
                   lineHeight: 1.5, display: 'inline-block',
@@ -527,8 +534,8 @@ export default function ReadingSession() {
                         )}
                         <div>Region: {debugInfo.endpoint?.split('.')[0]?.replace('https://', '')}</div>
                         <div>Time: {debugInfo.requestedAt}</div>
-                        <div style={{ marginTop:6, color:'#93C5FD' }}>Pronunciation Config:</div>
-                        <pre style={{ margin:0, color:'#93C5FD', whiteSpace:'pre-wrap', wordBreak:'break-all' }}>
+                        <div style={{ marginTop:6, color:'var(--debug-text)' }}>Pronunciation Config:</div>
+                        <pre style={{ margin:0, color:'var(--debug-text)', whiteSpace:'pre-wrap', wordBreak:'break-all' }}>
                           {JSON.stringify(debugInfo.pronConfig, null, 2)}
                         </pre>
                       </div>
@@ -541,10 +548,10 @@ export default function ReadingSession() {
                             <div>RecognizedText: "{debugInfo.azureRawResponse.NBest[0].Display}"</div>
                             <div>Accuracy: {debugInfo.azureRawResponse.NBest[0].PronunciationAssessment?.AccuracyScore}%</div>
                             <div>Fluency: {debugInfo.azureRawResponse.NBest[0].PronunciationAssessment?.FluencyScore}%</div>
-                            <div style={{ marginTop:6, color:'#FCA5A5' }}>Raw Words ({debugInfo.azureRawResponse.NBest[0].Words?.length}):</div>
+                            <div style={{ marginTop:6, color:'var(--danger-light)' }}>Raw Words ({debugInfo.azureRawResponse.NBest[0].Words?.length}):</div>
                             <div style={{ maxHeight:180, overflow:'auto' }}>
                               {debugInfo.azureRawResponse.NBest[0].Words?.map((w, i) => (
-                                <div key={i} style={{ color: w.PronunciationAssessment?.ErrorType === 'Insertion' ? 'var(--text-light)' : w.PronunciationAssessment?.AccuracyScore < 60 ? '#FCA5A5' : 'var(--brand-primary-light)', marginBottom:2 }}>
+                                <div key={i} style={{ color: w.PronunciationAssessment?.ErrorType === 'Insertion' ? 'var(--text-light)' : w.PronunciationAssessment?.AccuracyScore < 60 ? 'var(--danger-light)' : 'var(--brand-primary-light)', marginBottom:2 }}>
                                   [{w.PronunciationAssessment?.ErrorType || 'None'}] "{w.Word}" → {Math.round(w.PronunciationAssessment?.AccuracyScore ?? 0)}%
                                   {w.PronunciationAssessment?.ErrorType === 'Insertion' ? ' (extra — filtered)' : ''}
                                 </div>
@@ -552,7 +559,7 @@ export default function ReadingSession() {
                             </div>
                           </>
                         ) : (
-                          <pre style={{ margin:0, color:'#FCA5A5', whiteSpace:'pre-wrap', wordBreak:'break-all', maxHeight:200, overflow:'auto' }}>
+                          <pre style={{ margin:0, color:'var(--danger-light)', whiteSpace:'pre-wrap', wordBreak:'break-all', maxHeight:200, overflow:'auto' }}>
                             {JSON.stringify(debugInfo.azureRawResponse, null, 2)}
                           </pre>
                         )}
@@ -601,7 +608,9 @@ export default function ReadingSession() {
            : 'Tap 🎙️ and read the sentence aloud!'}
         </p>
         <p style={{ fontSize: 11, color: dark ? 'var(--overlay-25)' : 'var(--border-2)', marginTop: 2 }}>
-          {providerInfo?.azure?.available ? '☁️ Azure Pronunciation Assessment active' : '📱 Browser mic mode (add Azure key for full scoring)'}
+          {providerInfo?.azure?.available
+            ? '☁️ Azure Pronunciation Assessment active — real phonics scoring'
+            : '⚠️ Add AZURE_SPEECH_KEY in Render settings for phonics scoring'}
         </p>
 
         {/* ── PAGE NAVIGATION — always visible so child can move freely ── */}

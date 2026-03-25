@@ -182,6 +182,20 @@ export const generateAiStoryBatch = async (req, res) => {
 
   const { stories, provider, themes } = result;
 
+  // Log if we fell back to static rules — this means both AI providers failed
+  if (provider === 'fallback') {
+    console.warn(`[AI Story] Both AI providers failed — using fallback stories for batch ${batchId}`);
+    try {
+      db.prepare(`INSERT INTO content_reports
+        (user_id, content_type, content_id, content_title, reason, detail, status)
+        VALUES (?,?,?,?,?,?,?)`)
+        .run(req.user.userId, 'ai_story', batchId,
+          `Batch ${batchId}`, 'generation_failed',
+          'Auto: Both Gemini and Groq failed — stories were generated using static fallback templates',
+          'pending');
+    } catch {}
+  }
+
   // Persist each story and its pages
   const phaseAcorns = { 2:15, 3:20, 4:25, 5:30, 6:40 };
   const acorns      = phaseAcorns[child.phase] || 20;

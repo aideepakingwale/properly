@@ -36,7 +36,7 @@ const THEME_META = {
 };
 
 const PROVIDER_BADGES = {
-  gemini:   { label:'Gemini AI',    color:'#0F766E', bg:'#CCFBF1' },  // free
+  gemini:   { label:'Gemini AI',    color:'var(--provider-gemini)', bg:'var(--provider-gemini-bg)' },  // free
   groq:     { label:'Groq / Llama', color:'var(--brand-pop1)', bg:'var(--brand-accent-pale)' },  // free
   fallback: { label:'Built-in',     color:'var(--text-warning-dark)', bg:'var(--brand-accent-pale)' },  // always free
 };
@@ -258,7 +258,7 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           {/* Daily counter */}
-          <span style={{ fontSize:10, color:dailyLeft>0?'var(--overlay-40)':'#F87171', fontWeight:600 }}>
+          <span style={{ fontSize:10, color:dailyLeft>0?'var(--overlay-40)':'var(--danger-muted)', fontWeight:600 }}>
             {dailyLeft}/5 today
           </span>
           <button onClick={() => setShowGenerator(s => !s)} disabled={generating || dailyLeft<=0}
@@ -271,7 +271,7 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
       {/* ── AI PROVIDER CHIP ── */}
       {providerInfo && (
         <div style={{ marginBottom:10, display:'flex', gap:5, flexWrap:'wrap' }}>
-          <span style={{ fontSize:10, background:providerInfo.gemini?'rgba(20,184,166,0.2)':providerInfo.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo.gemini?'#0F766E':providerInfo.groq?'var(--brand-pop1)':'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
+          <span style={{ fontSize:10, background:providerInfo.gemini?'rgba(20,184,166,0.2)':providerInfo.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo.gemini?'var(--provider-gemini)':providerInfo.groq?'var(--brand-pop1)':'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
             {providerInfo.gemini ? '♊ Gemini AI (free)' : providerInfo.groq ? '⚡ Groq/Llama (free)' : '📚 Built-in templates'}
           </span>
           {interests.length > 0 && (
@@ -302,7 +302,7 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
 
       {/* ── ERROR ── */}
       {error && (
-        <div style={{ background:'rgba(239,68,68,0.15)', border:'1.5px solid rgba(239,68,68,0.3)', borderRadius:14, padding:'10px 14px', marginBottom:12, fontSize:13, color:'#FCA5A5', fontWeight:600 }}>
+        <div style={{ background:'rgba(239,68,68,0.15)', border:'1.5px solid rgba(239,68,68,0.3)', borderRadius:14, padding:'10px 14px', marginBottom:12, fontSize:13, color:'var(--danger-light)', fontWeight:600 }}>
           ⚠️ {error}
         </div>
       )}

@@ -148,7 +148,7 @@ export default function KidsManager() {
         )}
       </div>
 
-      {err && <p style={{ color:'#FCA5A5', fontSize:13, marginBottom:12 }}>{err}</p>}
+      {err && <p style={{ color:'var(--danger-light)', fontSize:13, marginBottom:12 }}>{err}</p>}
 
       {/* Add form */}
       {showAdd && (
@@ -196,7 +196,7 @@ export default function KidsManager() {
                       Edit
                     </button>
                     {allChildren.length > 1 && (
-                      <button onClick={()=>handleDelete(c.id)} style={{ background:'rgba(239,68,68,0.12)', border:'1.5px solid rgba(239,68,68,0.25)', borderRadius:50, padding:'5px 10px', color:'#FCA5A5', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+                      <button onClick={()=>handleDelete(c.id)} style={{ background:'rgba(239,68,68,0.12)', border:'1.5px solid rgba(239,68,68,0.25)', borderRadius:50, padding:'5px 10px', color:'var(--danger-light)', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
                         ✕
                       </button>
                     )}

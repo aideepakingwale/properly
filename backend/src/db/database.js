@@ -308,6 +308,23 @@ function migrate(db) {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+
+  // Book generation debug logging columns
+  try { db.exec(`ALTER TABLE story_books ADD COLUMN generation_log TEXT`); } catch {}
+  try { db.exec(`ALTER TABLE story_books ADD COLUMN generation_progress TEXT`); } catch {}
+
+
+  // Book generation debug logs
+  db.exec(`CREATE TABLE IF NOT EXISTS book_generation_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_id TEXT NOT NULL,
+    step TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ok',
+    detail TEXT,
+    duration_ms INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   console.log('✅ Migrations complete');
 }
 
