@@ -26,7 +26,7 @@ import { randomBytes }                  from 'crypto';
 // safe=true  enables kid-safe content filtering (required for children's app)
 // nologo=true removes the Pollinations watermark
 // model=flux  uses the best free model for illustrations
-const POLL_BASE = 'https://image.pollinations.ai/prompt';
+const POLL_BASE = 'https://gen.pollinations.ai/image';
 
 // ── IMAGE GENERATION (Pollinations.ai) ───────────────────────
 /**

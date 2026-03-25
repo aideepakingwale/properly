@@ -574,7 +574,7 @@ export const testPollinations = async (_req, res) => {
   // Pollinations.ai is free and needs no API key — just test connectivity
   try {
     const prompt = encodeURIComponent('simple colourful star, children book illustration');
-    const url    = `https://image.pollinations.ai/prompt/${prompt}?width=64&height=64&nologo=true&safe=true&seed=1&model=flux`;
+    const url    = `https://gen.pollinations.ai/image/${prompt}?width=64&height=64&nologo=true&safe=true&seed=1&model=flux`;
     const r = await fetch(url, { signal: AbortSignal.timeout(30000), headers: { Accept: 'image/*' } });
     if (!r.ok) {
       return res.json({ success: false, service: 'pollinations', error: `HTTP ${r.status}` });
