@@ -571,20 +571,23 @@ export const testResend = async (_req, res) => {
 };
 
 export const testPollinations = async (_req, res) => {
-  // Pollinations.ai is free and needs no API key — just test connectivity
+  // Test by hitting the /models endpoint — instant response, no image generation needed
+  // Avoids timeout issues with the actual generation endpoint (30-60s per image)
   try {
-    const prompt = encodeURIComponent('simple colourful star, children book illustration');
-    const url    = `https://gen.pollinations.ai/image/${prompt}?width=64&height=64&nologo=true&safe=true&seed=1&model=flux`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(30000), headers: { Accept: 'image/*' } });
+    const r = await fetch('https://image.pollinations.ai/models', {
+      signal: AbortSignal.timeout(10000),
+      headers: { Accept: 'application/json' },
+    });
     if (!r.ok) {
       return res.json({ success: false, service: 'pollinations', error: `HTTP ${r.status}` });
     }
-    const ct   = r.headers.get('content-type') || '';
-    const size = r.headers.get('content-length') || '?';
-    if (!ct.includes('image')) {
-      return res.json({ success: false, service: 'pollinations', error: `Unexpected content-type: ${ct}` });
-    }
-    res.json({ success: true, service: 'pollinations', note: `Image returned (${size} bytes, ${ct}) — no API key needed ✅` });
+    const models = await r.json();
+    const list   = Array.isArray(models) ? models : Object.keys(models);
+    res.json({
+      success: true,
+      service: 'pollinations',
+      note:    `Connected ✅ — available models: ${list.slice(0, 5).join(', ')}${list.length > 5 ? ` +${list.length - 5} more` : ''}. No API key required.`,
+    });
   } catch (e) {
     res.json({ success: false, service: 'pollinations', error: e.message });
   }
