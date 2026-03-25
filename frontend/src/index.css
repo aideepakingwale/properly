@@ -1,68 +1,125 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap');
 
-/* ── DESIGN TOKENS ─────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────
+   PROPERLY — DESIGN SYSTEM v2
+   Palette: Vibrant, joyful, multicolour — professional but
+   irresistibly kid-friendly. Inspired by LEGO, Duolingo, Notion.
+   Primary: Deep Violet  /  Accent: Sunshine Yellow
+   Pops of Coral, Sky Blue, Mint, Lavender throughout.
+   ───────────────────────────────────────────────────────────── */
+
+/* ── GOOGLE FONTS: add Baloo 2 for display headings ─────────── */
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;600;700;800;900&display=swap');
+
 :root {
-  --forest-darkest: #051A0D;
-  --forest-dark:    #0D2318;
-  --forest-mid:     #1B4332;
-  --forest-light:   #2D6A4F;
-  --forest-bright:  #52B788;
-  --forest-pale:    #D8F3DC;
+  /* ── BRAND CORE ──────────────────────────────────────────── */
+  --violet:        #5B21B6;   /* primary — deep violet */
+  --violet-mid:    #7C3AED;
+  --violet-bright: #8B5CF6;
+  --violet-pale:   #EDE9FE;
 
-  --acorn:        #F59E0B;
-  --acorn-light:  #FEF3C7;
-  --acorn-dark:   #92400E;
+  --sunshine:      #FBBF24;   /* accent — sunshine yellow */
+  --sunshine-dark: #D97706;
+  --sunshine-pale: #FEF9C3;
 
-  --red:    #EF4444;
-  --green:  #10B981;
-  --amber:  #F59E0B;
-  --blue:   #3B82F6;
-  --purple: #8B5CF6;
+  /* ── RAINBOW ACCENT PALETTE ──────────────────────────────── */
+  --coral:         #F97316;   /* warm orange-red */
+  --coral-pale:    #FFEDD5;
+  --sky:           #0EA5E9;   /* clear blue */
+  --sky-pale:      #E0F2FE;
+  --mint:          #10B981;   /* fresh green */
+  --mint-pale:     #D1FAE5;
+  --rose:          #F43F5E;   /* bright pink */
+  --rose-pale:     #FFE4E6;
+  --lavender:      #A78BFA;   /* soft purple */
+  --lavender-pale: #F5F3FF;
 
-  --text:      #1C1917;
-  --text-muted:#78716C;
-  --border:    #E5E7EB;
-  --bg-page:   #FFFBF0;
-  --bg-card:   #FFFFFF;
-  --bg-subtle: #F9FAFB;
+  /* ── SEMANTIC ────────────────────────────────────────────── */
+  --success:  #10B981;
+  --warning:  #FBBF24;
+  --danger:   #EF4444;
+  --info:     #0EA5E9;
 
+  /* ── NEUTRALS ────────────────────────────────────────────── */
+  --text:        #1E1B4B;   /* deep indigo — warmer than black */
+  --text-muted:  #6B7280;
+  --text-light:  #9CA3AF;
+  --border:      #E5E7EB;
+  --border2:     #D1D5DB;
+  --bg-page:     #FAFAFA;
+  --bg-card:     #FFFFFF;
+  --bg-subtle:   #F8F7FF;   /* very light violet tint */
+
+  /* ── GRADIENTS ───────────────────────────────────────────── */
+  --grad-hero:    linear-gradient(135deg, #4C1D95 0%, #7C3AED 50%, #EC4899 100%);
+  --grad-card:    linear-gradient(145deg, #FFFFFF, #F8F7FF);
+  --grad-sunshine:linear-gradient(135deg, #FBBF24, #F97316);
+  --grad-sky:     linear-gradient(135deg, #0EA5E9, #6366F1);
+  --grad-mint:    linear-gradient(135deg, #10B981, #0EA5E9);
+  --grad-coral:   linear-gradient(135deg, #F97316, #F43F5E);
+
+  /* ── RADIUS ──────────────────────────────────────────────── */
   --radius-sm: 8px;
-  --radius:    16px;
-  --radius-lg: 24px;
+  --radius:    14px;
+  --radius-lg: 22px;
   --radius-xl: 32px;
 
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-  --shadow:    0 4px 16px rgba(0,0,0,0.1);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
-  --shadow-xl: 0 16px 48px rgba(0,0,0,0.18);
+  /* ── SHADOWS ─────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 4px rgba(91,33,182,0.07);
+  --shadow:    0 4px 16px rgba(91,33,182,0.1);
+  --shadow-lg: 0 8px 32px rgba(91,33,182,0.14);
+  --shadow-xl: 0 16px 48px rgba(91,33,182,0.2);
+  --shadow-colour: 0 8px 24px rgba(124,58,237,0.25);
 
-  --transition: 0.2s ease;
+  /* ── TYPOGRAPHY ──────────────────────────────────────────── */
   --font-body:    'Nunito', sans-serif;
-  --font-display: 'Fredoka One', cursive;
+  --font-display: 'Baloo 2', 'Fredoka One', cursive;
+
+  /* Legacy aliases kept for backward compat */
+  --forest-darkest: #2E1065;
+  --forest-dark:    #3B0764;
+  --forest-mid:     #5B21B6;
+  --forest-light:   #7C3AED;
+  --forest-bright:  #A78BFA;
+  --forest-pale:    #EDE9FE;
+  --acorn:          #FBBF24;
+  --acorn-light:    #FEF9C3;
+  --acorn-dark:     #92400E;
+  --red:    #EF4444;
+  --green:  #10B981;
+  --amber:  #FBBF24;
+  --blue:   #3B82F6;
+  --purple: #7C3AED;
 }
 
-/* ── RESETS ────────────────────────────────────────────────── */
+/* ── RESETS ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
-body { font-family: var(--font-body); background: var(--bg-page); color: var(--text); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg-page);
+  color: var(--text);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
 img, svg { display: block; max-width: 100%; }
 button { cursor: pointer; font-family: var(--font-body); border: none; background: none; }
 button:active { transform: scale(0.97); }
 input, select, textarea { font-family: var(--font-body); }
 a { color: inherit; text-decoration: none; }
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.2); border-radius: 2px; }
 
-/* ── PAGE BG CLASSES (used in stories) ─────────────────────── */
-.bg-warm   { background: linear-gradient(160deg, #FEF9EC, #FFF7ED) !important; }
-.bg-green  { background: linear-gradient(160deg, #F0FDF4, #ECFDF5) !important; }
+/* ── STORY PAGE BACKGROUND CLASSES ─────────────────────────── */
+.bg-warm   { background: linear-gradient(160deg, #FFFBEB, #FEF3C7) !important; }
+.bg-green  { background: linear-gradient(160deg, #ECFDF5, #D1FAE5) !important; }
 .bg-blue   { background: linear-gradient(160deg, #EFF6FF, #DBEAFE) !important; }
-.bg-pink   { background: linear-gradient(160deg, #FFF0F5, #FCE7F3) !important; }
+.bg-pink   { background: linear-gradient(160deg, #FFF1F2, #FFE4E6) !important; }
 .bg-purple { background: linear-gradient(160deg, #F5F3FF, #EDE9FE) !important; }
 .bg-orange { background: linear-gradient(160deg, #FFF7ED, #FFEDD5) !important; }
-.bg-dark   { background: linear-gradient(160deg, #1C1917, #292524) !important; }
+.bg-dark   { background: linear-gradient(160deg, #1E1B4B, #312E81) !important; }
 
-/* ── ANIMATIONS ────────────────────────────────────────────── */
+/* ── ANIMATIONS ─────────────────────────────────────────────── */
 @keyframes float     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
 @keyframes floatSlow { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
 @keyframes bounceIn  { 0%{transform:scale(0.3);opacity:0} 55%{transform:scale(1.1)} 75%{transform:scale(0.95)} 100%{transform:scale(1);opacity:1} }
@@ -76,6 +133,8 @@ a { color: inherit; text-decoration: none; }
 @keyframes popIn     { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.15) rotate(3deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
 @keyframes shimmer   { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 @keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes rainbow   { 0%{filter:hue-rotate(0deg)} 100%{filter:hue-rotate(360deg)} }
+@keyframes wiggle    { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-4deg)} 75%{transform:rotate(4deg)} }
 
 .animate-float     { animation: float 3s ease-in-out infinite; }
 .animate-float-slow{ animation: floatSlow 4s ease-in-out infinite; }
@@ -86,6 +145,7 @@ a { color: inherit; text-decoration: none; }
 .animate-breathe   { animation: breathe 2s ease-in-out infinite; }
 .animate-pop-in    { animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 .animate-spin      { animation: spin 1s linear infinite; }
+.animate-wiggle    { animation: wiggle 0.4s ease-in-out; }
 
 /* ── UTILITIES ──────────────────────────────────────────────── */
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }

@@ -21,6 +21,7 @@ import Stories from './pages/Stories';
 import Analytics from './pages/Analytics';
 import Config from './pages/Config';
 import BooksAdmin from './pages/Books';
+import Reports from './pages/Reports';
 
 function Guard({ children }) {
   const { user, loading } = useAuth();

@@ -372,3 +372,23 @@ CREATE TABLE IF NOT EXISTS book_credit_transactions (
   admin_id    TEXT,               -- set when admin granted
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ── CONTENT REPORTS ──────────────────────────────────────────────────────────
+-- Users can flag AI stories or story books for review
+CREATE TABLE IF NOT EXISTS content_reports (
+  id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  child_id     TEXT REFERENCES children(id) ON DELETE SET NULL,
+  content_type TEXT NOT NULL,  -- 'ai_story' | 'story_book'
+  content_id   TEXT NOT NULL,  -- ai_stories.id or story_books.id
+  content_title TEXT,
+  reason       TEXT NOT NULL,  -- 'wrong_words' | 'inappropriate' | 'image_error' | 'generation_failed' | 'other'
+  detail       TEXT,           -- free-text from user
+  status       TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'reviewed' | 'credited' | 'dismissed'
+  admin_note   TEXT,           -- admin's review note
+  credits_awarded INTEGER DEFAULT 0,
+  credit_type  TEXT,           -- 'story' | 'book' | null
+  reviewed_by  TEXT REFERENCES users(id),
+  reviewed_at  DATETIME,
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+);

@@ -294,6 +294,20 @@ function migrate(db) {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+
+  // Content reports table
+  db.exec(`CREATE TABLE IF NOT EXISTS content_reports (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    child_id TEXT REFERENCES children(id) ON DELETE SET NULL,
+    content_type TEXT NOT NULL, content_id TEXT NOT NULL, content_title TEXT,
+    reason TEXT NOT NULL, detail TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    admin_note TEXT, credits_awarded INTEGER DEFAULT 0, credit_type TEXT,
+    reviewed_by TEXT REFERENCES users(id), reviewed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   console.log('✅ Migrations complete');
 }
 

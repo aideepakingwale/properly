@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { bookAPI } from '../services/api';
+import ReportButton from './ReportButton';
 
 // ── BOOK CARD ─────────────────────────────────────────────────
 function BookCard({ book, onOpen }) {
@@ -54,6 +55,11 @@ function BookCard({ book, onOpen }) {
         <div style={{ position: 'absolute', top: 8, right: 8, background: statusColour, color: '#fff', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>
           {statusLabel}
         </div>
+        {book.status === 'ready' && (
+          <div style={{ position: 'absolute', top: 8, left: 8 }} onClick={e => e.stopPropagation()}>
+            <ReportButton contentType="story_book" contentId={book.id} contentTitle={book.title || book.story_title} variant="icon-only" />
+          </div>
+        )}
       </div>
       {/* Info */}
       <div style={{ padding: '12px 14px' }}>

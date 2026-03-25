@@ -34,6 +34,7 @@ import {
 import { authMiddleware, requireChild } from '../middleware/auth.middleware.js';
 import getDb from '../db/database.js';
 import { requireAdmin } from '../middleware/admin.middleware.js';
+import { submitReport, myReports, adminListReports, adminReviewReport } from '../controllers/report.controller.js';
 import { getUserCredits, listBooks, getBook, createBook, deleteBook, orderPrint } from '../controllers/book.controller.js';
 import { adminListBooks, adminAddCredits, adminGetCredits } from '../controllers/book.controller.js';
 import { getDashboard, listUsers, getUser, updateUser, deleteUser, listShopItems, createShopItem, updateShopItem, deleteShopItem, listStories, getAiStoryStats, getAnalytics, getConfig, getR2Status, triggerBackup, testAzure, testGemini, testGroq, testResend, testStripe, testPollinations, debugEnv, getDebugMode, setDebugMode } from '../controllers/admin.controller.js';
@@ -148,6 +149,12 @@ router.get('/debug-mode', (_req, res) => {
 });
 
 // ── BOOK ROUTES ──────────────────────────────────────────────
+// ── REPORT ROUTES ────────────────────────────────────────────
+router.post('/reports',                         authMiddleware, submitReport);
+router.get('/reports/mine',                     authMiddleware, myReports);
+router.get('/admin/reports',                    authMiddleware, requireAdmin, adminListReports);
+router.post('/admin/reports/:id/review',        authMiddleware, requireAdmin, adminReviewReport);
+
 router.get('/books/credits',                    authMiddleware, getUserCredits);
 router.get('/books/child/:childId',             authMiddleware, listBooks);
 router.post('/books',                           authMiddleware, createBook);
