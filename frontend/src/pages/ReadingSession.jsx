@@ -292,7 +292,9 @@ export default function ReadingSession() {
   const dark = page.isDark;
   const textCol  = dark ? 'rgba(255,255,255,0.92)' : 'var(--text)';
   const mutedCol = dark ? 'rgba(255,255,255,0.5)'  : 'var(--text-muted)';
-  const words    = page.text.trim().split(/\s+/);
+  const words     = page.text.trim().split(/\s+/);
+  // Last page of an AI story is the moral/lesson page — special gentle display
+  const isMoralPage = isAiStory && story?.pages && pageIdx === story.pages.length - 1;
   const overallAcc = wordScores.length ? Math.round(wordScores.reduce((a, b) => a + b.score, 0) / wordScores.length) : null;
 
   return (
@@ -489,6 +491,15 @@ export default function ReadingSession() {
 
         {/* Mic error */}
         {micError && <p style={{ color: 'var(--red)', fontWeight: 700, fontSize: 13, textAlign: 'center', background: '#FEF2F2', borderRadius: 10, padding: '8px 14px', marginBottom: 8, width: '100%' }}>⚠️ {micError}</p>}
+
+        {/* Moral page banner */}
+        {isMoralPage && (
+          <div style={{ width:'100%', background:'linear-gradient(135deg,rgba(245,158,11,0.12),rgba(16,185,129,0.12))', border:'1.5px solid rgba(245,158,11,0.3)', borderRadius:14, padding:'12px 16px', marginBottom:14, textAlign:'center' }}>
+            <div style={{ fontSize:22, marginBottom:4 }}>🌟</div>
+            <div style={{ fontSize:12, fontWeight:800, color:'#F59E0B', letterSpacing:'0.5px', textTransform:'uppercase' }}>The Moral of the Story</div>
+            <div style={{ fontSize:11, color:'var(--muted)', marginTop:3 }}>Read this wise message together</div>
+          </div>
+        )}
 
         {/* Hear sentence */}
         {/* ── DEBUG PANEL — only shown when admin has enabled debug mode ── */}

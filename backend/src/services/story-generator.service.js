@@ -1,6 +1,8 @@
 /**
  * @file        story-generator.service.js
- * @description AI story generation service — creates phonics-appropriate stories personalised to child name, age, phase, interests and struggled words
+ * @description AI story generation — rich, moralistic phonics stories personalised to
+ *              the child. Stories are 6–8 pages, have a full narrative arc, a clear moral,
+ *              and use phonics-appropriate vocabulary for the child's phase.
  * @module      Story Generator
  *
  * @project     Properly — AI Phonics Tutor
@@ -9,9 +11,11 @@
  * @license     Proprietary
  *
  * @remarks
- *   - Tries Gemini Flash first, falls back to Groq Llama 3.1 on failure
- *   - Phase-appropriate vocabulary lists constrain word selection per story page
- *   - Theme rotation prevents repetition across a child's story history
+ *   - Stories are 6 pages minimum, 8 pages maximum (was 3 — too short)
+ *   - Every story has: Setting → Problem → Journey × 3-4 → Resolution → Moral
+ *   - Each page sentence is longer and richer within the phonics phase constraints
+ *   - moral field is mandatory — a simple, child-friendly life lesson
+ *   - Phase vocabulary lists include richer, more expressive words
  */
 
 // ── PHONICS CURRICULUM ────────────────────────────────────────
@@ -19,37 +23,47 @@ export const PHASE_PHONICS = {
   2: {
     label: 'Simple CVC Words',
     patterns: ['s','a','t','p','i','n','m','d','g','o','c','k','ck','e','u','r','h','b','f','l','ff','ll','ss'],
-    targetWords: ['sat','pat','tap','map','nap','tin','pin','fin','dot','hot','cut','bug','run','bed','hen'],
-    sentenceLength: '4–6 words',
-    vocab: 'cat, dog, pig, hen, fox, cup, mat, hat, pin, fin, dot, hot, big, red, top, sit, run, get, put, cap',
+    targetWords: ['sat','pat','tap','map','nap','tin','pin','fin','dot','hot','cut','bug','run','bed','hen','big','red','top','sit','got'],
+    sentenceLength: '5–7 words',
+    sentenceGuide: 'Simple subject + verb + object. Use "and" to join two short ideas. e.g. "Tom sat on the big mat and grinned."',
+    vocab: 'sat, pat, tap, map, ran, pin, dot, hot, cut, bug, bed, red, big, top, got, pig, hat, can, had, him, not, but, men, let, yes, off, win, hug, wet, dip',
+    richWords: 'grin, skip, flip, spin, grab, drip, snap, clap, wag, jig, plop, slip, trip, nod, wink',
   },
   3: {
     label: 'Digraphs & Vowel Teams',
     patterns: ['ch','sh','th','ng','ai','ee','igh','oa','oo','ar','or','ur','ow','oi','ear','air'],
-    targetWords: ['chat','shop','ship','rain','feet','night','boat','moon','look','park','corn','hurt'],
-    sentenceLength: '5–8 words',
-    vocab: 'sheep, chain, shout, light, coach, tooth, dark, storm, turn, farm, green, street, beach',
+    targetWords: ['chat','shop','ship','rain','feet','night','boat','moon','look','park','corn','hurt','roar','shout','light'],
+    sentenceLength: '6–9 words',
+    sentenceGuide: 'Subject + vivid verb + location/detail. Chain two ideas with "but" or "so". e.g. "She ran through the dark park and heard a shout."',
+    vocab: 'sheep, chain, shout, light, coach, tooth, dark, storm, turn, farm, green, street, beach, night, rain, feet, boat, moon, roar, bark, glow, soil, air, hair, fear, cheer, near, hear, boil, join',
+    richWords: 'gleam, soar, swoop, dash, creep, prowl, howl, shriek, flash, charge, shield, vow, gleam',
   },
   4: {
     label: 'CCVC & CVCC Blends',
-    patterns: ['bl','cl','fl','gl','pl','sl','br','cr','dr','fr','gr','pr','tr','st','sp','sn','sk','lt','lf'],
-    targetWords: ['frog','clap','drip','trip','flag','best','grip','plan','snip','stomp','crisp'],
-    sentenceLength: '6–9 words',
-    vocab: 'black, clock, flame, globe, plant, slide, brick, crab, dress, frost, stamp, drink, spring',
+    patterns: ['bl','cl','fl','gl','pl','sl','br','cr','dr','fr','gr','pr','tr','st','sp','sn','sk','lt','lf','mp','nd'],
+    targetWords: ['frog','clap','drip','trip','flag','best','grip','plan','stomp','crisp','blend','trust','brave','cliff','stamp'],
+    sentenceLength: '7–10 words',
+    sentenceGuide: 'Include a blend word as the key action. Add feeling or consequence. e.g. "She gripped the branch and swung across the dark stream."',
+    vocab: 'black, clock, flame, globe, plant, slide, brick, crab, dress, frost, stamp, drink, spring, brand, cleft, crisp, drift, flask, grunt, pluck, scalp, strap, swift, trust, grasp',
+    richWords: 'prowl, startle, scramble, tremble, stride, grapple, clash, crumble, flinch, brace, grip, glint',
   },
   5: {
     label: 'Split Digraphs & Alternatives',
     patterns: ['a_e','e_e','i_e','o_e','u_e','ay','ea','ie','oe','ue','ew','wh','ph'],
-    targetWords: ['cake','slide','home','tune','play','dream','pie','blue','crew','phone'],
-    sentenceLength: '7–10 words',
-    vocab: 'brave, smile, stone, huge, spray, treat, tried, clue, flew, photo, throne, while',
+    targetWords: ['cake','slide','home','tune','play','dream','pie','blue','crew','phone','brave','stone','flame','while','pride'],
+    sentenceLength: '8–11 words',
+    sentenceGuide: 'Use a split digraph word as a key noun or verb. Include an emotional word. e.g. "She felt brave as she slid down the huge stone slope."',
+    vocab: 'brave, smile, stone, huge, spray, treat, tried, clue, flew, photo, throne, while, phase, theme, drove, strove, pride, flame, glaze, shade, quite, these, those, grove, kneel',
+    richWords: 'gleaming, blazing, soaring, trembling, shining, gliding, fierce, noble, daring, graceful, gentle',
   },
   6: {
     label: 'Prefixes, Suffixes & Morphology',
-    patterns: ['un-','re-','dis-','pre-','-ful','-less','-ness','-tion','-sion','-ment','-ly','-ing','-ed'],
-    targetWords: ['unhappy','discovery','fearless','wonderful','careful','excitement','remarkable'],
-    sentenceLength: '8–12 words',
-    vocab: 'remarkable, thoughtful, careless, restarted, discovery, invention, happiness, protection',
+    patterns: ['un-','re-','dis-','pre-','-ful','-less','-ness','-tion','-sion','-ment','-ly','-ing','-ed','-er'],
+    targetWords: ['unhappy','discovery','fearless','wonderful','careful','excitement','remarkable','kindness','invention','protection'],
+    sentenceLength: '9–13 words',
+    sentenceGuide: 'Use one prefix/suffix word naturally in context. Show a consequence or realisation. e.g. "She was fearless and led the remarkable discovery that changed everything."',
+    vocab: 'remarkable, thoughtful, careless, restarted, discovery, invention, happiness, protection, kindness, wonderful, fearless, carefully, excitement, adventure, proudly, gently, suddenly, quickly, brightly',
+    richWords: 'determination, courageous, astonishing, boundless, precious, unstoppable, transformation, enlightened, compassionate',
   },
 };
 
@@ -69,275 +83,286 @@ export const THEMES = {
   pirates:     { emoji:'🏴‍☠️', scenes:['⚓🗺️','🌊🦜','🏝️💎','⛵🌊'] },
   superheroes: { emoji:'🦸', scenes:['💥⚡','🌆🦸','✨🌟','🌈💪'] },
   cooking:     { emoji:'🍳', scenes:['🍳🌿','🎂🍰','🥘🌶️','🧁✨'] },
+  friendship:  { emoji:'🤝', scenes:['🤝🌸','🌈👫','💛🌟','🏡🤗'] },
+  kindness:    { emoji:'💛', scenes:['💛🌸','🌟🤗','🏡💕','🌈🙏'] },
 };
 
 const BG_CLASSES = ['bg-warm','bg-green','bg-blue','bg-pink','bg-purple','bg-orange'];
 
-// ── PRONOUN HELPER ────────────────────────────────────────────
+// ── PRONOUNS ─────────────────────────────────────────────────
 function pronouns(gender) {
-  if (gender === 'boy')    return { sub:'he',   obj:'him',  pos:'his'  };
-  if (gender === 'girl')   return { sub:'she',  obj:'her',  pos:'her'  };
-  return                          { sub:'they', obj:'them', pos:'their' };
+  if (gender === 'boy')  return { sub:'he',   obj:'him',  pos:'his'  };
+  if (gender === 'girl') return { sub:'she',  obj:'her',  pos:'her'  };
+  return                        { sub:'they', obj:'them', pos:'their' };
 }
 
-// ── THEME-AWARE VOCABULARY ────────────────────────────────────
-const THEME_VOCAB = {
-  superheroes: 'cape, mask, fly, jump, run, zip, zap, big, fast, win, snap, cop, hero, top, tip',
-  space:       'ship, star, sun, hot, red, jet, fly, rock, map, dot, pod, moon, beam, zoom',
-  dinosaurs:   'dig, big, run, egg, pit, mud, hot, lap, tap, rock, snap, stomp, tail, claw',
-  dragons:     'fly, big, hot, red, snap, egg, top, zip, run, sit, pit, wing, roar, cave',
-  magic:       'wand, pop, zip, tap, spin, wish, glow, gem, bag, hum, orb, dust, ring',
-  pirates:     'ship, map, dig, flag, sand, rock, run, bag, cap, dot, mast, gold, gem',
-  robots:      'zap, spin, run, zip, big, top, tin, cog, tap, click, bolt, arm, pod',
-  ocean:       'fish, swim, fin, crab, shell, wave, dip, pop, wet, net, blue, deep, reef',
-  forest:      'log, ant, bug, fox, den, nest, nut, mud, run, hop, sit, dig, tap, bark',
-  farm:        'hen, pig, mud, egg, dog, cat, moo, run, hop, pat, fat, pen, oat, crop',
-  animals:     'cat, dog, pig, hen, fox, ant, bug, bee, pup, cub, kit, run, hop, lap',
-  cooking:     'mix, stir, pot, pan, hot, bake, melt, cup, tip, add, pop, stew, tart',
-  adventure:   'run, jump, hide, find, big, fast, go, map, bag, bold, trek, cliff, path',
-  cats:        'paw, purr, lap, sit, nap, bat, hiss, pad, fur, flap, pounce, stretch',
+// ── MORALS BANK (varied per theme) ───────────────────────────
+const THEME_MORALS = {
+  adventure:   ['Being brave means going even when you are scared.','Every big journey starts with one small step.'],
+  animals:     ['All creatures deserve kindness and care.','We can learn something from every living thing.'],
+  space:       ['Curiosity leads us to amazing discoveries.','We are never too small to reach for the stars.'],
+  dinosaurs:   ['Working together is always stronger than working alone.','Helping others makes the world a better place.'],
+  magic:       ['The greatest magic is the kindness inside you.','True power comes from believing in yourself.'],
+  ocean:       ['Even small acts of kindness make big waves.','Looking after our world is everyone\'s job.'],
+  farm:        ['Hard work and patience bring great rewards.','Every small job matters when we work together.'],
+  forest:      ['Nature is a gift — we must care for it.','Even the smallest creature has an important role.'],
+  dragons:     ['Courage is not the absence of fear, but choosing to act anyway.','True strength comes from kindness, not force.'],
+  robots:      ['It is not what you are made of, but what you do that matters.','Anyone can learn to feel and care for others.'],
+  cats:        ['Curiosity and boldness lead to wonderful adventures.','Home is where the people who love you are.'],
+  pirates:     ['The greatest treasure is the friends you find along the way.','Honesty and trust are worth more than gold.'],
+  superheroes: ['Everyone has the power to help someone today.','The best hero is the one who lifts others up.'],
+  cooking:     ['Sharing what you make brings people together.','A little love is the best ingredient.'],
+  friendship:  ['A true friend is always there, no matter what.','Kindness to others always comes back to you.'],
+  kindness:    ['One small act of kindness can change someone\'s whole day.','We grow stronger by lifting each other up.'],
 };
 
-// ── BATCH SYSTEM PROMPT ───────────────────────────────────────
-function buildBatchSystemPrompt(phase) {
+function getMoral(theme) {
+  const options = THEME_MORALS[theme] || ['Being kind and brave makes the world brighter.'];
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+// ── SYSTEM PROMPT ─────────────────────────────────────────────
+function buildSystemPrompt(phase) {
   const p = PHASE_PHONICS[phase];
-  return `You are an expert UK primary school phonics teacher creating personalised reading stories for children aged 4–8.
+  return `You are an expert UK primary school phonics author writing personalised storybooks for children aged 4–8.
 
-You will generate MULTIPLE complete stories in one response as a JSON array.
+STORY STRUCTURE — every story MUST have exactly these 7 pages:
+  Page 1: SETTING    — introduce the world and the main character (the child)
+  Page 2: PROBLEM    — something goes wrong or a challenge appears
+  Page 3: JOURNEY 1  — the child tries something to solve it
+  Page 4: JOURNEY 2  — a twist, helper or obstacle appears
+  Page 5: JOURNEY 3  — the child shows courage, kindness or creativity
+  Page 6: RESOLUTION — the problem is solved, things are better
+  Page 7: MORAL      — a warm, clear life lesson the child takes away
 
-PHONICS CURRICULUM — Phase ${phase}: ${p.label}
-- Target phoneme patterns: ${p.patterns.slice(0,14).join(', ')}
-- Example target words: ${p.targetWords.join(', ')}
-- Sentence length per page: ${p.sentenceLength}
-- UK English spelling ONLY (colour, mum, programme, behaviour)
-- NEVER use phoneme patterns above Phase ${phase} difficulty
+PHONICS RULES — Phase ${phase}: ${p.label}
+  • Target patterns: ${p.patterns.slice(0, 16).join(', ')}
+  • Example target words: ${p.targetWords.join(', ')}
+  • Sentence length per page: ${p.sentenceLength}
+  • Sentence writing guide: ${p.sentenceGuide}
+  • Core vocabulary: ${p.vocab}
+  • Richer expressive words (use sparingly): ${p.richWords}
+  • UK English spelling ONLY (colour, mum, programme)
+  • NEVER use phonics patterns above Phase ${phase} difficulty
+  • Page 7 (moral page) may use slightly richer language — it is read by parent to child
 
-STORY RULES:
-- Each story = exactly 3 pages. Each page = exactly ONE sentence (the reading target).
-- Clear beginning (page 1), middle (page 2), end (page 3) narrative arc.
-- Use the child's name AND correct pronouns in at least one page of each story.
-- Age-appropriate, warm, exciting. No scary/violent content.
-- Each story must have a DIFFERENT theme from the others in the same batch.
+QUALITY RULES:
+  • Each sentence must be vivid and engaging — paint a picture with words
+  • Include emotions on at least 3 pages (felt, glad, scared, proud, kind, brave, etc.)
+  • The child character must DO something active — not just observe
+  • The story must feel COMPLETE and SATISFYING — a real story, not a list of events
+  • Include at least one other character (animal, friend, creature, helper)
+  • The moral on page 7 must be a complete warm sentence the child can remember
+  • VARY sentence structure across pages — not all sentences starting with the child's name
 
-OUTPUT FORMAT — JSON array only, no markdown:
+OUTPUT FORMAT — return a JSON array of stories, NO markdown fences:
 [
   {
-    "title": "3–5 word title",
+    "title": "4–6 word punchy title",
     "emoji": "single emoji",
     "cover_scene": "2–3 emojis",
     "theme": "theme name",
-    "target_phonemes": ["phoneme1","phoneme2"],
+    "moral": "The life lesson in one complete sentence.",
+    "target_phonemes": ["ph1","ph2","ph3"],
     "pages": [
-      { "text": "Sentence.", "scene": "2 emojis", "bg": "bg-warm", "target_words": ["word1","word2"] },
-      { "text": "Sentence.", "scene": "2 emojis", "bg": "bg-green", "target_words": ["word3"] },
-      { "text": "Sentence.", "scene": "2 emojis", "bg": "bg-blue", "target_words": ["word4","word5"] }
+      { "text": "Page sentence.", "scene": "2 emojis", "bg": "bg-warm",   "target_words": ["w1","w2"] },
+      { "text": "Page sentence.", "scene": "2 emojis", "bg": "bg-green",  "target_words": ["w3"] },
+      { "text": "Page sentence.", "scene": "2 emojis", "bg": "bg-blue",   "target_words": ["w4","w5"] },
+      { "text": "Page sentence.", "scene": "2 emojis", "bg": "bg-pink",   "target_words": ["w6"] },
+      { "text": "Page sentence.", "scene": "2 emojis", "bg": "bg-purple", "target_words": ["w7","w8"] },
+      { "text": "Page sentence.", "scene": "2 emojis", "bg": "bg-orange", "target_words": ["w9"] },
+      { "text": "Moral sentence — warm and memorable.", "scene": "🌟💛",   "bg": "bg-warm", "target_words": [] }
     ]
   }
 ]
-
 bg values: bg-warm, bg-green, bg-blue, bg-pink, bg-purple, bg-orange`;
 }
 
-// ── BATCH USER PROMPT ─────────────────────────────────────────
-function buildBatchUserPrompt({ child, interests, struggledWords, recentTitles, themes, count }) {
-  const p = PHASE_PHONICS[child.phase];
+// ── USER PROMPT ───────────────────────────────────────────────
+function buildUserPrompt({ child, interests, struggledWords, recentTitles, themes, count }) {
+  const p  = PHASE_PHONICS[child.phase];
   const pr = pronouns(child.gender || 'neutral');
-  const age = child.age ? `${child.age} years old` : 'young child';
-  const themeList = themes.join(', ');
-  const vocabHints = themes.map(t => `${t}: ${THEME_VOCAB[t] || THEME_VOCAB.adventure}`).join('\n  ');
+  const age = child.age ? `${child.age} years old` : 'about 5 years old';
   const interestStr = interests?.length ? interests.join(', ') : themes.join(', ');
-  const struggledStr = struggledWords?.length
-    ? `\nStruggledWords to reintroduce (include 1–2 naturally across the batch): ${struggledWords.slice(0,6).join(', ')}`
+  const struggled = struggledWords?.length
+    ? `\nPhonics words ${child.name} has found tricky — weave 1–2 of these in naturally: ${struggledWords.slice(0,5).join(', ')}`
     : '';
-  const avoidStr = recentTitles?.length
-    ? `\nAvoid repeating these recent titles/themes: ${recentTitles.slice(0,5).join(', ')}`
+  const avoid = recentTitles?.length
+    ? `\nAvoid re-using these recent story titles or themes: ${recentTitles.slice(0,5).join(', ')}`
     : '';
 
-  return `Generate exactly ${count} phonics stories for this child:
+  const storyBriefs = themes.map((theme, i) => {
+    const moral = getMoral(theme);
+    return `Story ${i+1}: Theme = ${theme.toUpperCase()} ${THEMES[theme]?.emoji || ''}
+  Moral to build towards: "${moral}"
+  Key emotion to include: ${['pride','courage','kindness','determination','joy','wonder'][i % 6]}`;
+  }).join('\n\n');
 
-STUDENT PROFILE:
+  return `Write exactly ${count} phonics story/stories for this child.
+
+CHILD PROFILE:
   Name: ${child.name}
   Age: ${age}
-  Gender: ${child.gender || 'neutral'} (use pronouns: ${pr.sub}/${pr.obj}/${pr.pos})
-  Phonics phase: Phase ${child.phase} (${p.label})
+  Gender pronouns: ${pr.sub} / ${pr.obj} / ${pr.pos}
+  Phonics Phase: ${child.phase} — ${p.label}
   Interests: ${interestStr}
+${struggled}${avoid}
 
-STORY THEMES FOR THIS BATCH (one story per theme, in this order):
-  ${themes.map((t, i) => `Story ${i+1}: ${t.toUpperCase()} ${THEMES[t]?.emoji || ''}`).join('\n  ')}
+STORY BRIEFS (write each story exactly as briefed):
+${storyBriefs}
 
-THEME VOCABULARY (phase-appropriate words you can use per theme):
-  ${vocabHints}
-${struggledStr}
-${avoidStr}
+PHONICS REMINDERS:
+  • Every page sentence must be ${p.sentenceLength} — ${p.sentenceGuide}
+  • Use these phase-appropriate rich words to make sentences vivid: ${p.richWords}
+  • Page 7 is the moral page — make it warm, wise, and easy to remember
+  • The child (${child.name}) is the HERO — ${pr.sub} must overcome something and grow
 
-MANDATORY RULES:
-1. Every story MUST be set firmly in its assigned theme world — characters, setting, objects
-2. Use "${child.name}" and ${pr.sub}/${pr.obj}/${pr.pos} pronouns in each story
-3. All sentences MUST be Phase ${child.phase} phonics level (${p.sentenceLength})
-4. If theme words don't fit phonics perfectly, keep theme SETTING and simplify vocabulary
-5. Each story must feel complete with a satisfying ending
+Each story MUST have exactly 7 pages following: Setting → Problem → Journey×3 → Resolution → Moral
 
-Generate the JSON array of ${count} stories now:`;
+Return the JSON array of ${count} complete stories now:`;
 }
 
-// ── AI PROVIDER CALLS ─────────────────────────────────────────
+// ── AI CALLS ──────────────────────────────────────────────────
 async function callGemini(systemPrompt, userPrompt) {
-  const key = process.env.GEMINI_API_KEY;
+  const key = (process.env.GEMINI_API_KEY || '').trim();
   if (!key || key.includes('your-')) return null;
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
       {
         method: 'POST',
-        headers: { 'Content-Type':'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts:[{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-          generationConfig: { maxOutputTokens:2400, temperature:0.82, responseMimeType:'application/json' },
+          contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          generationConfig: {
+            maxOutputTokens: 6000,   // increased from 2400 to allow 7-page stories
+            temperature: 0.85,
+            responseMimeType: 'application/json',
+          },
           safetySettings: [
-            { category:'HARM_CATEGORY_HARASSMENT',        threshold:'BLOCK_LOW_AND_ABOVE' },
-            { category:'HARM_CATEGORY_HATE_SPEECH',       threshold:'BLOCK_LOW_AND_ABOVE' },
-            { category:'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold:'BLOCK_LOW_AND_ABOVE' },
-            { category:'HARM_CATEGORY_DANGEROUS_CONTENT', threshold:'BLOCK_LOW_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_LOW_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_LOW_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
           ],
         }),
       }
     );
-    if (!res.ok) { console.warn('Gemini HTTP', res.status); return null; }
+    if (!res.ok) { console.warn('[story-gen] Gemini HTTP', res.status, await res.text().catch(() => '')); return null; }
     const data = await res.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
-  } catch (e) { console.warn('Gemini error:', e.message); return null; }
+  } catch (e) { console.warn('[story-gen] Gemini error:', e.message); return null; }
 }
 
 async function callGroq(systemPrompt, userPrompt) {
-  const key = process.env.GROQ_API_KEY;
+  const key = (process.env.GROQ_API_KEY || '').trim();
   if (!key) return null;
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model: 'llama-3.1-70b-versatile',
-        max_tokens: 2400,
-        temperature: 0.82,
+        max_tokens: 6000,
+        temperature: 0.85,
         response_format: { type: 'json_object' },
         messages: [
-          { role:'system', content: systemPrompt + '\n\nIMPORTANT: Your response must be a JSON object with a "stories" array key containing the array.' },
-          { role:'user',   content: userPrompt },
+          { role: 'system', content: systemPrompt + '\n\nIMPORTANT: Wrap your JSON array in {"stories": [...]}' },
+          { role: 'user',   content: userPrompt },
         ],
       }),
     });
-    if (!res.ok) { console.warn('Groq HTTP', res.status); return null; }
+    if (!res.ok) { console.warn('[story-gen] Groq HTTP', res.status); return null; }
     const data = await res.json();
-    const raw = data.choices?.[0]?.message?.content?.trim();
-    // Groq wraps in object due to json_object mode — unwrap
+    const raw  = data.choices?.[0]?.message?.content?.trim();
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (parsed.stories) return JSON.stringify(parsed.stories);
-        // If it returned an array directly somehow
         if (Array.isArray(parsed)) return JSON.stringify(parsed);
       } catch {}
     }
     return raw || null;
-  } catch (e) { console.warn('Groq error:', e.message); return null; }
+  } catch (e) { console.warn('[story-gen] Groq error:', e.message); return null; }
 }
 
 // ── JSON PARSER ───────────────────────────────────────────────
-function parseBatchJSON(raw, expectedCount) {
+function parseBatchJSON(raw) {
   if (!raw) return null;
   try {
-    const cleaned = raw.replace(/^```json\n?/,'').replace(/\n?```$/,'').trim();
-    const parsed = JSON.parse(cleaned);
-    const arr = Array.isArray(parsed) ? parsed : parsed.stories;
+    const cleaned = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+    const parsed  = JSON.parse(cleaned);
+    const arr     = Array.isArray(parsed) ? parsed : parsed.stories;
     if (!Array.isArray(arr) || arr.length === 0) return null;
-    // Validate each story has required shape
-    const valid = arr.filter(s =>
-      s.title && Array.isArray(s.pages) && s.pages.length >= 2
-    ).map(s => {
-      // Ensure 3 pages
-      while (s.pages.length < 3) s.pages.push(s.pages[s.pages.length-1]);
-      s.pages = s.pages.slice(0, 3);
-      return s;
-    });
+
+    const valid = arr.filter(s => s.title && Array.isArray(s.pages) && s.pages.length >= 3)
+      .map(s => {
+        // Ensure exactly 7 pages — pad with a moral page if short, trim if too long
+        while (s.pages.length < 7) {
+          // Add a moral page if the last page isn't one
+          s.pages.push({
+            text: s.moral || 'Being kind and brave makes every adventure worth it.',
+            scene: '🌟💛',
+            bg: 'bg-warm',
+            target_words: [],
+          });
+        }
+        s.pages = s.pages.slice(0, 8);  // max 8 pages
+        if (!s.moral && s.pages.length >= 7) s.moral = s.pages[6].text;
+        return s;
+      });
+
     return valid.length > 0 ? valid : null;
-  } catch (e) { console.warn('Parse error:', e.message); return null; }
+  } catch (e) { console.warn('[story-gen] Parse error:', e.message, raw?.slice(0, 200)); return null; }
 }
 
-// ── FALLBACK BATCH ────────────────────────────────────────────
-const FALLBACK_STORIES = {
-  superheroes: {
-    2: (n, pr) => ({ title:`${n} the Big Hero`, emoji:'🦸', cover_scene:'💥⚡', theme:'superheroes', target_phonemes:['s','a','t','p'], pages:[
-      {text:`${n} put on a big red cap.`,scene:'🦸💥',bg:'bg-warm',target_words:['big','red','cap']},
-      {text:`${pr.sub.charAt(0).toUpperCase()+pr.sub.slice(1)} ran fast to stop the bad van.`,scene:'💨🦸',bg:'bg-blue',target_words:['ran','fast','bad']},
-      {text:`${n} got the map and all was well.`,scene:'🌟🦸',bg:'bg-purple',target_words:['got','map','well']}]}),
-    3: (n, pr) => ({ title:`${n} Saves the Town`, emoji:'🦸', cover_scene:'🌆🦸', theme:'superheroes', target_phonemes:['ch','sh','ai'], pages:[
-      {text:`${n} put on ${pr.pos} shining cape and flew.`,scene:'🦸✨',bg:'bg-blue',target_words:['shining','cape','flew']},
-      {text:`A shout rang out and ${pr.sub} rushed in.`,scene:'💥🌙',bg:'bg-purple',target_words:['shout','rushed']},
-      {text:`The crowd cheered as ${n} saved the day.`,scene:'🌟👏',bg:'bg-warm',target_words:['crowd','cheered','saved']}]}),
-  },
-  space: {
-    2: (n, pr) => ({ title:`${n} in Space`, emoji:'🚀', cover_scene:'🌟🚀', theme:'space', target_phonemes:['s','p','a','t'], pages:[
-      {text:`${n} sat in the big red pod.`,scene:'🚀⭐',bg:'bg-purple',target_words:['sat','big','red','pod']},
-      {text:`The pod shot up and up!`,scene:'🌙🚀',bg:'bg-blue',target_words:['shot','up']},
-      {text:`${n} saw a big dot of sun.`,scene:'⭐🌟',bg:'bg-warm',target_words:['saw','big','dot','sun']}]}),
-    3: (n, pr) => ({ title:`${n} on the Moon`, emoji:'🌙', cover_scene:'🌙🚀', theme:'space', target_phonemes:['igh','oo','ar'], pages:[
-      {text:`${n} took off in a bright rocket ship.`,scene:'🚀✨',bg:'bg-purple',target_words:['bright','rocket','ship']},
-      {text:`The moon was white and cool that night.`,scene:'🌙⭐',bg:'bg-blue',target_words:['white','cool','night']},
-      {text:`${n} found a moon rock and took it home.`,scene:'🪨🏠',bg:'bg-warm',target_words:['found','rock','home']}]}),
-  },
-  dinosaurs: {
-    2: (n, pr) => ({ title:`${n} and the Big Egg`, emoji:'🦕', cover_scene:'🌿🦕', theme:'dinosaurs', target_phonemes:['d','i','g','e'], pages:[
-      {text:`${n} dug in the mud and hit a big egg.`,scene:'🌿🥚',bg:'bg-green',target_words:['dug','mud','big','egg']},
-      {text:`The egg had a tap, tap, tap.`,scene:'🥚💥',bg:'bg-warm',target_words:['tap']},
-      {text:`A big red dino sat with ${n}.`,scene:'🦕🌿',bg:'bg-purple',target_words:['big','red','dino','sat']}]}),
-  },
-};
-
-function buildFallbackBatch(child, themes) {
+// ── RICH FALLBACK STORIES ─────────────────────────────────────
+function buildFallback(child, themes) {
   const pr = pronouns(child.gender || 'neutral');
-  const stories = themes.map(theme => {
-    const themeTemplates = FALLBACK_STORIES[theme];
-    const phaseTemplates = themeTemplates || FALLBACK_STORIES.space;
-    const templateFn = (phaseTemplates[child.phase] || phaseTemplates[2] || phaseTemplates[3]);
-    if (templateFn) return templateFn(child.name, pr);
-    // Generic fallback
+  const p  = PHASE_PHONICS[child.phase];
+  const He = pr.sub.charAt(0).toUpperCase() + pr.sub.slice(1);
+  const n  = child.name;
+
+  return themes.map(theme => {
+    const moral = getMoral(theme);
+    const bg    = BG_CLASSES;
     return {
-      title:`${child.name} and the ${theme}`, emoji: THEMES[theme]?.emoji||'📖',
-      cover_scene: THEMES[theme]?.scenes[0]||'🌿✨', theme,
-      target_phonemes: PHASE_PHONICS[child.phase]?.patterns.slice(0,4)||['s','a','t'],
-      pages:[
-        {text:`${child.name} went on a ${theme} trip.`,scene:'🌿✨',bg:'bg-warm',target_words:['went']},
-        {text:`${pr.sub.charAt(0).toUpperCase()+pr.sub.slice(1)} saw something big and red.`,scene:'💥🌿',bg:'bg-green',target_words:['big','red']},
-        {text:`${child.name} got home and felt glad.`,scene:'🏠🌟',bg:'bg-blue',target_words:['got','home','glad']},
+      title:           `${n} and the ${theme.charAt(0).toUpperCase() + theme.slice(1)}`,
+      emoji:           THEMES[theme]?.emoji || '📖',
+      cover_scene:     THEMES[theme]?.scenes[0] || '🌟✨',
+      theme,
+      moral,
+      target_phonemes: p.patterns.slice(0, 4),
+      pages: [
+        { text: `${n} set off on a ${theme} trip one sunny day.`,                                         scene: THEMES[theme]?.scenes[0] || '🌿✨', bg: bg[0], target_words: [p.targetWords[0] || 'set', 'day'] },
+        { text: `${He} spotted a big problem and felt a bit scared.`,                                     scene: '😟🌿', bg: bg[1], target_words: [p.targetWords[1] || 'big', 'felt'] },
+        { text: `${n} took a deep breath and decided to try.`,                                            scene: '💭🌟', bg: bg[2], target_words: [p.targetWords[2] || 'try', 'deep'] },
+        { text: `A helpful friend appeared and showed ${pr.obj} the way.`,                               scene: '🤝✨', bg: bg[3], target_words: [p.targetWords[3] || 'way', 'friend'] },
+        { text: `Together they worked hard and never gave up.`,                                           scene: '💪🌈', bg: bg[4], target_words: [p.targetWords[4] || 'hard', 'gave'] },
+        { text: `${n} solved it at last and felt so proud and glad.`,                                     scene: '🎉🌟', bg: bg[5], target_words: [p.targetWords[5] || 'proud', 'glad'] },
+        { text: moral,                                                                                    scene: '🌟💛', bg: bg[0], target_words: [] },
       ],
     };
   });
-  return stories;
 }
 
 // ── THEME SELECTOR ────────────────────────────────────────────
-// Pick themes for the batch — prioritise the child's interests,
-// ensure variety, fill remaining slots from defaults
 function selectThemes(interests, recentTitles, count) {
-  const allThemes = Object.keys(THEMES);
+  const allThemes    = Object.keys(THEMES);
   const recentThemes = new Set(
     recentTitles.map(t => allThemes.find(k => t.toLowerCase().includes(k))).filter(Boolean)
   );
-
-  // Normalise interests to valid theme keys
   const interestThemes = (interests || [])
     .map(i => allThemes.find(k => k.includes(i.toLowerCase()) || i.toLowerCase().includes(k)))
     .filter(Boolean);
 
   const selected = [];
-  const used = new Set();
+  const used     = new Set();
 
-  // First: all interest-matched themes (no repeats)
   for (const t of interestThemes) {
     if (!used.has(t) && selected.length < count) { selected.push(t); used.add(t); }
   }
 
-  // Fill: non-recent themes in a shuffled order
   const remaining = allThemes
     .filter(t => !used.has(t) && !recentThemes.has(t))
     .sort(() => Math.random() - 0.5);
@@ -347,7 +372,6 @@ function selectThemes(interests, recentTitles, count) {
     selected.push(t); used.add(t);
   }
 
-  // Last resort: anything not already used
   for (const t of allThemes) {
     if (selected.length >= count) break;
     if (!used.has(t)) { selected.push(t); used.add(t); }
@@ -356,44 +380,30 @@ function selectThemes(interests, recentTitles, count) {
   return selected.slice(0, count);
 }
 
-// ── MAIN EXPORT: generateBatch ────────────────────────────────
-/**
- * Generate a batch of personalised phonics stories for a child.
- *
- * @param {object} opts
- * @param {object}   opts.child          - Full child record { id, name, phase, age, gender }
- * @param {string[]} opts.interests      - Parent-set interest keywords
- * @param {string[]} opts.struggledWords - Recently failed words for spaced repetition
- * @param {string[]} opts.recentTitles   - Recent story titles to avoid repeating
- * @param {number}   opts.count          - Number of stories to generate (3–5)
- * @param {string[]} [opts.forceThemes]  - Override theme selection (optional)
- * @returns {Promise<{ stories: object[], provider: string, themes: string[] }>}
- */
+// ── MAIN EXPORT ───────────────────────────────────────────────
 export async function generateBatch(opts) {
   const {
     child,
-    interests     = [],
+    interests      = [],
     struggledWords = [],
-    recentTitles  = [],
-    count         = 5,
-    forceThemes   = null,
+    recentTitles   = [],
+    count          = 5,
+    forceThemes    = null,
   } = opts;
 
-  const themes = forceThemes || selectThemes(interests, recentTitles, count);
-  const systemPrompt = buildBatchSystemPrompt(child.phase);
-  const userPrompt   = buildBatchUserPrompt({ child, interests, struggledWords, recentTitles, themes, count: themes.length });
+  const themes       = forceThemes || selectThemes(interests, recentTitles, count);
+  const systemPrompt = buildSystemPrompt(child.phase);
+  const userPrompt   = buildUserPrompt({ child, interests, struggledWords, recentTitles, themes, count: themes.length });
 
-  console.log(`[story-gen] Generating batch of ${themes.length} stories for ${child.name} (Phase ${child.phase})`);
-  console.log(`[story-gen] Themes: ${themes.join(', ')}`);
+  console.log(`[story-gen] Generating ${themes.length} stories for ${child.name} (Phase ${child.phase}): ${themes.join(', ')}`);
 
   // 1. Gemini
   const geminiRaw = await callGemini(systemPrompt, userPrompt);
   if (geminiRaw) {
-    const parsed = parseBatchJSON(geminiRaw, themes.length);
+    const parsed = parseBatchJSON(geminiRaw);
     if (parsed) {
-      // Stamp theme from our selection if AI didn't set it correctly
       parsed.forEach((s, i) => { if (!s.theme || !THEMES[s.theme]) s.theme = themes[i] || 'adventure'; });
-      console.log(`[story-gen] Gemini generated ${parsed.length} stories`);
+      console.log(`[story-gen] Gemini: ${parsed.length} stories, ${parsed[0]?.pages?.length || '?'} pages each`);
       return { stories: parsed, provider: 'gemini', themes };
     }
   }
@@ -401,20 +411,20 @@ export async function generateBatch(opts) {
   // 2. Groq
   const groqRaw = await callGroq(systemPrompt, userPrompt);
   if (groqRaw) {
-    const parsed = parseBatchJSON(groqRaw, themes.length);
+    const parsed = parseBatchJSON(groqRaw);
     if (parsed) {
       parsed.forEach((s, i) => { if (!s.theme || !THEMES[s.theme]) s.theme = themes[i] || 'adventure'; });
-      console.log(`[story-gen] Groq generated ${parsed.length} stories`);
+      console.log(`[story-gen] Groq: ${parsed.length} stories, ${parsed[0]?.pages?.length || '?'} pages each`);
       return { stories: parsed, provider: 'groq', themes };
     }
   }
 
-  // 3. Deterministic fallback
-  console.log(`[story-gen] Using deterministic fallback for ${themes.length} stories`);
-  return { stories: buildFallbackBatch(child, themes), provider: 'fallback', themes };
+  // 3. Fallback
+  console.log(`[story-gen] Using fallback for ${themes.length} stories`);
+  return { stories: buildFallback(child, themes), provider: 'fallback', themes };
 }
 
-// Keep single-story export for backwards compat
+// Backwards compat single story
 export async function generateStory(opts) {
   const { childName, phase, theme = 'adventure', interests = [], struggledWords = [], recentTitles = [] } = opts;
   const result = await generateBatch({

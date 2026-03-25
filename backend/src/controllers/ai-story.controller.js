@@ -41,6 +41,7 @@ function formatStory(story, pages) {
     timesRead:     story.times_read || 0,
     lastReadAt:    story.last_read_at,
     completedAt:   story.completed_at,
+    moral:         story.moral || null,   // populated when story loaded with pages
     isAiGenerated: true,
     aiProvider:    story.ai_provider,
     createdAt:     story.created_at,
@@ -214,6 +215,9 @@ export const generateAiStoryBatch = async (req, res) => {
         JSON.stringify(interests), JSON.stringify(struggledWords),
         provider
       );
+
+      // Store the moral in app_settings as a quick lookup (moral is also last page text)
+      // Note: moral may not be in the schema — it lives as the last page's text
 
       // Insert pages
       story.pages.forEach((page, idx) => {

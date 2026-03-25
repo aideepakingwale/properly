@@ -582,11 +582,14 @@ export const testPollinations = async (_req, res) => {
       return res.json({ success: false, service: 'pollinations', error: `HTTP ${r.status}` });
     }
     const models = await r.json();
-    const list   = Array.isArray(models) ? models : Object.keys(models);
+    // Each model is an object with a .name field; filter to free (no paid_only flag)
+    const allModels  = Array.isArray(models) ? models : [];
+    const freeModels = allModels.filter(m => !m.paid_only).map(m => m.name || m);
+    const paidCount  = allModels.length - freeModels.length;
     res.json({
       success: true,
       service: 'pollinations',
-      note:    `Connected ✅ — available models: ${list.slice(0, 5).join(', ')}${list.length > 5 ? ` +${list.length - 5} more` : ''}. No API key required.`,
+      note:    `Connected ✅ — ${freeModels.length} free models: ${freeModels.slice(0,6).join(', ')}${freeModels.length > 6 ? ` +${freeModels.length-6} more` : ''}. Using: flux (free). No API key required.`,
     });
   } catch (e) {
     res.json({ success: false, service: 'pollinations', error: e.message });

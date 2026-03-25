@@ -23,9 +23,9 @@ import { randomBytes }                  from 'crypto';
 
 // Pollinations.ai — completely free, no API key required, no account needed.
 // Docs: https://pollinations.ai
-// safe=true  enables kid-safe content filtering (required for children's app)
-// nologo=true removes the Pollinations watermark
-// model=flux  uses the best free model for illustrations
+// model=flux     uses the best free model for illustrations (no account needed)
+// enhance=false  disable auto prompt enhancement (faster, more predictable)
+// NOTE: nologo=true and safe=true require a Pollinations account — not used here
 const POLL_BASE = 'https://image.pollinations.ai/prompt';
 
 // ── IMAGE GENERATION (Pollinations.ai) ───────────────────────
@@ -42,7 +42,7 @@ export async function generatePageImage(prompt, childName, seed = 42) {
   const stylePrefix = 'cute kawaii watercolour children book illustration, bright pastel colours, friendly characters, no text, safe for kids,';
   const fullPrompt  = `${stylePrefix} ${prompt}, featuring a child named ${childName}`;
   const encoded     = encodeURIComponent(fullPrompt);
-  const url = `${POLL_BASE}/${encoded}?width=800&height=600&nologo=true&safe=true&seed=${seed}&model=flux`;
+  const url = `${POLL_BASE}/${encoded}?width=800&height=600&seed=${seed}&model=flux&enhance=false`;
   console.log(`[Book] Pollinations request: ${url.slice(0, 100)}…`);
 
   const res = await fetch(url, {
@@ -260,7 +260,7 @@ export async function generateBook(bookId) {
         }
 
         // Also store the Pollinations URL as fallback
-        const imgUrl = `${POLL_BASE}/${encodeURIComponent(buildImagePrompt(page.text, childName, story.title))}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+        const imgUrl = `${POLL_BASE}/${encodeURIComponent(buildImagePrompt(page.text, childName, story.title))}?width=800&height=600&seed=${seed}&model=flux&enhance=false`;
         db.prepare(`UPDATE story_book_pages SET image_url=? WHERE book_id=? AND page_num=?`)
           .run(imgUrl, bookId, page.page_index);
 
