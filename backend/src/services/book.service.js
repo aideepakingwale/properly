@@ -217,7 +217,7 @@ export async function generateBook(bookId) {
     if (!story) throw new Error(`AI story ${book.ai_story_id} not found`);
 
     const child = db.prepare('SELECT * FROM children WHERE id=?').get(book.child_id);
-    const pages = db.prepare('SELECT * FROM ai_story_pages WHERE story_id=? ORDER BY page_num').all(book.ai_story_id);
+    const pages = db.prepare('SELECT * FROM ai_story_pages WHERE story_id=? ORDER BY page_index').all(book.ai_story_id);
 
     story.pages = pages;
     const childName = child?.name || 'Reader';
@@ -256,13 +256,13 @@ export async function generateBook(bookId) {
           const imgKey = `books/${bookId}/page_${i + 1}.png`;
           await r2Put(imgKey, imgBuf, 'image/png');
           db.prepare(`UPDATE story_book_pages SET image_r2_key=? WHERE book_id=? AND page_num=?`)
-            .run(imgKey, bookId, page.page_num);
+            .run(imgKey, bookId, page.page_index);
         }
 
         // Also store the Pollinations URL as fallback
         const imgUrl = `${POLL_BASE}/${encodeURIComponent(buildImagePrompt(page.text, childName, story.title))}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
         db.prepare(`UPDATE story_book_pages SET image_url=? WHERE book_id=? AND page_num=?`)
-          .run(imgUrl, bookId, page.page_num);
+          .run(imgUrl, bookId, page.page_index);
 
       } catch (e) {
         console.warn(`[Book] Page ${i + 1} image failed:`, e.message);

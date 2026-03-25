@@ -118,10 +118,10 @@ export const createBook = (req, res) => {
               VALUES (?,?,?,?,?)`).run(bookId, childId, aiStoryId, story.title || `${child.name}'s Story`, 'pending');
 
   // Create page placeholders
-  const pages = db.prepare('SELECT * FROM ai_story_pages WHERE story_id=? ORDER BY page_num').all(aiStoryId);
+  const pages = db.prepare('SELECT * FROM ai_story_pages WHERE story_id=? ORDER BY page_index').all(aiStoryId);
   for (const page of pages) {
     db.prepare(`INSERT INTO story_book_pages (book_id, page_num, text, image_prompt)
-                VALUES (?,?,?,?)`).run(bookId, page.page_num, page.text, page.text);
+                VALUES (?,?,?,?)`).run(bookId, page.page_index, page.text, page.text);
   }
 
   // Start async generation (non-blocking)
