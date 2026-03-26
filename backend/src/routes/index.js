@@ -25,7 +25,7 @@ import {
 } from '../controllers/progress.controller.js';
 import { getShopItems, getOwnedItems, purchaseItem }               from '../controllers/shop.controller.js';
 import { getFeedback, getTTS }                                      from '../services/ai.service.js';
-import { assessSpeech, uploadMiddleware, getSpeechToken, getSpeechStatus } from '../controllers/speech.controller.js';
+import { assessSpeech, uploadMiddleware, getSpeechToken, getSpeechStatus, testAzureConnectivity } from '../controllers/speech.controller.js';
 import {
   generateAiStoryBatch, getAiStories, getAiStory, deleteAiStory,
   getAiStoryProgress, getThemes, getPhaseInfo,
@@ -126,6 +126,7 @@ router.post('/ai/tts',      authMiddleware, getTTS);
 
 // ── SPEECH ────────────────────────────────────────────────────
 router.get('/speech/status',  getSpeechStatus);
+router.post('/speech/test-azure', authMiddleware, testAzureConnectivity);
 router.get('/speech/token',   authMiddleware, getSpeechToken);
 router.post('/speech/assess', authMiddleware, uploadMiddleware, assessSpeech);
 

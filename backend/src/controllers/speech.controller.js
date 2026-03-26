@@ -41,6 +41,7 @@ export const assessSpeech = async (req, res) => {
   } catch {}
 
   // ── 1. AZURE PRONUNCIATION ASSESSMENT ────────────────────────
+  let azureError = null;  // captured for debug panel if Azure fails
   if (azureAvailable() && req.file?.buffer) {
     const audioBytes = req.file.buffer.length;
     console.log(`[Speech] Azure assess: ${audioBytes} bytes ${req.file.mimetype} → "${referenceText.slice(0,40)}…"`);
@@ -134,8 +135,8 @@ export const assessSpeech = async (req, res) => {
         req.file.mimetype || 'audio/webm'
       );
 
-      const debugInfo = (debugMode && result._debug) ? result._debug : undefined;
-      const { _debug, ...pub } = result;
+      const { _debug: groqDebug, ...pub } = result;
+      const azureFailed = typeof azureError !== 'undefined' ? azureError : null;
 
       return res.json({
         success: true,
@@ -144,7 +145,13 @@ export const assessSpeech = async (req, res) => {
           source:        'groq-whisper',
           azureAssessed: false,
           groqAssessed:  true,
-          ...(debugInfo && { _debugInfo: debugInfo }),
+          _debugInfo:    {
+            ...(groqDebug || {}),
+            azureFailed,
+            source:  'groq-whisper',
+            blobKB:  (req.file.buffer.length / 1024).toFixed(1),
+            mime:    req.file.mimetype,
+          },
         },
       });
     } catch (err) {
@@ -258,3 +265,81 @@ function scoreWords(spoken, target) {
 function avg(arr) {
   return arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 }
+
+/**
+ * POST /api/speech/test-azure
+ * Sends a pre-recorded silent WAV to Azure to test connectivity.
+ * Returns the raw Azure response so admin can see exactly what's happening.
+ */
+export const testAzureConnectivity = async (req, res) => {
+  if (!azureAvailable()) {
+    return res.json({ success: false, message: 'AZURE_SPEECH_KEY not configured' });
+  }
+
+  const key    = (process.env.AZURE_SPEECH_KEY || '').trim();
+  const region = (process.env.AZURE_SPEECH_REGION || 'uksouth').trim();
+
+  // Minimal valid WAV header: 44 bytes header + 3200 bytes of silence (0.1s @ 16kHz PCM16)
+  const sampleRate = 16000, bitsPerSample = 16, numChannels = 1;
+  const dataSize   = 3200;
+  const header     = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * numChannels * bitsPerSample / 8, 28);
+  header.writeUInt16LE(numChannels * bitsPerSample / 8, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+  const silentWav = Buffer.concat([header, Buffer.alloc(dataSize)]);
+
+  const pronConfig = {
+    ReferenceText: 'the cat sat', GradingSystem: 'HundredMark',
+    Granularity: 'Phoneme', EnableMiscue: true, PhonemeAlphabet: 'IPA',
+  };
+
+  try {
+    const endpoint = \`https://\${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1\`;
+    const params   = new URLSearchParams({ language: 'en-GB', format: 'detailed' });
+    const r = await fetch(\`\${endpoint}?\${params}\`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': key,
+        'Content-Type':              'audio/wav; codecs=audio/pcm; samplerate=16000',
+        'Pronunciation-Assessment':  Buffer.from(JSON.stringify(pronConfig)).toString('base64'),
+      },
+      body: silentWav,
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const status = r.status;
+    const body   = await r.text();
+    let parsed;
+    try { parsed = JSON.parse(body); } catch { parsed = { raw: body }; }
+
+    res.json({
+      success: true,
+      data: {
+        httpStatus:          status,
+        keyPreview:          key.slice(0,4) + '****' + key.slice(-4),
+        region,
+        wavSentKB:           (silentWav.length / 1024).toFixed(1),
+        contentType:         'audio/wav; codecs=audio/pcm; samplerate=16000',
+        azureResponse:       parsed,
+        interpretation:      status === 401 ? '❌ Invalid key' :
+                             status === 403 ? '❌ Key forbidden — check region' :
+                             status === 400 ? '⚠️ Bad request — check Content-Type' :
+                             parsed.RecognitionStatus === 'InitialSilenceTimeout' ? '✅ Key works! (Silence = no speech detected — expected)' :
+                             parsed.RecognitionStatus === 'NoMatch' ? '✅ Key works! (No match — expected for silence)' :
+                             parsed.RecognitionStatus === 'Success' ? '✅ Success!' : \`Status: \${parsed.RecognitionStatus}\`,
+      },
+    });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+};

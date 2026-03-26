@@ -117,6 +117,19 @@ export default function Config() {
     adminAPI.r2Status().then(r => setR2(r.data)).catch(() => setR2({ error:'Could not reach backend' })).finally(() => setR2Loading(false));
   }, []);
 
+  const [azureConnTest, setAzureConnTest] = useState(null);
+  const [testingConn, setTestingConn]     = useState(false);
+
+  const testAzureLive = async () => {
+    setTestingConn(true); setAzureConnTest(null);
+    try {
+      const r = await api.post('/speech/test-azure');
+      setAzureConnTest(r.data);
+    } catch (e) {
+      setAzureConnTest({ success: false, message: e.message });
+    } finally { setTestingConn(false); }
+  };
+
   const runTest = async (service) => {
     setTesting(service);
     setResults(prev => ({ ...prev, [service]: null }));
@@ -270,6 +283,34 @@ export default function Config() {
           <ServiceRow label="Azure Cognitive Services" configured={!!cfg.azure.key}
             note={"Pronunciation assessment + Neural TTS · region: " + cfg.azure.region}
             testKey="azure" onTest={runTest} testing={testing} results={results} />
+
+          {/* Live Azure connectivity test */}
+          <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: azureConnTest ? 8 : 0 }}>
+              <div>
+                <span style={{ fontWeight: 700, fontSize: 13 }}>🔬 Azure Live Key Test</span>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Sends a silent WAV — verifies key, region, and Content-Type without a real recording</div>
+              </div>
+              <button onClick={testAzureLive} disabled={testingConn || !cfg.azure.key}
+                style={{ background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 8, padding: '6px 16px', fontWeight: 700, fontSize: 12, cursor: cfg.azure.key ? 'pointer' : 'not-allowed', opacity: cfg.azure.key ? 1 : 0.4 }}>
+                {testingConn ? '⏳ Testing…' : '▶ Test Live'}
+              </button>
+            </div>
+            {azureConnTest && (
+              <div style={{ background: '#0F0A2E', color: '#93C5FD', borderRadius: 8, padding: '10px 12px', fontFamily: 'monospace', fontSize: 10, whiteSpace: 'pre-wrap', marginTop: 8 }}>
+                <div style={{ color: '#FCD34D', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{azureConnTest.data?.interpretation || (azureConnTest.success ? '✅ Done' : '❌ Error')}</div>
+                {azureConnTest.data && <>
+                  <div>HTTP: {azureConnTest.data.httpStatus} · Key: {azureConnTest.data.keyPreview} · Region: {azureConnTest.data.region}</div>
+                  <div>WAV sent: {azureConnTest.data.wavSentKB}KB · Content-Type: {azureConnTest.data.contentType}</div>
+                  {azureConnTest.data.azureResponse && <div style={{ marginTop: 4 }}>
+                    RecognitionStatus: <span style={{ color: azureConnTest.data.azureResponse.RecognitionStatus?.includes('Timeout') || azureConnTest.data.azureResponse.RecognitionStatus === 'NoMatch' ? '#6EE7B7' : '#FCA5A5' }}>{azureConnTest.data.azureResponse.RecognitionStatus}</span>
+                    {' '}· DisplayText: "{azureConnTest.data.azureResponse.DisplayText}"
+                  </div>}
+                </>}
+                {!azureConnTest.success && <div style={{ color: '#FCA5A5' }}>{azureConnTest.message}</div>}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 

@@ -162,14 +162,32 @@ export default function ReadingSession() {
 
     try {
       // 1. Send audio to backend → Azure Pronunciation Assessment
+      const blobKB = (audioBlob?.size / 1024).toFixed(1);
+      setLastDebug({ stage: 'sending', blobKB, mime: audioBlob?.type, ref: page.text });
       const assessRes = await speechAPI.assess(audioBlob, page.text, browserTranscript || null);
       if (!assessRes.success) return;
 
       const { wordScores, overallAccuracy, overallFluency, overallCompleteness,
               overallProsody, displayText, source, azureAssessed, _debugInfo } = assessRes.data;
 
-      // Store raw Azure debug data if debug mode is on
-      if (debugMode && user?.isAdmin && _debugInfo) setDebugInfo(_debugInfo);
+      // Always store last assessment debug info for the on-screen panel
+      const debug = _debugInfo || {
+        source, azureAssessed, overallAccuracy,
+        displayText, wordCount: wordScores?.length,
+        blobKB: (audioBlob?.size / 1024).toFixed(1),
+        mime: audioBlob?.type,
+        note: 'No phoneme-level data (Groq/fallback path)',
+      };
+      setDebugInfo(debug);
+      setLastDebug({ stage: 'done', ...debug });
+      if (debugMode && user?.isAdmin && _debugInfo) {}  // already set above
+      else setDebugInfo({
+        source, azureAssessed, overallAccuracy, overallFluency,
+        wordScores: wordScores?.slice(0,3),
+        displayText,
+        blobSizeKB: (audioBlob?.size / 1024).toFixed(1),
+        note: 'No _debugInfo returned — Azure may not have been called',
+      });
 
       setRevealedCount(0);
       setWordScores(wordScores);
@@ -299,6 +317,8 @@ export default function ReadingSession() {
   //  - Raw audio blob → sent to Azure for phoneme-level scoring (when key set)
   //  - Browser Web Speech transcript → used as fallback when Azure not configured
   const transcriptRef = useRef(null);
+  const [lastDebug, setLastDebug]     = useState(null);  // always-visible debug panel
+  const [showDebug, setShowDebug]     = useState(false); // toggle
 
   const handleMic = async () => {
     if (isRecording) {
@@ -608,6 +628,61 @@ export default function ReadingSession() {
           </button>
         )}
       </div>
+
+      {/* ── ALWAYS-VISIBLE DEBUG PANEL ── */}
+      {lastDebug && (
+        <div style={{ margin: '0 0 8px', borderRadius: 14, overflow: 'hidden', border: '1.5px solid var(--border)', fontSize: 11 }}>
+          <button
+            onClick={() => setShowDebug(v => !v)}
+            style={{ width: '100%', padding: '8px 14px', background: lastDebug.overallAccuracy === 0 ? 'var(--bg-danger-muted)' : 'var(--bg-success-light)', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11 }}>
+            <span>
+              {lastDebug.overallAccuracy === 0 ? '❌' : '✅'} Last attempt: {lastDebug.overallAccuracy ?? '?'}% · Source: {lastDebug.source || lastDebug.stage} · Audio: {lastDebug.blobKB}KB ({lastDebug.mime?.split(';')[0]})
+            </span>
+            <span>{showDebug ? '▲' : '▼'} Details</span>
+          </button>
+          {showDebug && (
+            <div style={{ background: '#0F0A2E', color: '#93C5FD', padding: '10px 14px', fontFamily: 'monospace', fontSize: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 280, overflowY: 'auto' }}>
+              {/* Key diagnostics */}
+              <div style={{ color: '#FCD34D', marginBottom: 4 }}>── ASSESSMENT RESULT ──</div>
+              <div>source: {lastDebug.source}</div>
+              <div>azureAssessed: {String(lastDebug.azureAssessed)}</div>
+              <div>overallAccuracy: {lastDebug.overallAccuracy}</div>
+              <div>displayText (heard): "{lastDebug.displayText || lastDebug.recognized || '(nothing)'}"</div>
+              <div>referenceText: "{lastDebug.refText || lastDebug.sanitised || page?.text}"</div>
+              {lastDebug.recognitionStatus && <div style={{ color: lastDebug.recognitionStatus === 'Success' ? '#6EE7B7' : '#FCA5A5' }}>recognitionStatus: {lastDebug.recognitionStatus}</div>}
+              {lastDebug.note && <div style={{ color: '#FCA5A5' }}>note: {lastDebug.note}</div>}
+              
+              <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── AUDIO ──</div>
+              <div>blob size: {lastDebug.blobKB} KB (min needed: ~2 KB)</div>
+              <div>mime type: {lastDebug.mime}</div>
+              <div>converted (ffmpeg): {String(lastDebug.converted)}</div>
+              <div>sent to Azure: {lastDebug.audioKB} KB</div>
+
+              {lastDebug.properNouns?.length > 0 && <>
+                <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── PROPER NOUNS ──</div>
+                {lastDebug.properNouns.map((p, i) => <div key={i}>{p}</div>)}
+              </>}
+
+              {lastDebug.wordScores?.length > 0 && <>
+                <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── WORD SCORES (first 5) ──</div>
+                {lastDebug.wordScores.slice(0,5).map((w, i) => (
+                  <div key={i} style={{ color: w.score >= 70 ? '#6EE7B7' : '#FCA5A5' }}>
+                    {w.word}: {w.score}% ({w.errorType}) {w.phonemes?.length ? `[${w.phonemes.map(p => `${p.phoneme}:${p.score}%`).join(' ')}]` : ''}
+                  </div>
+                ))}
+              </>}
+
+              {lastDebug.azureRawResponse && <>
+                <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── AZURE RAW ──</div>
+                <div>RecognitionStatus: {lastDebug.azureRawResponse.RecognitionStatus}</div>
+                <div>DisplayText: "{lastDebug.azureRawResponse.DisplayText}"</div>
+                <div>NBest[0] words: {lastDebug.azureRawResponse.NBest?.[0]?.Words?.length ?? 0}</div>
+                <div>AccuracyScore: {lastDebug.azureRawResponse.NBest?.[0]?.PronunciationAssessment?.AccuracyScore}</div>
+              </>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── MIC CONTROLS ── */}
       <div style={{ padding: '12px 18px 32px', textAlign: 'center', background: dark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', borderTop: `1px solid ${dark ? 'var(--overlay-8)' : 'rgba(0,0,0,0.06)'}`, position: 'sticky', bottom: 0 }}>
