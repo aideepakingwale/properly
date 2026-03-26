@@ -304,9 +304,9 @@ export const testAzureConnectivity = async (req, res) => {
   };
 
   try {
-    const endpoint = \`https://\${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1\`;
+    const endpoint = `https://\${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`;
     const params   = new URLSearchParams({ language: 'en-GB', format: 'detailed' });
-    const r = await fetch(\`\${endpoint}?\${params}\`, {
+    const r = await fetch(`\${endpoint}?\${params}`, {
       method: 'POST',
       headers: {
         'Ocp-Apim-Subscription-Key': key,
@@ -336,7 +336,7 @@ export const testAzureConnectivity = async (req, res) => {
                              status === 400 ? '⚠️ Bad request — check Content-Type' :
                              parsed.RecognitionStatus === 'InitialSilenceTimeout' ? '✅ Key works! (Silence = no speech detected — expected)' :
                              parsed.RecognitionStatus === 'NoMatch' ? '✅ Key works! (No match — expected for silence)' :
-                             parsed.RecognitionStatus === 'Success' ? '✅ Success!' : \`Status: \${parsed.RecognitionStatus}\`,
+                             parsed.RecognitionStatus === 'Success' ? '✅ Success!' : `Status: \${parsed.RecognitionStatus}`,
       },
     });
   } catch (e) {
