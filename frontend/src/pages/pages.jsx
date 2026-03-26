@@ -477,8 +477,8 @@ export function ParentDash() {
           <div style={{ textAlign: 'center', marginTop: 8 }}>
             <button onClick={() => { logout(); nav('/'); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font-body)', padding: 10 }}>Sign out of Properly</button>
           </div>
-        </div>  {/* end settings tab content */}
-      )}  {/* end settings tab */}
+        </div>
+      )}
       </div>
       {toast && <Toast message={toast.message} emoji={toast.emoji} onHide={hideToast} />}
     </div>

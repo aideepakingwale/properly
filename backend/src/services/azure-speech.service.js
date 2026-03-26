@@ -365,8 +365,7 @@ export async function assessWithGroqWhisper(audioBuffer, referenceText, mimeType
   const boundary = '----GroqBoundary' + Math.random().toString(36).slice(2);
   
   // Build multipart body manually for Node.js compatibility
-  const CRLF = '
-';
+  const CRLF = '\r\n';
   const refText = referenceText.trim();
   
   // Determine file extension from MIME
