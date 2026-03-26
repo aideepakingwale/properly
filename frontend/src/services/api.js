@@ -17,9 +17,19 @@ import axios from 'axios';
 
 // __API_URL__ is replaced at build time by Vite define (see vite.config.js)
 // Falls back to /api for local dev (proxied by Vite)
-const BASE = (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null)
-  || import.meta.env.VITE_API_URL
-  || '/api';
+function resolveApiBase() {
+  const raw = (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null)
+    || import.meta.env.VITE_API_URL
+    || '/api';
+  // Render fromService:host gives "hostname.onrender.com" without protocol or /api
+  // Normalise: ensure https:// prefix and /api suffix
+  if (!raw || raw === '/api') return '/api';
+  let url = raw;
+  if (!url.startsWith('http')) url = 'https://' + url;
+  if (!url.endsWith('/api')) url = url.replace(/\/$/, '') + '/api';
+  return url;
+}
+const BASE = resolveApiBase();
 
 const api = axios.create({ baseURL: BASE, timeout: 20000 });
 

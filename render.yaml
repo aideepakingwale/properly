@@ -153,10 +153,12 @@ services:
 
     envVars:
       - key: VITE_API_URL
+        # IMPORTANT: Must include https:// AND /api suffix
+        # If auto-detection fails, set manually to: https://properly-api.onrender.com/api
         fromService:
           name: properly-api
           type: web
-          property: host
+          property: hostport
 
   # ── ADMIN PANEL (separate static site) ──────────────────────
   - type: web
@@ -178,4 +180,4 @@ services:
         fromService:
           name: properly-api
           type: web
-          property: host
+          property: hostport

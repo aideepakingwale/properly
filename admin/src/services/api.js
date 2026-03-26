@@ -15,9 +15,14 @@
 
 import axios from 'axios';
 
-const BASE = (typeof __API_URL__ !== 'undefined' && __API_URL__)
-  ? `https://${__API_URL__}/api`
-  : '/api';
+function resolveAdminBase() {
+  if (typeof __API_URL__ === 'undefined' || !__API_URL__) return '/api';
+  let url = __API_URL__;
+  if (!url.startsWith('http')) url = 'https://' + url;
+  if (!url.endsWith('/api')) url = url.replace(/\/$/, '') + '/api';
+  return url;
+}
+const BASE = resolveAdminBase();
 
 const api = axios.create({ baseURL: BASE, timeout: 30000 });
 

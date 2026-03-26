@@ -15,9 +15,17 @@
 
 import { useRef, useCallback } from 'react';
 
-const BASE = (typeof __API_URL__!=='undefined' ? __API_URL__ : null)
-  || (typeof window!=='undefined' && window.__ENV__?.VITE_API_URL)
-  || '/api';
+function resolveOwlBase() {
+  const raw = (typeof __API_URL__ !== 'undefined' ? __API_URL__ : null)
+    || (typeof window !== 'undefined' && window.__ENV__?.VITE_API_URL)
+    || '/api';
+  if (!raw || raw === '/api') return '/api';
+  let url = raw;
+  if (!url.startsWith('http')) url = 'https://' + url;
+  if (!url.endsWith('/api')) url = url.replace(/\/$/, '') + '/api';
+  return url;
+}
+const BASE = resolveOwlBase();
 
 const cache = new Map();
 

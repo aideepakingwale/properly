@@ -353,15 +353,7 @@ export async function assessWithGroqWhisper(audioBuffer, referenceText, mimeType
   const key = (process.env.GROQ_API_KEY || '').trim();
   if (!key) throw new Error('GROQ_API_KEY not set');
 
-  // Groq Whisper accepts multipart/form-data — build FormData manually
-  const { FormData, Blob } = await import('node-fetch').then(() => ({ 
-    FormData: globalThis.FormData, Blob: globalThis.Blob 
-  })).catch(async () => {
-    const mod = await import('formdata-node');
-    return { FormData: mod.FormData, Blob: mod.Blob };
-  });
-
-  // Build multipart form using Node's built-in fetch (available in Node 18+)
+  // Build raw multipart/form-data body — Node 22 native fetch handles this natively
   const boundary = '----GroqBoundary' + Math.random().toString(36).slice(2);
   
   // Build multipart body manually for Node.js compatibility

@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { storyAPI, aiStoryAPI } from '../services/api';
 import { AcornPill, ProgressBar, StarBg, Badge, Spinner, Toast } from '../components/ui';

@@ -24,6 +24,8 @@ import { useSpeechRecognition } from '../hooks/useSpeech';
 import { useMrsOwl } from '../hooks/useMrsOwl';
 import { getWordColor } from '../utils/scoring';
 import { AcornPill, Modal, Confetti, ProgressBar, Button, Spinner } from '../components/ui';
+import PhonicsWord from '../components/PhonicsWord';
+import { analyseWord, getPhonemeHint } from '../utils/phonicsAnalyser';
 
 // Colour coding for Azure error types
 function getErrorBadge(errorType) {
