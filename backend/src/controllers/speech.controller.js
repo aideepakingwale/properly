@@ -12,7 +12,7 @@
 
 import multer from 'multer';
 import getDb from '../db/database.js';
-import { assessPronunciation, azureAvailable, getAzureSasToken } from '../services/azure-speech.service.js';
+import { assessPronunciation, azureAvailable, getAzureSasToken, assessWithGroqWhisper, groqAvailable } from '../services/azure-speech.service.js';
 
 // Multer: store audio in memory (max 10 MB)
 const upload = multer({
@@ -70,7 +70,23 @@ export const assessSpeech = async (req, res) => {
       );
 
       const debugInfo = (debugMode && result._debug) ? result._debug : undefined;
-      const { _debug, ...pub } = result;
+      const { _debug, allOmitted, ...pub } = result;
+
+      // If Azure ran but recognised nothing (all words Omitted/0%) — technical failure
+      // Show "couldn't hear" rather than fake-passing with 0% scores
+      if (allOmitted) {
+        return res.json({
+          success: true,
+          data: {
+            ...pub,
+            source:        'azure',
+            azureAssessed: false,
+            noAssessment:  true,
+            message:       'Could not hear your voice clearly — speak louder and closer to the microphone 🎙️',
+            ...(debugInfo && { _debugInfo: debugInfo }),
+          },
+        });
+      }
 
       return res.json({
         success: true,
@@ -82,14 +98,62 @@ export const assessSpeech = async (req, res) => {
         },
       });
     } catch (err) {
-      console.error('[Speech] Azure failed:', err.message);
-      // Surface the actual error to admin debug panel; fall through to text-comparison
+      console.error('[Speech] Azure pipeline failed:', err.message);
+
+      // If ffmpeg missing — return specific guidance, don't silently score 0
+      if (err.message?.includes('ffmpeg')) {
+        return res.json({
+          success: true,
+          data: {
+            wordScores:          wordsAsFallback(referenceText, 0),
+            overallAccuracy:     0,
+            overallFluency:      0,
+            overallCompleteness: 0,
+            displayText:         '',
+            source:              'ffmpeg-missing',
+            azureAssessed:       false,
+            noAssessment:        true,
+            message:             'Audio conversion failed — ffmpeg not installed. Add "apt-get install -y ffmpeg" to Render build command.',
+          },
+        });
+      }
+      // Other Azure errors — fall through to text-comparison
     }
   } else if (azureAvailable() && !req.file) {
     console.warn('[Speech] Azure configured but no audio file received');
   }
 
-  // ── 2. TEXT-COMPARISON FALLBACK ───────────────────────────────
+  // ── 2. GROQ WHISPER FALLBACK ──────────────────────────────────
+  // Free, no ffmpeg, works on iOS/Android. Uses word-level timestamps + confidence.
+  if (groqAvailable() && req.file?.buffer) {
+    try {
+      console.log('[Speech] Trying Groq Whisper fallback…');
+      const result = await assessWithGroqWhisper(
+        req.file.buffer,
+        referenceText,
+        req.file.mimetype || 'audio/webm'
+      );
+
+      const debugInfo = (debugMode && result._debug) ? result._debug : undefined;
+      const { _debug, ...pub } = result;
+
+      return res.json({
+        success: true,
+        data: {
+          ...pub,
+          source:        'groq-whisper',
+          azureAssessed: false,
+          groqAssessed:  true,
+          ...(debugInfo && { _debugInfo: debugInfo }),
+        },
+      });
+    } catch (err) {
+      console.error('[Speech] Groq Whisper failed:', err.message);
+      // Fall through to text-comparison
+    }
+  }
+
+  // ── 3. TEXT-COMPARISON FALLBACK ───────────────────────────────
   // Used when Azure not configured OR when Azure fails.
   // Requires browser Web Speech API transcript.
   if (transcript && transcript.trim()) {
@@ -110,7 +174,7 @@ export const assessSpeech = async (req, res) => {
     });
   }
 
-  // ── 3. NO SCORING AVAILABLE ───────────────────────────────────
+  // ── 4. NO SCORING AVAILABLE ───────────────────────────────────
   // Azure not configured + no browser transcript (iOS Safari, Firefox, etc.)
   // Return honest 0 scores so the child knows they need to try again,
   // rather than fake 75% scores that suggest success.
@@ -126,9 +190,9 @@ export const assessSpeech = async (req, res) => {
       source:              'no-assessment',
       azureAssessed:       false,
       noAssessment:        true,
-      message:             azureAvailable()
+      message:             azureAvailable() || groqAvailable()
         ? 'Audio not received — check microphone permissions'
-        : 'Add AZURE_SPEECH_KEY in Render settings for real phonics scoring',
+        : 'Add AZURE_SPEECH_KEY or GROQ_API_KEY in Render settings for real phonics scoring',
     },
   });
 };
@@ -159,8 +223,9 @@ export const getSpeechStatus = (_req, res) => {
         role:      'Mrs. Owl coaching tips + phonetic name lookup',
       },
       groq: {
-        available: Boolean(process.env.GROQ_API_KEY),
-        role:      'Mrs. Owl coaching tips (fast fallback)',
+        available:    Boolean(process.env.GROQ_API_KEY),
+        role:         'Mrs. Owl coaching tips + pronunciation assessment fallback (Whisper)',
+        whisper:      groqAvailable() ? 'whisper-large-v3-turbo — free tier, word-level scoring' : 'not configured',
       },
     },
   });

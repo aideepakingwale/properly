@@ -112,6 +112,22 @@ export default function ReadingSession() {
         }
         if (storyRes.status === 'fulfilled' && storyRes.value.success) {
           const s = storyRes.value.data;
+
+          // Normalise page shape:
+          // Curriculum pages: { index, text, scene, bgClass, isDark }
+          // AI story pages:   { index, text, scene, bg, targetWords, ... }
+          // Reading session always reads page.bgClass, page.scene, page.isDark
+          // so we normalise AI story pages to the same shape here.
+          if (s.pages?.length) {
+            s.pages = s.pages.map((p, i) => ({
+              ...p,
+              bgClass:  p.bgClass || p.bg || 'bg-warm',   // AI uses 'bg', curriculum uses 'bgClass'
+              isDark:   p.isDark   || false,
+              scene:    p.scene    || '🌿',
+              index:    p.index    ?? i,
+            }));
+          }
+
           setStory({ ...s, isAiGenerated: s.isAiGenerated ?? isAiStory });
         } else {
           if (isAiStory) { setError('AI story not found — it may have been deleted.'); }
@@ -159,9 +175,13 @@ export default function ReadingSession() {
       wordScores.forEach((_, i) => {
         setTimeout(() => setRevealedCount(i + 1), 120 + i * 180);
       });
-      setScoringMode(azureAssessed ? 'azure' : source === 'no-transcript' ? 'no-transcript' : 'text-comparison');
-      if (azureAssessed) {
-        setAzureDetails({ fluency: overallFluency, completeness: overallCompleteness, prosody: overallProsody, source: 'azure' });
+      setScoringMode(azureAssessed ? 'azure' : source === 'groq-whisper' ? 'groq-whisper' : source === 'no-transcript' ? 'no-transcript' : 'text-comparison');
+      if (azureAssessed || source === 'groq-whisper') {
+        setAzureDetails({
+          fluency: overallFluency, completeness: overallCompleteness,
+          prosody: overallProsody,
+          source: azureAssessed ? 'azure' : 'groq-whisper',
+        });
       }
 
       // Submit page to backend
@@ -177,13 +197,25 @@ export default function ReadingSession() {
       // 2. Handle no-assessment case (Azure not configured, no browser transcript)
       if (assessRes.data?.noAssessment) {
         setFeedbackData({
-          tip: "I couldn't hear you clearly! Make sure your microphone is allowed and try speaking clearly. 🎙️",
+          tip: "I couldn't hear you! Check your microphone is allowed, then try again. 🎙️",
           source: 'fallback', provider: 'rules',
         });
         return;
       }
 
-      // 3. Identify worst word for coaching
+      // 3. Detect all-zeros: Azure ran but got silence/corrupt audio
+      //    All 0% = recording failure, NOT actual pronunciation errors.
+      //    Show a "couldn't hear" prompt rather than random coaching for random words.
+      const allZero = wordScores.length > 0 && wordScores.every(w => w.score === 0);
+      if (allZero) {
+        setFeedbackData({
+          tip: "Hmm, I couldn't catch that! Try speaking louder and closer to the microphone. 🎙️",
+          source: 'fallback', provider: 'rules',
+        });
+        return;
+      }
+
+      // 4. Identify worst word for coaching
       const isRealAssessment = source === 'azure' || azureAssessed;
       const threshold = isRealAssessment ? 70 : 50;
       const poor = wordScores.filter(w => w.score < threshold);
@@ -342,8 +374,20 @@ export default function ReadingSession() {
         <button onClick={() => { stop(); nav('/home'); }} style={{ background: dark ? 'var(--overlay-12)' : 'rgba(0,0,0,0.07)', border: 'none', borderRadius: 50, width: 36, height: 36, fontSize: 17, cursor: 'pointer', color: textCol, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 900, fontSize: 14, color: textCol }}>{story.emoji} {story.title}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', marginTop: 3 }}>
-            {story.pages.map((_, i) => <div key={i} style={{ height: 5, width: i === pageIdx ? 24 : 8, borderRadius: 50, background: i === pageIdx ? 'var(--color-accent)' : i < pageIdx ? 'var(--color-primary)' : 'var(--dark-15)', transition: 'all 0.3s' }} />)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+            {story.pages.map((_, i) => (
+              <div key={i} style={{
+                height:     4,
+                width:      i === pageIdx ? 20 : 7,
+                borderRadius: 50,
+                background: i === pageIdx
+                  ? 'var(--color-accent)'
+                  : i < pageIdx
+                    ? 'var(--color-primary)'
+                    : dark ? 'var(--overlay-20)' : 'rgba(0,0,0,0.12)',
+                transition: 'all 0.3s',
+              }} />
+            ))}
           </div>
         </div>
         <AcornPill count={`+${sessionAcorns}`} />
@@ -352,12 +396,15 @@ export default function ReadingSession() {
       {/* ── MAIN ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 18px 12px', maxWidth: 560, margin: '0 auto', width: '100%' }}>
 
-        {/* Provider status chip */}
+        {/* Provider status chip — shows which scoring engine is active */}
         {providerInfo && (
           <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {providerInfo.azure?.available && (
-              <span style={{ fontSize: 11, background: 'var(--bg-info-light)', color: 'var(--color-info)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>☁️ Azure Pronunciation AI</span>
-            )}
+            {providerInfo.azure?.available
+              ? <span style={{ fontSize: 11, background: 'var(--bg-info-light)', color: 'var(--color-info)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>☁️ Azure Pronunciation AI</span>
+              : providerInfo.groq?.available
+              ? <span style={{ fontSize: 11, background: 'var(--bg-primary-light)', color: 'var(--color-primary)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>🟢 Groq Whisper (free)</span>
+              : <span style={{ fontSize: 11, background: 'var(--bg-warning-light)', color: 'var(--text-warning)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>📱 Browser only</span>
+            }
             {providerInfo.gemini?.available && (
               <span style={{ fontSize: 11, background: 'var(--provider-gemini-bg)', color: 'var(--provider-gemini)', borderRadius: 50, padding: '3px 10px', fontWeight: 700 }}>♊ Gemini (free)</span>
             )}
@@ -378,70 +425,43 @@ export default function ReadingSession() {
         `}</style>
         <div className="animate-float" style={{ fontSize: 72, lineHeight: 1, marginBottom: 20, textAlign: 'center' }}>{page.scene}</div>
 
-        {/* ── WORD DISPLAY ── */}
-        <div style={{ background: dark ? 'var(--overlay-10)' : 'white', backdropFilter: dark ? 'blur(10px)' : 'none', borderRadius: 24, padding: '26px 24px', boxShadow: dark ? 'none' : 'var(--shadow-lg)', width: '100%', marginBottom: 16, border: dark ? '1px solid var(--overlay-15)' : 'none', minHeight: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '12px 8px' }}>
-          {words.map((word, i) => {
-            const sc = wordScores[i]?.score ?? null;
-            const errorType = wordScores[i]?.errorType;
-            const punctMatch = word.match(/([.,!?;:]+)$/);
-            const punct = punctMatch ? punctMatch[0] : '';
-            const clean = word.slice(0, word.length - punct.length);
-            const colors = getWordColor(sc);
-            const badge = getErrorBadge(errorType);
-            const isRevealed   = i < revealedCount;          // score shown
-            const isSpeaking   = i === speakingWordIdx;         // TTS is on this word
-            const showScore    = isRevealed && wordScores.length > 0;
-            const scoreVal     = showScore ? wordScores[i]?.score ?? null : null;
-            const revealColors = showScore ? getWordColor(scoreVal) : null;
-            const revealBadge  = showScore ? getErrorBadge(wordScores[i]?.errorType) : null;
-
-            return (
-              <span key={i} style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center',
-                transform: isSpeaking ? 'scale(1.18) translateY(-3px)' : isRevealed && scoreVal !== null ? 'scale(1.0)' : 'scale(1)',
-                transition: 'transform 0.18s ease, opacity 0.25s ease',
-              }}>
-                {/* Score badge — shown above word after reveal */}
-                {showScore && scoreVal !== null && (
-                  <span style={{ position: 'absolute', top: -18, fontSize: 10, fontWeight: 900,
-                    color: scoreVal >= 80 ? 'var(--text-success)' : scoreVal >= 60 ? 'var(--color-accent-dark)' : 'var(--color-danger-dark)',
-                    animation: 'fadeInUp 0.25s ease',
-                    whiteSpace: 'nowrap' }}>
-                    {Math.round(scoreVal)}%
-                  </span>
-                )}
-                <span style={{
-                  fontSize: 'clamp(22px,5vw,32px)', fontWeight: 800,
-                  color: isSpeaking ? 'var(--color-info)' : revealColors ? revealColors.text : textCol,
-                  background: isSpeaking ? 'var(--bg-info-light)' : revealColors ? revealColors.bg : 'transparent',
-                  padding: (isSpeaking || revealColors) ? '3px 10px' : '2px 4px',
-                  borderRadius: 10,
-                  border: isSpeaking ? '2px solid var(--color-info)' : revealColors ? `1.5px solid ${revealColors.border}` : 'none',
-                  boxShadow: isSpeaking ? '0 0 12px rgba(59,130,246,0.4)' : 'none',
-                  transition: 'all 0.25s ease',
-                  lineHeight: 1.5, display: 'inline-block',
-                }}>{clean}</span>
-                {punct && <span style={{ fontSize: 'clamp(22px,5vw,32px)', fontWeight: 800, color: mutedCol }}>{punct}</span>}
-                {revealBadge && (
-                  <span style={{ position: 'absolute', top: -16, fontSize: 9, background: revealBadge.color, color: 'white', borderRadius: 50, padding: '1px 5px', fontWeight: 800, whiteSpace: 'nowrap' }}>
-                    {revealBadge.label}
-                  </span>
-                )}
-                {/* Phoneme detail row — shown after reveal if Azure returned them */}
-                {showScore && wordScores[i]?.phonemes?.length > 0 && (
-                  <span style={{ fontSize: 8, color: revealColors?.text || mutedCol, marginTop: 3, display: 'flex', gap: 2 }}>
-                    {wordScores[i].phonemes.slice(0, 6).map((p, j) => (
-                      <span key={j} style={{
-                        background: getWordColor(p.score)?.bg || 'transparent',
-                        color: getWordColor(p.score)?.text || mutedCol,
-                        borderRadius: 3, padding: '0 3px', fontWeight: 700,
-                        fontSize: 8,
-                      }}>{p.phoneme}</span>
-                    ))}
-                  </span>
-                )}
-              </span>
-            );
-          })}
+        {/* ── PHONICS WORD DISPLAY ── */}
+        {/* Before assessment: each word split into grapheme tiles with phoneme labels */}
+        {/* After assessment:  each grapheme tile colour-coded green/amber/red by score */}
+        <div style={{
+          background: dark ? 'var(--overlay-10)' : 'white',
+          backdropFilter: dark ? 'blur(10px)' : 'none',
+          borderRadius: 24,
+          padding: '28px 20px 20px',
+          boxShadow: dark ? 'none' : 'var(--shadow-lg)',
+          width: '100%', marginBottom: 16,
+          border: dark ? '1px solid var(--overlay-15)' : '1px solid var(--border)',
+          minHeight: 100, position: 'relative',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexWrap: 'wrap', gap: '20px 10px',
+        }}>
+          {wordScores.length === 0 && (
+            <div style={{ position: 'absolute', top: 8, right: 12, display: 'flex', gap: 5, alignItems: 'center' }}>
+              <span style={{ fontSize: 9, color: dark ? 'var(--overlay-40)' : 'var(--text-muted)', fontWeight: 700 }}>PHONICS</span>
+              <span style={{ width: 7, height: 7, borderRadius: 2, background: 'var(--color-success)' }} />
+              <span style={{ fontSize: 9, color: dark ? 'var(--overlay-40)' : 'var(--text-muted)' }}>known</span>
+              <span style={{ width: 7, height: 7, borderRadius: 2, background: 'var(--brand-pop1)' }} />
+              <span style={{ fontSize: 9, color: dark ? 'var(--overlay-40)' : 'var(--text-muted)' }}>⭐ new</span>
+            </div>
+          )}
+          {words.map((word, i) => (
+            <PhonicsWord
+              key={i}
+              word={word}
+              phase={child?.phase || 2}
+              score={i < revealedCount && wordScores[i] ? wordScores[i].score : null}
+              azurePhonemes={wordScores[i]?.phonemes || []}
+              isSpeaking={i === speakingWordIdx}
+              isRevealed={i < revealedCount && wordScores.length > 0}
+              dark={dark}
+              compact={words.length > 8}
+            />
+          ))}
         </div>
 
         {/* ── AZURE DETAILED SCORES ── */}
@@ -608,41 +628,106 @@ export default function ReadingSession() {
            : 'Tap 🎙️ and read the sentence aloud!'}
         </p>
         <p style={{ fontSize: 11, color: dark ? 'var(--overlay-25)' : 'var(--border-2)', marginTop: 2 }}>
-          {providerInfo?.azure?.available
-            ? '☁️ Azure Pronunciation Assessment active — real phonics scoring'
-            : '⚠️ Add AZURE_SPEECH_KEY in Render settings for phonics scoring'}
+          {scoringMode === 'azure'
+            ? '☁️ Azure Pronunciation Assessment — phoneme-level scoring'
+            : scoringMode === 'groq-whisper'
+            ? '🟢 Groq Whisper — word-level scoring (free)'
+            : scoringMode === 'text-comparison'
+            ? '📱 Browser speech — basic word matching'
+            : providerInfo?.azure?.available || providerInfo?.groq?.available
+            ? 'Ready — tap 🎙️ to record'
+            : '⚠️ Add AZURE_SPEECH_KEY or GROQ_API_KEY for phonics scoring'}
         </p>
 
-        {/* ── PAGE NAVIGATION — always visible so child can move freely ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
-          {/* Previous page */}
-          <button
-            onClick={() => { stop(); setPageIdx(p => Math.max(0, p - 1)); }}
-            disabled={pageIdx === 0 || assessing || isRecording}
-            style={{ background: 'transparent', border: `1.5px solid ${pageIdx === 0 ? 'var(--dark-8)' : dark ? 'var(--overlay-20)' : 'var(--dark-15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: pageIdx === 0 ? 'default' : 'pointer', color: pageIdx === 0 ? (dark ? 'var(--overlay-15)' : 'var(--dark-15)') : (dark ? 'var(--overlay-70)' : 'var(--text-secondary)'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ‹
-          </button>
+        {/* ── PAGE NAVIGATION ────────────────────────────────── */}
+        {/* Page dot strip — tap any dot to jump directly to that page */}
+        <div style={{ width: '100%', marginTop: 14 }}>
+          {/* Clickable page dots — each shows completion state */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {story.pages.map((p, i) => {
+              const isActive    = i === pageIdx;
+              const isCompleted = i < pageIdx;                 // visited pages
+              const isMoral     = isAiStory && i === story.pages.length - 1;
+              return (
+                <button
+                  key={i}
+                  onClick={() => { if (!assessing && !isRecording) { stop(); setPageIdx(i); } }}
+                  disabled={assessing || isRecording}
+                  title={`Page ${i + 1}${isCompleted ? ' ✓' : ''}`}
+                  style={{
+                    width:        isActive ? 32 : 10,
+                    height:       10,
+                    borderRadius: 50,
+                    border:       'none',
+                    cursor:       assessing || isRecording ? 'default' : 'pointer',
+                    background:   isActive
+                      ? 'var(--color-accent)'
+                      : isCompleted
+                        ? 'var(--color-primary)'
+                        : dark ? 'var(--overlay-20)' : 'var(--border)',
+                    opacity:      assessing || isRecording ? 0.5 : 1,
+                    transition:   'all 0.25s ease',
+                    padding:      0,
+                  }}
+                />
+              );
+            })}
+          </div>
 
-          {/* Page indicator */}
-          <span style={{ fontSize: 12, color: dark ? 'var(--overlay-45)' : 'var(--text-muted)', minWidth: 80, textAlign: 'center', fontWeight: 600 }}>
-            Page {pageIdx + 1} of {story?.pages?.length || '?'}
-          </span>
+          {/* Previous / counter / next row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <button
+              onClick={() => { stop(); setPageIdx(p => Math.max(0, p - 1)); }}
+              disabled={pageIdx === 0 || assessing || isRecording}
+              style={{
+                background:   pageIdx === 0 ? 'transparent' : (dark ? 'var(--overlay-10)' : 'var(--bg-subtle)'),
+                border:       `1.5px solid ${pageIdx === 0 ? (dark ? 'var(--overlay-10)' : 'var(--border)') : (dark ? 'var(--overlay-25)' : 'var(--border-2)')}`,
+                borderRadius: 50, width: 38, height: 38, fontSize: 18,
+                cursor:       pageIdx === 0 || assessing || isRecording ? 'default' : 'pointer',
+                color:        pageIdx === 0 ? (dark ? 'var(--overlay-20)' : 'var(--border-2)') : (dark ? 'var(--overlay-80)' : 'var(--text)'),
+                display:      'flex', alignItems: 'center', justifyContent: 'center',
+                transition:   'all 0.2s',
+              }}>
+              ‹
+            </button>
 
-          {/* Next page */}
-          <button
-            onClick={() => {
-              stop();
-              if (story && pageIdx < story.pages.length - 1) {
-                setPageIdx(p => p + 1);
-              } else if (story && pageIdx === story.pages.length - 1) {
-                // Allow completing from nav button too
-                nav('/home');
-              }
-            }}
-            disabled={assessing || isRecording}
-            style={{ background: 'transparent', border: `1.5px solid ${dark ? 'var(--overlay-20)' : 'var(--dark-15)'}`, borderRadius: 50, width: 36, height: 36, fontSize: 18, cursor: assessing || isRecording ? 'default' : 'pointer', color: dark ? 'var(--overlay-70)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {story && pageIdx === story.pages.length - 1 ? '🏠' : '›'}
-          </button>
+            <div style={{ textAlign: 'center', minWidth: 90 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: dark ? 'var(--overlay-80)' : 'var(--text)' }}>
+                Page {pageIdx + 1} <span style={{ fontWeight: 400, color: dark ? 'var(--overlay-45)' : 'var(--text-muted)' }}>of {story.pages.length}</span>
+              </div>
+              {/* Show score for current page if assessed */}
+              {overallAcc !== null && (
+                <div style={{
+                  fontSize: 11, fontWeight: 700, marginTop: 2,
+                  color: overallAcc >= 80 ? 'var(--text-success)' : overallAcc >= 55 ? 'var(--color-accent-dark)' : 'var(--color-danger)',
+                }}>
+                  {overallAcc >= 80 ? '⭐' : overallAcc >= 55 ? '👍' : '🔄'} {overallAcc}% this page
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                stop();
+                if (story && pageIdx < story.pages.length - 1) {
+                  setPageIdx(p => p + 1);
+                } else if (story && pageIdx === story.pages.length - 1) {
+                  nav('/home');
+                }
+              }}
+              disabled={assessing || isRecording}
+              style={{
+                background:   dark ? 'var(--overlay-10)' : 'var(--bg-subtle)',
+                border:       `1.5px solid ${dark ? 'var(--overlay-25)' : 'var(--border-2)'}`,
+                borderRadius: 50, width: 38, height: 38, fontSize: 18,
+                cursor:       assessing || isRecording ? 'default' : 'pointer',
+                color:        dark ? 'var(--overlay-80)' : 'var(--text)',
+                display:      'flex', alignItems: 'center', justifyContent: 'center',
+                transition:   'all 0.2s',
+              }}>
+              {story && pageIdx === story.pages.length - 1 ? '🏠' : '›'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -253,6 +253,21 @@ function migrate(db) {
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // Detect if story pages need expanding (old 3-page stories → new 5-6 page stories)
+  // This fires once on existing deployments and is a no-op after the first run
+  try {
+    const pageCountRow = db.prepare("SELECT COUNT(*) as n FROM story_pages").get();
+    const storyCountRow = db.prepare("SELECT COUNT(*) as n FROM stories").get();
+    const EXPECTED_MIN_PAGES = storyCountRow.n * 4;  // at least 4 pages per story
+    if (storyCountRow.n > 0 && pageCountRow.n < EXPECTED_MIN_PAGES) {
+      console.log(`[Migration] Expanding story pages: found ${pageCountRow.n} pages for ${storyCountRow.n} stories — reseeding pages…`);
+      // Dynamic import to avoid circular dep at module load time
+      import('../db/seed.js').then(mod => {
+        if (mod.seedDatabase) mod.seedDatabase(db);
+      }).catch(e => console.warn('[Migration] Reseed failed:', e.message));
+    }
+  } catch {}
+
   db.exec(`CREATE TABLE IF NOT EXISTS ai_story_batches (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,

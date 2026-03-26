@@ -135,12 +135,15 @@ export async function toWavPcm16k(inputBuffer, inputMime) {
     ], { stdio: 'pipe', timeout: 20000 });
 
     const wav = readFileSync(outFile);
-    console.log(`[Azure] ffmpeg: ${(inputBuffer.length/1024).toFixed(1)} KB ${ext} → ${(wav.length/1024).toFixed(1)} KB WAV PCM 16 kHz`);
+    console.log(`[Azure] ffmpeg OK: ${(inputBuffer.length/1024).toFixed(1)} KB ${ext} → ${(wav.length/1024).toFixed(1)} KB WAV 16kHz`);
     return { buffer: wav, converted: true };
   } catch (e) {
+    // IMPORTANT: return null so the caller knows conversion failed.
+    // DO NOT return the original buffer — sending WebM to Azure with WAV Content-Type
+    // will make Azure return 0% for every word (it can't decode the audio).
     console.error('[Azure] ffmpeg FAILED:', e.message);
-    console.error('[Azure] Sending original audio — Azure may reject it');
-    return { buffer: inputBuffer, converted: false };
+    console.error('[Azure] Install ffmpeg: add "apt-get install -y ffmpeg" to Render build command');
+    return { buffer: null, converted: false };
   } finally {
     try { unlinkSync(inFile);  } catch {}
     try { unlinkSync(outFile); } catch {}
@@ -163,13 +166,18 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   }));
   const sanitisedText = sanitisedWords.join(' ');
 
-  // Step 2 — convert audio to WAV PCM 16 kHz
-  const isAlreadyWav = mimeType.includes('wav');
-  const { buffer: audioToSend, converted } = isAlreadyWav
-    ? { buffer: audioBuffer, converted: false }
-    : await toWavPcm16k(audioBuffer, mimeType);
+  // Step 2 — ALWAYS convert to WAV PCM 16 kHz via ffmpeg.
+  // Browsers often lie about mimeType (report 'audio/wav' but send WebM).
+  // ffmpeg detects the real format from the file header regardless of extension.
+  const { buffer: audioToSend, converted } = await toWavPcm16k(audioBuffer, mimeType);
 
-  // Step 3 — build Azure request
+  // Step 3 — abort if audio conversion failed (ffmpeg not available)
+  // Sending unconverted WebM to Azure causes 0% on every word — better to fail clearly
+  if (!audioToSend) {
+    throw new Error('Audio conversion failed — ffmpeg not installed. Add "apt-get install -y ffmpeg" to Render build command');
+  }
+
+  // Step 4 — build Azure request
   const pronConfig = {
     ReferenceText:   sanitisedText,
     GradingSystem:   'HundredMark',
@@ -292,9 +300,17 @@ function parseAzureResult(result, sanitised, original, properNounMap) {
     ? Math.round(wordScores.reduce((s, w) => s + w.score, 0) / wordScores.length)
     : Math.round(pa.AccuracyScore ?? 0);
 
+  // If every single word is 0 and all are Omission — Azure heard nothing meaningful
+  // This is almost always a technical issue (bad audio format) not a child reading badly
+  const allOmitted = wordScores.every(w => w.score === 0 && w.errorType === 'Omission');
+  if (allOmitted) {
+    console.warn('[Azure] All words Omitted (score=0) — audio likely not recognised. Check ffmpeg conversion.');
+  }
+
   return {
     wordScores,
     overallAccuracy,
+    allOmitted,   // flag for controller to surface as technical failure
     overallFluency:      Math.round(pa.FluencyScore      ?? 0),
     overallCompleteness: Math.round(pa.CompletenessScore ?? 0),
     overallProsody:      0,
@@ -310,6 +326,222 @@ function buildFallback(referenceText, score) {
     overallAccuracy: score, overallFluency: score,
     overallCompleteness: score, overallProsody: 0, displayText: '',
   };
+}
+
+
+// ── GROQ WHISPER PRONUNCIATION ASSESSMENT ────────────────────
+// Strategy:
+//   1. Send audio + reference text as `prompt` (guides Whisper to expect these words)
+//   2. Request verbose_json with word-level timestamps + confidence
+//   3. Align transcribed words against reference using DTW-style matching
+//   4. Score each word: exact=100, similar=partial, missing=0
+//   5. Use segment avg_logprob as a pronunciation confidence signal
+//
+// Why this works for kids:
+//   • Accepts WebM/OGG/MP3 directly — no ffmpeg needed
+//   • `prompt` biases Whisper to listen for the specific phonics words
+//   • Word-level confidence captures whether the child's sounds were clear
+//   • Works on iOS Safari, Firefox, all browsers (no Web Speech API needed)
+//   • Already free on Groq's existing free tier
+
+export function groqAvailable() {
+  const key = (process.env.GROQ_API_KEY || '').trim();
+  return Boolean(key && !key.includes('your-'));
+}
+
+export async function assessWithGroqWhisper(audioBuffer, referenceText, mimeType = 'audio/webm') {
+  const key = (process.env.GROQ_API_KEY || '').trim();
+  if (!key) throw new Error('GROQ_API_KEY not set');
+
+  // Groq Whisper accepts multipart/form-data — build FormData manually
+  const { FormData, Blob } = await import('node-fetch').then(() => ({ 
+    FormData: globalThis.FormData, Blob: globalThis.Blob 
+  })).catch(async () => {
+    const mod = await import('formdata-node');
+    return { FormData: mod.FormData, Blob: mod.Blob };
+  });
+
+  // Build multipart form using Node's built-in fetch (available in Node 18+)
+  const boundary = '----GroqBoundary' + Math.random().toString(36).slice(2);
+  
+  // Build multipart body manually for Node.js compatibility
+  const CRLF = '
+';
+  const refText = referenceText.trim();
+  
+  // Determine file extension from MIME
+  const ext = mimeType.includes('webm') ? 'webm'
+            : mimeType.includes('ogg')  ? 'ogg'
+            : mimeType.includes('mp4')  ? 'mp4'
+            : mimeType.includes('mpeg') ? 'mp3' : 'wav';
+
+  // Build multipart manually
+  const textPart = (name, value) =>
+    `--${boundary}${CRLF}Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}${value}${CRLF}`;
+  
+  const filePart = Buffer.concat([
+    Buffer.from(`--${boundary}${CRLF}`, 'utf8'),
+    Buffer.from(`Content-Disposition: form-data; name="file"; filename="audio.${ext}"${CRLF}`, 'utf8'),
+    Buffer.from(`Content-Type: ${mimeType}${CRLF}${CRLF}`, 'utf8'),
+    audioBuffer,
+    Buffer.from(CRLF, 'utf8'),
+  ]);
+
+  const body = Buffer.concat([
+    Buffer.from(textPart('model',                    'whisper-large-v3-turbo'),  'utf8'),
+    Buffer.from(textPart('language',                 'en'),                      'utf8'),
+    Buffer.from(textPart('response_format',          'verbose_json'),             'utf8'),
+    Buffer.from(textPart('timestamp_granularities[]','word'),                     'utf8'),
+    Buffer.from(textPart('temperature',              '0.0'),                     'utf8'),
+    // prompt guides Whisper to expect these specific words — crucial for short phonics sentences
+    Buffer.from(textPart('prompt', refText),                                     'utf8'),
+    filePart,
+    Buffer.from(`--${boundary}--${CRLF}`, 'utf8'),
+  ]);
+
+  console.log(`[Groq Whisper] Assess: "${refText.slice(0,50)}" — ${(audioBuffer.length/1024).toFixed(1)} KB ${ext}`);
+
+  const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      'Authorization':  `Bearer ${key}`,
+      'Content-Type':   `multipart/form-data; boundary=${boundary}`,
+    },
+    body,
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!response.ok) {
+    const err = await response.text().catch(() => response.statusText);
+    throw new Error(`Groq Whisper ${response.status}: ${err.slice(0, 150)}`);
+  }
+
+  const result = await response.json();
+  console.log(`[Groq Whisper] Got: "${(result.text||'').slice(0,60)}" — ${result.words?.length ?? 0} words`);
+
+  return parseGroqResult(result, refText);
+}
+
+function parseGroqResult(result, referenceText) {
+  const refWords     = referenceText.trim().split(/\s+/);
+  const spokenWords  = (result.words || []);
+  const spokenText   = (result.text || '').trim();
+
+  // Align spoken words to reference words using greedy string matching
+  // This handles omissions, insertions and slight mispronunciations
+  const spokenNorm = spokenWords.map(w => ({
+    word:     w.word?.trim().toLowerCase().replace(/[^a-z]/g, '') || '',
+    rawWord:  w.word || '',
+    start:    w.start || 0,
+    end:      w.end   || 0,
+  }));
+
+  // Get overall segment confidence from avg_logprob
+  // avg_logprob: 0 = perfect, -0.5 = uncertain, < -1.0 = very unclear
+  const segLogProb   = result.segments?.[0]?.avg_logprob ?? -0.3;
+  // Convert log-prob to 0-100 confidence multiplier
+  // -0.1 → 97, -0.3 → 86, -0.5 → 74, -1.0 → 50, -2.0 → 13
+  const confMultiplier = Math.max(0.1, Math.min(1, Math.exp(segLogProb)));
+
+  let spokenPtr = 0;
+  const wordScores = refWords.map((refWord, i) => {
+    const refClean = refWord.toLowerCase().replace(/[^a-z]/g, '');
+
+    // Search ahead in spoken words for a match (allows for insertions)
+    let bestMatch = null;
+    let bestScore = -1;
+    for (let j = spokenPtr; j < Math.min(spokenPtr + 3, spokenNorm.length); j++) {
+      const s = stringSimilarity(spokenNorm[j].word, refClean);
+      if (s > bestScore) { bestScore = s; bestMatch = { spoken: spokenNorm[j], idx: j }; }
+    }
+
+    if (!bestMatch || bestScore < 0.3) {
+      // Word not found — child omitted it
+      return { word: refWord, score: 0, rawScore: 0, errorType: 'Omission', phonemes: [],
+               groqConfidence: Math.round(confMultiplier * 100) };
+    }
+
+    spokenPtr = bestMatch.idx + 1;
+
+    // Base score from string similarity (did they say roughly the right word?)
+    const similarityScore = bestScore * 100;
+    // Modulate by Whisper's confidence in what it heard
+    const adjustedScore = Math.round(similarityScore * confMultiplier);
+
+    const errorType = adjustedScore >= 85 ? 'None'
+                    : adjustedScore >= 50 ? 'Mispronunciation'
+                    : 'Mispronunciation';
+
+    return {
+      word:            refWord,
+      score:           adjustedScore,
+      rawScore:        Math.round(similarityScore),
+      errorType,
+      groqTranscribed: bestMatch.spoken.rawWord,
+      groqConfidence:  Math.round(confMultiplier * 100),
+      phonemes:        [],   // Whisper doesn't provide phoneme-level data
+    };
+  });
+
+  const overallAccuracy = wordScores.length
+    ? Math.round(wordScores.reduce((s, w) => s + w.score, 0) / wordScores.length)
+    : 0;
+
+  return {
+    wordScores,
+    overallAccuracy,
+    overallFluency:      Math.round(confMultiplier * 90),
+    overallCompleteness: Math.round((wordScores.filter(w => w.score > 0).length / refWords.length) * 100),
+    overallProsody:      0,
+    displayText:         spokenText,
+    _debug: {
+      groqRaw:        result,
+      refWords,
+      spokenNorm,
+      confMultiplier: confMultiplier.toFixed(3),
+      segLogProb,
+    },
+  };
+}
+
+// Jaro-Winkler inspired string similarity 0..1
+function stringSimilarity(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (Math.abs(a.length - b.length) > Math.max(a.length, b.length) * 0.5) return 0;
+  
+  // Count matching characters within a window
+  const matchWindow = Math.floor(Math.max(a.length, b.length) / 2) - 1;
+  const aMatches = new Array(a.length).fill(false);
+  const bMatches = new Array(b.length).fill(false);
+  let matches = 0;
+  
+  for (let i = 0; i < a.length; i++) {
+    const start = Math.max(0, i - matchWindow);
+    const end   = Math.min(i + matchWindow + 1, b.length);
+    for (let j = start; j < end; j++) {
+      if (!bMatches[j] && a[i] === b[j]) { aMatches[i] = bMatches[j] = true; matches++; break; }
+    }
+  }
+  if (!matches) return 0;
+  
+  let trans = 0;
+  let k = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (aMatches[i]) {
+      while (!bMatches[k]) k++;
+      if (a[i] !== b[k]) trans++;
+      k++;
+    }
+  }
+  const jaro = (matches/a.length + matches/b.length + (matches - trans/2)/matches) / 3;
+  
+  // Winkler prefix bonus
+  let prefix = 0;
+  for (let i = 0; i < Math.min(4, Math.min(a.length, b.length)); i++) {
+    if (a[i] === b[i]) prefix++; else break;
+  }
+  return jaro + prefix * 0.1 * (1 - jaro);
 }
 
 // ── NEURAL TTS ────────────────────────────────────────────────

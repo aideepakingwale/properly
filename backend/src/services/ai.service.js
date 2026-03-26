@@ -76,9 +76,16 @@ async function askGemini(word, sentence, phase) {
         body: JSON.stringify({
           contents: [{ parts: [{ text:
             `You are Mrs. Owl, a warm UK phonics tutor for children aged 4-7 (Phase ${phase || 2}).
-Give ONE short playful phonics tip (max 12 words) to help a child say "${word}" from: "${sentence}".
-Use a rhyme, body action, or animal sound. End with one emoji.
-Reply ONLY with the tip — nothing else.`
+The child struggled to say the word "${word}" in this sentence: "${sentence}".
+Write ONE complete coaching sentence (8-14 words) to help them pronounce "${word}" correctly.
+Start the sentence with "Say", "Try", "Put" or similar action word.
+Use a fun body action, sound comparison, or rhyme. End with one emoji.
+Good examples:
+  word=cat → "Say c-a-t slowly, like a cat stretching out! 🐱"
+  word=ship → "Say sh like you're shushing a baby, then ip! 🤫"
+  word=rain → "Say r-ai-n — the ai says ayyyy like a happy wave! 🌈"
+Bad examples (DO NOT do this): "Stick" / "Try again" / "Practice more"
+Reply with ONLY the complete coaching sentence, nothing else.`
           }] }],
           generationConfig: { maxOutputTokens: 60, temperature: 0.75 },
           safetySettings: [
@@ -117,11 +124,15 @@ async function askGroq(word, sentence, phase) {
         messages: [
           {
             role: 'system',
-            content: `You are Mrs. Owl, a warm UK phonics tutor for children aged 4-7 at Phase ${phase || 2}. Give ONE short playful phonics tip (max 12 words) using a rhyme, body action, or animal sound. End with one emoji. Reply ONLY with the tip.`,
+            content: `You are Mrs. Owl, a warm UK phonics tutor for children aged 4-7 at Phase ${phase || 2}.
+When a child struggles with a word, write ONE complete coaching sentence (8-14 words) starting with an action word like "Say", "Try", or "Put".
+Use a fun body action, sound comparison, or rhyme. End with one emoji.
+Example: word=sat → "Say s-a-t — tap your knee for each sound! 🌟"
+Always write a COMPLETE SENTENCE. Never respond with just one or two words.`,
           },
           {
             role: 'user',
-            content: `Child struggled with "${word}" in: "${sentence}". Give a phonics tip.`,
+            content: `The child could not say the word "${word}". Give ONE short phonics tip (max 12 words) about HOW TO SAY "${word}" — sounds, mouth position, or simple comparison. Must mention the word "${word}". End with one emoji.`,
           },
         ],
       }),

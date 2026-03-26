@@ -16,94 +16,133 @@
 import getDb from './database.js';
 
 const STORIES = [
-  // Phase 2
+  // ── PHASE 2: Simple CVC Words (s a t p i n m d g o c k e u r h b f l) ──────
   { id:'p2_1', phase:2, title:'Cat and the Hat', emoji:'🐱', cover:'🐱🎩', acorns:15, sort_order:1,
     pages:[
       { idx:0, text:'The fat cat sat on the mat.', scene:'☀️🌿', bg:'bg-warm' },
-      { idx:1, text:'The cat ran to get a big red hat.', scene:'🏠🌸', bg:'bg-pink' },
-      { idx:2, text:'The cat sat and had a nap in its hat.', scene:'🌙⭐', bg:'bg-purple' },
+      { idx:1, text:'The cat got up and ran to the red hat.', scene:'🏠🌸', bg:'bg-pink' },
+      { idx:2, text:'The hat was big and the cat did not fit.', scene:'😅🎩', bg:'bg-orange' },
+      { idx:3, text:'The cat sat on top of the hat and had a nap.', scene:'🌙💤', bg:'bg-purple' },
+      { idx:4, text:'The cat woke up and the hat was flat!', scene:'😲🎩', bg:'bg-blue' },
     ]},
   { id:'p2_2', phase:2, title:'Big Dog Bud', emoji:'🐶', cover:'🐶🦴', acorns:15, sort_order:2,
     pages:[
-      { idx:0, text:'Bud is a big tan dog.', scene:'🌳🌤️', bg:'bg-warm' },
-      { idx:1, text:'Bud can dig and run and hop.', scene:'🌿🦋', bg:'bg-green' },
-      { idx:2, text:'Bud sat in the mud and got wet.', scene:'💧🌧️', bg:'bg-blue' },
+      { idx:0, text:'Bud is a big tan dog with a wet nose.', scene:'🌳🌤️', bg:'bg-warm' },
+      { idx:1, text:'Bud can dig and run and hop on the grass.', scene:'🌿🦋', bg:'bg-green' },
+      { idx:2, text:'Bud got in the mud and it got on his leg.', scene:'💧🌧️', bg:'bg-blue' },
+      { idx:3, text:'His pal Tom had to rub him with a rag.', scene:'🛁😄', bg:'bg-pink' },
+      { idx:4, text:'Bud sat in the sun and had a big nap.', scene:'☀️😴', bg:'bg-orange' },
     ]},
   { id:'p2_3', phase:2, title:'Hen and Ten Eggs', emoji:'🐔', cover:'🐔🥚', acorns:15, sort_order:3,
     pages:[
-      { idx:0, text:'The red hen sat in her pen.', scene:'🌅🌾', bg:'bg-orange' },
+      { idx:0, text:'The red hen sat in her pen on the farm.', scene:'🌅🌾', bg:'bg-orange' },
       { idx:1, text:'She had ten big fat eggs to sit on.', scene:'🌸🌻', bg:'bg-warm' },
-      { idx:2, text:'The hen got up and a chick ran out.', scene:'🐣🌈', bg:'bg-green' },
+      { idx:2, text:'She sat on them all day and all night.', scene:'🌙⭐', bg:'bg-purple' },
+      { idx:3, text:'Tap tap tap! The eggs began to crack.', scene:'🥚💥', bg:'bg-pink' },
+      { idx:4, text:'Ten little chicks ran out into the sun.', scene:'🐣🌈', bg:'bg-green' },
     ]},
   { id:'p2_4', phase:2, title:'The Pot of Mud', emoji:'🦊', cover:'🦊🪨', acorns:15, sort_order:4,
     pages:[
-      { idx:0, text:'A fox sat by a hot pot.', scene:'🔥🌿', bg:'bg-orange' },
-      { idx:1, text:'The fox hid a bit of ham in it.', scene:'🌲🦊', bg:'bg-green' },
-      { idx:2, text:'The dog dug it up and ran off fast.', scene:'💨🌳', bg:'bg-blue' },
+      { idx:0, text:'A red fox sat by a hot big pot.', scene:'🔥🌿', bg:'bg-orange' },
+      { idx:1, text:'The fox put a bit of ham and a fig in it.', scene:'🍖🌲', bg:'bg-green' },
+      { idx:2, text:'The fox hid the pot in the mud by the log.', scene:'🌳🦊', bg:'bg-warm' },
+      { idx:3, text:'A dog ran up and sniffed at the log.', scene:'🐕👃', bg:'bg-blue' },
+      { idx:4, text:'The dog dug up the pot and ran off fast!', scene:'💨🏃', bg:'bg-pink' },
     ]},
-  // Phase 3
+
+  // ── PHASE 3: Digraphs & Vowel Teams (ch sh th ai ee igh oa oo ar or) ──────────
   { id:'p3_1', phase:3, title:'Snail in the Rain', emoji:'🐌', cover:'🐌🌧️', acorns:20, sort_order:1,
     pages:[
-      { idx:0, text:'The snail went out in the rain.', scene:'🌧️🌿', bg:'bg-blue' },
-      { idx:1, text:'She left a long silver trail on the path.', scene:'✨🌱', bg:'bg-green' },
-      { idx:2, text:'The snail found a big green leaf to eat.', scene:'🍃🌤️', bg:'bg-warm' },
+      { idx:0, text:'A little snail set off in the rain.', scene:'🌧️🌿', bg:'bg-blue' },
+      { idx:1, text:'She left a long shiny trail on the path.', scene:'✨🌱', bg:'bg-green' },
+      { idx:2, text:'The rain was cool on her smooth brown shell.', scene:'💧🌀', bg:'bg-purple' },
+      { idx:3, text:'She crept under a big green leaf to wait.', scene:'🍃☔', bg:'bg-warm' },
+      { idx:4, text:'The sun came out and the snail went on her way.', scene:'☀️🌈', bg:'bg-orange' },
     ]},
-  { id:'p3_2', phase:3, title:'Beach Day', emoji:'⛱️', cover:'⛱️🐚', acorns:20, sort_order:2,
+  { id:'p3_2', phase:3, title:'Shark at the Beach', emoji:'🦈', cover:'🦈🌊', acorns:20, sort_order:2,
     pages:[
-      { idx:0, text:'We went to the beach on a hot day.', scene:'☀️🌊', bg:'bg-warm' },
-      { idx:1, text:'I could see tall ships far out at sea.', scene:'⛵🐟', bg:'bg-blue' },
-      { idx:2, text:'We each found a pink shell on the wet sand.', scene:'🐚🌅', bg:'bg-pink' },
+      { idx:0, text:'A shark swam out in the deep dark sea.', scene:'🌊🌙', bg:'bg-blue' },
+      { idx:1, text:'She had sharp teeth and a bright silver fin.', scene:'🦈✨', bg:'bg-purple' },
+      { idx:2, text:'She chased a shoal of fish near the reef.', scene:'🐟🪸', bg:'bg-green' },
+      { idx:3, text:'The fish shot off into the dark cool water.', scene:'💨🌊', bg:'bg-dark', is_dark:1 },
+      { idx:4, text:'The shark turned and swam back to the deep.', scene:'🌊⭐', bg:'bg-blue' },
     ]},
-  { id:'p3_3', phase:3, title:'Flash the Fish', emoji:'🐠', cover:'🐠🌊', acorns:20, sort_order:3,
+  { id:'p3_3', phase:3, title:'The Night Owl', emoji:'🦉', cover:'🦉🌙', acorns:20, sort_order:3,
     pages:[
-      { idx:0, text:'Flash is a bright fish with a long tail.', scene:'🌊🌿', bg:'bg-blue' },
-      { idx:1, text:'She swam deep in the cool dark pool.', scene:'🐙🪸', bg:'bg-purple' },
-      { idx:2, text:'She found a shell and made it her home.', scene:'🐚✨', bg:'bg-green' },
+      { idx:0, text:'The owl sat high in the old oak tree at night.', scene:'🌙🌲', bg:'bg-dark', is_dark:1 },
+      { idx:1, text:'She had big round eyes that could see in the dark.', scene:'👁️⭐', bg:'bg-purple' },
+      { idx:2, text:'She flew out to hunt for food in the moonlight.', scene:'🌕✨', bg:'bg-dark', is_dark:1 },
+      { idx:3, text:'She caught a mouse near the tall green corn.', scene:'🌾🐭', bg:'bg-green' },
+      { idx:4, text:'She flew back to her tree as the sun came up.', scene:'🌅🦉', bg:'bg-orange' },
     ]},
-  // Phase 4
+
+  // ── PHASE 4: CCVC & CVCC Blends (bl cl fl gr br str spl) ─────────────────────
   { id:'p4_1', phase:4, title:'The Best Nest', emoji:'🐦', cover:'🐦🪹', acorns:25, sort_order:1,
     pages:[
-      { idx:0, text:'The bird built the best nest she could find.', scene:'🌸🍃', bg:'bg-orange' },
-      { idx:1, text:'She kept her three cracked eggs warm and snug.', scene:'☀️🌿', bg:'bg-warm' },
-      { idx:2, text:'The small chicks crept out of their broken shells.', scene:'🌈🌸', bg:'bg-green' },
+      { idx:0, text:'The bird flew from branch to branch to find the best spot.', scene:'🌸🍃', bg:'bg-orange' },
+      { idx:1, text:'She found a strong branch and started to build her nest.', scene:'🪹🌿', bg:'bg-warm' },
+      { idx:2, text:'She kept her three speckled eggs warm and snug.', scene:'☀️🥚', bg:'bg-green' },
+      { idx:3, text:'At last she felt the shells crack and split.', scene:'💥🥚', bg:'bg-pink' },
+      { idx:4, text:'Three small chicks crept out and filled the nest with chirps.', scene:'🐣🌈', bg:'bg-blue' },
+      { idx:5, text:'She felt proud as she brought them their first grub.', scene:'🐛😊', bg:'bg-orange' },
     ]},
-  { id:'p4_2', phase:4, title:'Lost Frog', emoji:'🐸', cover:'🐸🏞️', acorns:25, sort_order:2,
+  { id:'p4_2', phase:4, title:'The Lost Frog', emoji:'🐸', cover:'🐸🏞️', acorns:25, sort_order:2,
     pages:[
-      { idx:0, text:'The frog jumped from the steep pond bank.', scene:'🌿🌧️', bg:'bg-blue' },
-      { idx:1, text:'It went on a long damp trip through the thick grass.', scene:'🌾🦗', bg:'bg-green' },
-      { idx:2, text:'At last the frog crept back to its pond.', scene:'🌅🌊', bg:'bg-warm' },
+      { idx:0, text:'The small green frog sat on the damp pond bank.', scene:'🌿🌧️', bg:'bg-green' },
+      { idx:1, text:'He jumped and slipped and fell into the long thick grass.', scene:'🌾😟', bg:'bg-warm' },
+      { idx:2, text:'He crept and stumbled and bumped into a flat grey stone.', scene:'🪨😮', bg:'bg-blue' },
+      { idx:3, text:'He called out but his friends could not find him.', scene:'📢🌿', bg:'bg-orange' },
+      { idx:4, text:'A kind blackbird saw him and led him back to the pond.', scene:'🐦🌊', bg:'bg-purple' },
+      { idx:5, text:'The frog jumped in with a big splash and felt glad.', scene:'💦😄', bg:'bg-blue' },
     ]},
-  // Phase 5
+
+  // ── PHASE 5: Split Digraphs & Alternatives (a-e i-e ay ou ue) ─────────────────
   { id:'p5_1', phase:5, title:'Jake and the Kite', emoji:'🪁', cover:'🪁☁️', acorns:30, sort_order:1,
     pages:[
-      { idx:0, text:'Jake made a kite on a fine summer day.', scene:'☀️🌤️', bg:'bg-warm' },
-      { idx:1, text:'The kite rose high into the wide blue sky.', scene:'🌈☁️', bg:'bg-blue' },
-      { idx:2, text:'A huge gust of wind made the kite swoop and dive.', scene:'💨🌿', bg:'bg-green' },
+      { idx:0, text:'Jake made a kite out of red and white paper.', scene:'☀️🎨', bg:'bg-warm' },
+      { idx:1, text:'He raced to the hill with the kite tucked under his arm.', scene:'🏃🌿', bg:'bg-green' },
+      { idx:2, text:'The kite rose high and soared into the wide blue sky.', scene:'🌈☁️', bg:'bg-blue' },
+      { idx:3, text:'A huge gust of wind made it swoop and twist and dive.', scene:'💨🌀', bg:'bg-purple' },
+      { idx:4, text:'Jake gripped the string and held on with all his might.', scene:'💪😤', bg:'bg-orange' },
+      { idx:5, text:'At dusk he rolled up the string and smiled at the fading sky.', scene:'🌅😊', bg:'bg-pink' },
     ]},
   { id:'p5_2', phase:5, title:'The Brave Knight', emoji:'⚔️', cover:'⚔️🏰', acorns:30, sort_order:2,
     pages:[
-      { idx:0, text:'The brave knight rode home through the dark night.', scene:'🌙⭐', bg:'bg-purple' },
-      { idx:1, text:'He came to a huge stone gate at the old castle.', scene:'🏰🌲', bg:'bg-dark', is_dark:1 },
-      { idx:2, text:'The knight smiled as he rode in from the cold.', scene:'🔥🏠', bg:'bg-orange' },
+      { idx:0, text:'The brave knight rode alone through the dark pine forest.', scene:'🌲🌙', bg:'bg-dark', is_dark:1 },
+      { idx:1, text:'He came to a huge stone gate at the old white castle.', scene:'🏰⭐', bg:'bg-purple' },
+      { idx:2, text:'He spoke his name and the gate swung wide open.', scene:'🚪✨', bg:'bg-blue' },
+      { idx:3, text:'Inside he saw a long bright hall with golden flames.', scene:'🔥🕯️', bg:'bg-orange' },
+      { idx:4, text:'The knight bowed low and made his promise to the throne.', scene:'👑🙏', bg:'bg-warm' },
+      { idx:5, text:'He rode home safe as the sun rose over the stone hills.', scene:'🌅🐴', bg:'bg-pink' },
     ]},
   { id:'p5_3', phase:5, title:'The Rose Garden', emoji:'🌹', cover:'🌹🌿', acorns:30, sort_order:3,
     pages:[
-      { idx:0, text:'Mia grew a rose in her small stone lane.', scene:'🌸☀️', bg:'bg-pink' },
-      { idx:1, text:'The rose had five bright petals on each stem.', scene:'🌺🦋', bg:'bg-warm' },
-      { idx:2, text:'She gave the rose to her gran on her birthday.', scene:'🎂🌹', bg:'bg-green' },
+      { idx:0, text:'Mia planted a tiny rose seed in her garden in June.', scene:'🌱☀️', bg:'bg-warm' },
+      { idx:1, text:'She gave it a shake of plant food and kept the soil damp.', scene:'💧🌿', bg:'bg-green' },
+      { idx:2, text:'A pale green shoot poked up through the dark earth.', scene:'🌱🌞', bg:'bg-blue' },
+      { idx:3, text:'Five bright red petals opened wide in the morning light.', scene:'🌺✨', bg:'bg-pink' },
+      { idx:4, text:'Bees came to drink the sweet nectar from each bloom.', scene:'🐝🌸', bg:'bg-orange' },
+      { idx:5, text:'Mia gave the rose to her gran and they smiled together.', scene:'👵🌹', bg:'bg-purple' },
     ]},
-  // Phase 6
+
+  // ── PHASE 6: Prefixes, Suffixes & Morphology ──────────────────────────────────
   { id:'p6_1', phase:6, title:'The Explorer', emoji:'🧭', cover:'🧭🗺️', acorns:40, sort_order:1,
     pages:[
-      { idx:0, text:'The fearless explorer discovered a completely hidden green valley.', scene:'🏔️🌿', bg:'bg-green' },
-      { idx:1, text:'She carefully mapped the entirely unfamiliar rocky landscape.', scene:'🗺️✏️', bg:'bg-warm' },
-      { idx:2, text:'Her remarkable discovery brought worldwide excitement and endless celebration.', scene:'🌍🎉', bg:'bg-blue' },
+      { idx:0, text:'The fearless explorer set off on an unexpected adventure.', scene:'🏔️🎒', bg:'bg-green' },
+      { idx:1, text:'She carefully crossed an unfamiliar and completely rocky path.', scene:'🪨🌿', bg:'bg-warm' },
+      { idx:2, text:'She discovered a breathtaking valley hidden between two mountains.', scene:'🏔️✨', bg:'bg-blue' },
+      { idx:3, text:'She thoughtfully recorded every remarkable detail in her notebook.', scene:'📓✏️', bg:'bg-purple' },
+      { idx:4, text:'She returned to share her wonderful and astonishing discovery.', scene:'🌍📢', bg:'bg-orange' },
+      { idx:5, text:'Her endless excitement and determination made everyone feel proud.', scene:'🏆🎉', bg:'bg-pink' },
     ]},
-  { id:'p6_2', phase:6, title:'Robot Helpers', emoji:'🤖', cover:'🤖⚙️', acorns:40, sort_order:2,
+  { id:'p6_2', phase:6, title:'The Invention', emoji:'🤖', cover:'🤖⚙️', acorns:40, sort_order:2,
     pages:[
-      { idx:0, text:'The unbelievable robot carefully collected the scattered pieces.', scene:'⚙️🔧', bg:'bg-purple' },
-      { idx:1, text:'Its remarkable movements were completely unpredictable to the watchers.', scene:'👀✨', bg:'bg-warm' },
-      { idx:2, text:'The thoughtful invention became the greatest discovery of the century.', scene:'🏆🌟', bg:'bg-orange' },
+      { idx:0, text:'The thoughtful scientist worked tirelessly in her remarkable laboratory.', scene:'⚗️🔬', bg:'bg-purple' },
+      { idx:1, text:'She carefully collected countless scattered and unorganised pieces.', scene:'⚙️🔧', bg:'bg-warm' },
+      { idx:2, text:'Her remarkable invention moved in completely unpredictable directions.', scene:'🤖✨', bg:'bg-blue' },
+      { idx:3, text:'She fearlessly adjusted and reconfigured its extraordinary movements.', scene:'🔩💡', bg:'bg-orange' },
+      { idx:4, text:'Her discovery brought unbelievable excitement to the worldwide community.', scene:'🌏📰', bg:'bg-green' },
+      { idx:5, text:'Her thoughtfulness and determination made her a truly remarkable person.', scene:'🏆🌟', bg:'bg-pink' },
     ]},
 ];
 
@@ -145,11 +184,12 @@ export function seed() {
   const db = getDb();
 
   const insertStory = db.prepare(`
-    INSERT OR IGNORE INTO stories (id, phase, title, emoji, cover, acorns, page_count, sort_order)
+    INSERT INTO stories (id, phase, title, emoji, cover, acorns, page_count, sort_order)
+    ON CONFLICT(id) DO UPDATE SET page_count=excluded.page_count, title=excluded.title, acorns=excluded.acorns
     VALUES (@id, @phase, @title, @emoji, @cover, @acorns, @page_count, @sort_order)
   `);
   const insertPage = db.prepare(`
-    INSERT OR IGNORE INTO story_pages (story_id, page_index, text, scene, bg_class, is_dark)
+    INSERT OR REPLACE INTO story_pages (story_id, page_index, text, scene, bg_class, is_dark)
     VALUES (@story_id, @page_index, @text, @scene, @bg_class, @is_dark)
   `);
   const insertShop = db.prepare(`
@@ -192,3 +232,4 @@ export function seed() {
   console.log(`✅ Seeded ${STORIES.length} stories, ${SHOP_ITEMS.length} shop items, ${ACHIEVEMENTS.length} achievements`);
 }
 
+export { seed as seedDatabase };
