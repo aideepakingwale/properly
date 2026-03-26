@@ -29,7 +29,7 @@ export const getBookLogs = (req, res) => {
  */
 
 import getDb             from '../db/database.js';
-import { generateBook, getBookDebugLog }  from '../services/book.service.js';
+import { generateBook } from '../services/book.service.js';
 import { r2Url, r2Available } from '../services/r2.service.js';
 
 // ── CREDIT HELPERS ────────────────────────────────────────────
@@ -238,8 +238,11 @@ export const orderPrint = (req, res) => {
 // ── DEBUG LOG (admin only) ────────────────────────────────────
 export const getBookDebug = (req, res) => {
   try {
-    const data = getBookDebugLog(req.params.bookId);
-    res.json({ success: true, data });
+    const db   = getDb();
+    const book = db.prepare('SELECT * FROM story_books WHERE id=?').get(req.params.bookId);
+    if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
+    const pages = db.prepare('SELECT * FROM story_book_pages WHERE book_id=? ORDER BY page_number').all(req.params.bookId);
+    res.json({ success: true, data: { book, pages } });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
