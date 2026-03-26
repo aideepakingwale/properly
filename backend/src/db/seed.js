@@ -185,8 +185,8 @@ export function seed() {
 
   const insertStory = db.prepare(`
     INSERT INTO stories (id, phase, title, emoji, cover, acorns, page_count, sort_order)
-    ON CONFLICT(id) DO UPDATE SET page_count=excluded.page_count, title=excluded.title, acorns=excluded.acorns
     VALUES (@id, @phase, @title, @emoji, @cover, @acorns, @page_count, @sort_order)
+    ON CONFLICT(id) DO UPDATE SET page_count=excluded.page_count, title=excluded.title, acorns=excluded.acorns
   `);
   const insertPage = db.prepare(`
     INSERT OR REPLACE INTO story_pages (story_id, page_index, text, scene, bg_class, is_dark)
