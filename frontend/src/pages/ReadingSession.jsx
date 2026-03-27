@@ -171,16 +171,18 @@ export default function ReadingSession() {
               overallProsody, displayText, source, azureAssessed, _debugInfo } = assessRes.data;
 
       // Always store last assessment debug info for the on-screen panel
-      const debug = _debugInfo || {
-        source, azureAssessed, overallAccuracy,
+      const debug = {
+        ...(_debugInfo || {}),
+        // Always include response-level fields (not in _debugInfo)
+        source, azureAssessed, overallAccuracy, overallFluency,
         displayText, wordCount: wordScores?.length,
         blobKB: (audioBlob?.size / 1024).toFixed(1),
         mime: audioBlob?.type,
-        note: 'No phoneme-level data (Groq/fallback path)',
+        wordScores,
+        recognized: assessRes.data?.displayText,
       };
       setDebugInfo(debug);
       setLastDebug({ stage: 'done', ...debug });
-      if (debugMode && user?.isAdmin && _debugInfo) {}  // already set above
       else setDebugInfo({
         source, azureAssessed, overallAccuracy, overallFluency,
         wordScores: wordScores?.slice(0,3),
@@ -672,13 +674,31 @@ export default function ReadingSession() {
                 ))}
               </>}
 
-              {lastDebug.azureRawResponse && <>
-                <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── AZURE RAW ──</div>
-                <div>RecognitionStatus: {lastDebug.azureRawResponse.RecognitionStatus}</div>
-                <div>DisplayText: "{lastDebug.azureRawResponse.DisplayText}"</div>
-                <div>NBest[0] words: {lastDebug.azureRawResponse.NBest?.[0]?.Words?.length ?? 0}</div>
-                <div>AccuracyScore: {lastDebug.azureRawResponse.NBest?.[0]?.PronunciationAssessment?.AccuracyScore}</div>
-              </>}
+              {lastDebug.azureRawResponse && (() => {
+                const nb = lastDebug.azureRawResponse.NBest?.[0];
+                const pa = nb?.PronunciationAssessment;
+                const w0 = nb?.Words?.[0];
+                return <>
+                  <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── AZURE RAW ──</div>
+                  <div>RecognitionStatus: <span style={{ color: lastDebug.azureRawResponse.RecognitionStatus === 'Success' ? '#6EE7B7' : '#FCA5A5' }}>{lastDebug.azureRawResponse.RecognitionStatus}</span></div>
+                  <div>DisplayText: "{lastDebug.azureRawResponse.DisplayText}"</div>
+                  <div>NBest[0] words: {nb?.Words?.length ?? 0}</div>
+                  <div style={{ color: pa ? '#6EE7B7' : '#FCA5A5' }}>
+                    NBest[0].PronunciationAssessment: {pa ? `AccuracyScore=${pa.AccuracyScore} FluencyScore=${pa.FluencyScore}` : '❌ MISSING — header not applied!'}
+                  </div>
+                  {w0 && <div style={{ color: w0.PronunciationAssessment ? '#6EE7B7' : '#FCA5A5' }}>
+                    Words[0] "{w0.Word}": {w0.PronunciationAssessment
+                      ? `✅ score=${w0.PronunciationAssessment.AccuracyScore} err=${w0.PronunciationAssessment.ErrorType}`
+                      : '❌ No PronunciationAssessment on word — header not applied'}
+                    {' '}{w0.Phonemes?.length ? `phonemes=${w0.Phonemes.length}` : '❌ No phonemes'}
+                  </div>}
+                  <div style={{ marginTop: 4 }}>Words[0] raw: {JSON.stringify(w0).slice(0, 200)}</div>
+                  <div style={{ marginTop: 4, color: '#FCD34D' }}>── PRON CONFIG SENT ──</div>
+                  <div>{JSON.stringify(lastDebug.pronConfig || {})}</div>
+                  <div style={{ marginTop: 4, color: '#FCD34D' }}>── ENDPOINT ──</div>
+                  <div style={{ wordBreak: 'break-all' }}>{lastDebug.endpoint}</div>
+                </>;
+              })()}
             </div>
           )}
         </div>

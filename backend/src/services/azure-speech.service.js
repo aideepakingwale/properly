@@ -186,9 +186,14 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
     PhonemeAlphabet: 'IPA',
     // Note: EnableProsodyAssessment omitted — only valid for en-US
   };
-  const pronConfigB64 = Buffer.from(JSON.stringify(pronConfig)).toString('base64');
+  // CRITICAL: base64 must be a single line — some Node builds wrap at 76 chars
+  // which breaks the HTTP header. Replace all whitespace/newlines from base64.
+  const pronConfigB64 = Buffer.from(JSON.stringify(pronConfig))
+    .toString('base64')
+    .replace(/[\r\n\s]/g, '');
   const endpoint = `https://${AZURE_REGION}.stt.speech.microsoft.com` +
                    `/speech/recognition/conversation/cognitiveservices/v1`;
+  // format=detailed is REQUIRED to get NBest array with PronunciationAssessment
   const params   = new URLSearchParams({ language: 'en-GB', format: 'detailed' });
 
   // CRITICAL: Azure pronunciation assessment REST API requires this EXACT Content-Type
@@ -196,6 +201,8 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   const contentType = 'audio/wav; codecs=audio/pcm; samplerate=16000';
 
   console.log(`[Azure] Assess: "${sanitisedText.slice(0, 60)}" — audio ${(audioToSend.length/1024).toFixed(1)} KB`);
+  console.log(`[Azure] PronConfig B64 len=${pronConfigB64.length} first5="${pronConfigB64.slice(0,5)}" hasNewline=${pronConfigB64.includes('\n')}`);
+  console.log(`[Azure] PronConfig: ${JSON.stringify(pronConfig)}`);
 
   const response = await fetch(`${endpoint}?${params}`, {
     method: 'POST',
@@ -219,7 +226,15 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
 
   // Log recognition status for debugging
   const recognitionStatus = result.RecognitionStatus;
+  const nBestPA = result.NBest?.[0]?.PronunciationAssessment;
+  const w0PA = result.NBest?.[0]?.Words?.[0]?.PronunciationAssessment;
   console.log(`[Azure] RecognitionStatus: ${recognitionStatus} — NBest words: ${result.NBest?.[0]?.Words?.length ?? 0}`);
+  console.log(`[Azure] NBest[0].PronunciationAssessment present: ${!!nBestPA} — AccuracyScore: ${nBestPA?.AccuracyScore}`);
+  console.log(`[Azure] Words[0].PronunciationAssessment present: ${!!w0PA} — AccuracyScore: ${w0PA?.AccuracyScore}`);
+  if (!nBestPA) {
+    console.error('[Azure] ❌ PronunciationAssessment MISSING from NBest — header likely not applied!');
+    console.error('[Azure] pronConfigB64 length:', pronConfigB64.length, 'hasNewline:', pronConfigB64.includes('\n'));
+  }
 
   if (recognitionStatus === 'NoMatch' || recognitionStatus === 'InitialSilenceTimeout') {
     throw new Error(`Azure: ${recognitionStatus} — audio may be too quiet or too short`);
