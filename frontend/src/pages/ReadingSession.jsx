@@ -287,7 +287,7 @@ export default function ReadingSession() {
       };
       setDebugInfo(debug);
       setLastDebug({ stage: 'done', ...debug });
-      else setDebugInfo({
+      setDebugInfo({
         source, azureAssessed, overallAccuracy, overallFluency,
         wordScores: wordScores?.slice(0,3),
         displayText,
