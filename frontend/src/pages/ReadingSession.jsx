@@ -38,6 +38,27 @@ function getErrorBadge(errorType) {
   return map[errorType] || null;
 }
 
+// ── DEBUG PANEL HELPERS ──────────────────────────────────────
+function Section({ label, color = '#FCD34D', children }) {
+  return (
+    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '6px 0 2px' }}>
+      <div style={{ padding: '2px 12px 4px', color, fontWeight: 700, fontSize: 9, letterSpacing: '0.08em' }}>
+        ── {label} ──
+      </div>
+      {children}
+    </div>
+  );
+}
+function Row({ label, val, ok, critical }) {
+  const color = critical ? '#FCA5A5' : ok === true ? '#6EE7B7' : ok === false ? '#FCA5A5' : '#93C5FD';
+  return (
+    <div style={{ display: 'flex', gap: 8, padding: '1px 12px', alignItems: 'flex-start' }}>
+      <span style={{ color: '#64748B', minWidth: 160, flexShrink: 0 }}>{label}:</span>
+      <span style={{ color, wordBreak: 'break-all' }}>{val === undefined || val === null ? <span style={{ opacity: 0.4 }}>—</span> : String(val)}</span>
+    </div>
+  );
+}
+
 // AI provider pill
 function ProviderPill({ provider, source }) {
   if (source === 'cache') return null;
@@ -631,76 +652,123 @@ export default function ReadingSession() {
         )}
       </div>
 
-      {/* ── ALWAYS-VISIBLE DEBUG PANEL ── */}
+      {/* ── DEBUG PANEL (always visible, full detail when debugMode on) ── */}
       {lastDebug && (
-        <div style={{ margin: '0 0 8px', borderRadius: 14, overflow: 'hidden', border: '1.5px solid var(--border)', fontSize: 11 }}>
+        <div style={{ margin: '0 0 8px', borderRadius: 14, overflow: 'hidden', border: `1.5px solid ${lastDebug.overallAccuracy > 0 ? 'var(--color-success)' : 'var(--color-danger)'}`, fontSize: 11 }}>
           <button
             onClick={() => setShowDebug(v => !v)}
-            style={{ width: '100%', padding: '8px 14px', background: lastDebug.overallAccuracy === 0 ? 'var(--bg-danger-muted)' : 'var(--bg-success-light)', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11 }}>
+            style={{ width: '100%', padding: '8px 14px', background: lastDebug.overallAccuracy > 0 ? 'var(--bg-success-light)' : 'var(--bg-danger-muted)', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11 }}>
             <span>
-              {lastDebug.overallAccuracy === 0 ? '❌' : '✅'} Last attempt: {lastDebug.overallAccuracy ?? '?'}% · Source: {lastDebug.source || lastDebug.stage} · Audio: {lastDebug.blobKB}KB ({lastDebug.mime?.split(';')[0]})
+              {lastDebug.overallAccuracy > 0 ? '✅' : '❌'} {lastDebug.overallAccuracy ?? '?'}% · {lastDebug.azureAssessed ? '☁️ Azure' : lastDebug.groqAssessed ? '🟢 Groq' : `Source: ${lastDebug.source || '?'}`} · Audio: {lastDebug.audioKB || lastDebug.blobKB || '?'}KB · PA: {lastDebug.nBestPAPresent ? '✅ present' : '❌ MISSING'}
             </span>
-            <span>{showDebug ? '▲' : '▼'} Details</span>
+            <span style={{ whiteSpace: 'nowrap', marginLeft: 8 }}>{showDebug ? '▲' : '▼'} {debugMode ? 'Full Debug' : 'Details'}</span>
           </button>
-          {showDebug && (
-            <div style={{ background: '#0F0A2E', color: '#93C5FD', padding: '10px 14px', fontFamily: 'monospace', fontSize: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 280, overflowY: 'auto' }}>
-              {/* Key diagnostics */}
-              <div style={{ color: '#FCD34D', marginBottom: 4 }}>── ASSESSMENT RESULT ──</div>
-              <div>source: {lastDebug.source}</div>
-              <div>azureAssessed: {String(lastDebug.azureAssessed)}</div>
-              <div>overallAccuracy: {lastDebug.overallAccuracy}</div>
-              <div>displayText (heard): "{lastDebug.displayText || lastDebug.recognized || '(nothing)'}"</div>
-              <div>referenceText: "{lastDebug.refText || lastDebug.sanitised || page?.text}"</div>
-              {lastDebug.recognitionStatus && <div style={{ color: lastDebug.recognitionStatus === 'Success' ? '#6EE7B7' : '#FCA5A5' }}>recognitionStatus: {lastDebug.recognitionStatus}</div>}
-              {lastDebug.note && <div style={{ color: '#FCA5A5' }}>note: {lastDebug.note}</div>}
-              
-              <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── AUDIO ──</div>
-              <div>blob size: {lastDebug.blobKB} KB (min needed: ~2 KB)</div>
-              <div>mime type: {lastDebug.mime}</div>
-              <div>converted (ffmpeg): {String(lastDebug.converted)}</div>
-              <div>sent to Azure: {lastDebug.audioKB} KB</div>
+          {showDebug && (() => {
+            const nb   = lastDebug.responseBody?.NBest?.[0] || lastDebug.azureRawResponse?.NBest?.[0];
+            const pa   = nb?.PronunciationAssessment;
+            const w0   = nb?.Words?.[0];
+            const w0pa = w0?.PronunciationAssessment;
+            return (
+              <div style={{ background: '#0B0F1A', color: '#93C5FD', fontFamily: 'monospace', fontSize: 10, maxHeight: 520, overflowY: 'auto' }}>
 
-              {lastDebug.properNouns?.length > 0 && <>
-                <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── PROPER NOUNS ──</div>
-                {lastDebug.properNouns.map((p, i) => <div key={i}>{p}</div>)}
-              </>}
+                {/* ── SECTION: RESULT SUMMARY ── */}
+                <Section label="ASSESSMENT RESULT" color="#FCD34D">
+                  <Row label="status"       val={`${lastDebug.overallAccuracy > 0 ? '✅' : '❌'} ${lastDebug.overallAccuracy ?? '?'}%`} ok={lastDebug.overallAccuracy > 0} />
+                  <Row label="source"       val={lastDebug.source || lastDebug.stage || '?'} />
+                  <Row label="azureAssessed" val={String(lastDebug.azureAssessed)} ok={lastDebug.azureAssessed} />
+                  <Row label="heard"        val={`"${lastDebug.displayText || nb?.Display || nb?.Lexical || '(nothing)'}"`} ok={!!(lastDebug.displayText || nb?.Display)} />
+                  <Row label="reference"    val={`"${lastDebug.refText || lastDebug.sanitised || page?.text}"`} />
+                  <Row label="recognitionStatus" val={lastDebug.recognitionStatus || nb?.RecognitionStatus || lastDebug.responseBody?.RecognitionStatus || '?'} ok={lastDebug.recognitionStatus === 'Success'} />
+                  <Row label="PA present"   val={String(!!pa)} ok={!!pa} critical={!pa} />
+                  {pa && <>
+                    <Row label="AccuracyScore"    val={pa.AccuracyScore} ok={pa.AccuracyScore > 0} />
+                    <Row label="FluencyScore"     val={pa.FluencyScore} />
+                    <Row label="CompletenessScore" val={pa.CompletenessScore} />
+                    <Row label="ProsodyScore"     val={pa.PronScore} />
+                  </>}
+                </Section>
 
-              {lastDebug.wordScores?.length > 0 && <>
-                <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── WORD SCORES (first 5) ──</div>
-                {lastDebug.wordScores.slice(0,5).map((w, i) => (
-                  <div key={i} style={{ color: w.score >= 70 ? '#6EE7B7' : '#FCA5A5' }}>
-                    {w.word}: {w.score}% ({w.errorType}) {w.phonemes?.length ? `[${w.phonemes.map(p => `${p.phoneme}:${p.score}%`).join(' ')}]` : ''}
-                  </div>
-                ))}
-              </>}
+                {/* ── SECTION: REQUEST HEADERS ── */}
+                {debugMode && lastDebug.requestHeaders && (
+                  <Section label="REQUEST HEADERS" color="#A78BFA">
+                    <Row label="URL"          val={lastDebug.requestUrl} />
+                    <Row label="Content-Type" val={lastDebug.requestHeaders['Content-Type']} ok={lastDebug.requestHeaders['Content-Type']?.includes('samplerate')} critical={!lastDebug.requestHeaders['Content-Type']?.includes('samplerate')} />
+                    <Row label="API Key"      val={lastDebug.requestHeaders['Ocp-Apim-Subscription-Key']} ok={!!lastDebug.requestHeaders['Ocp-Apim-Subscription-Key']} />
+                    <Row label="PA Header len" val={lastDebug.pronConfigB64Length} ok={lastDebug.pronConfigB64Length > 10} />
+                    <Row label="PA Header hasNewline" val={String(lastDebug.pronConfigB64HasNewline)} ok={!lastDebug.pronConfigB64HasNewline} critical={lastDebug.pronConfigB64HasNewline} />
+                    {lastDebug.requestHeaders['Pronunciation-Assessment'] && (
+                      <div style={{ padding: '2px 12px', wordBreak: 'break-all', color: '#C4B5FD', opacity: 0.7 }}>
+                        Pronunciation-Assessment: {lastDebug.requestHeaders['Pronunciation-Assessment']}
+                      </div>
+                    )}
+                  </Section>
+                )}
 
-              {lastDebug.azureRawResponse && (() => {
-                const nb = lastDebug.azureRawResponse.NBest?.[0];
-                const pa = nb?.PronunciationAssessment;
-                const w0 = nb?.Words?.[0];
-                return <>
-                  <div style={{ color: '#FCD34D', marginTop: 8, marginBottom: 4 }}>── AZURE RAW ──</div>
-                  <div>RecognitionStatus: <span style={{ color: lastDebug.azureRawResponse.RecognitionStatus === 'Success' ? '#6EE7B7' : '#FCA5A5' }}>{lastDebug.azureRawResponse.RecognitionStatus}</span></div>
-                  <div>DisplayText: "{lastDebug.azureRawResponse.DisplayText}"</div>
-                  <div>NBest[0] words: {nb?.Words?.length ?? 0}</div>
-                  <div style={{ color: pa ? '#6EE7B7' : '#FCA5A5' }}>
-                    NBest[0].PronunciationAssessment: {pa ? `AccuracyScore=${pa.AccuracyScore} FluencyScore=${pa.FluencyScore}` : '❌ MISSING — header not applied!'}
-                  </div>
-                  {w0 && <div style={{ color: w0.PronunciationAssessment ? '#6EE7B7' : '#FCA5A5' }}>
-                    Words[0] "{w0.Word}": {w0.PronunciationAssessment
-                      ? `✅ score=${w0.PronunciationAssessment.AccuracyScore} err=${w0.PronunciationAssessment.ErrorType}`
-                      : '❌ No PronunciationAssessment on word — header not applied'}
-                    {' '}{w0.Phonemes?.length ? `phonemes=${w0.Phonemes.length}` : '❌ No phonemes'}
-                  </div>}
-                  <div style={{ marginTop: 4 }}>Words[0] raw: {JSON.stringify(w0).slice(0, 200)}</div>
-                  <div style={{ marginTop: 4, color: '#FCD34D' }}>── PRON CONFIG SENT ──</div>
-                  <div>{JSON.stringify(lastDebug.pronConfig || {})}</div>
-                  <div style={{ marginTop: 4, color: '#FCD34D' }}>── ENDPOINT ──</div>
-                  <div style={{ wordBreak: 'break-all' }}>{lastDebug.endpoint}</div>
-                </>;
-              })()}
-            </div>
-          )}
+                {/* ── SECTION: PRON CONFIG DECODED ── */}
+                {debugMode && lastDebug.pronConfigDecoded && (
+                  <Section label="PRONUNCIATION CONFIG (decoded)" color="#6EE7B7">
+                    <div style={{ padding: '4px 12px', whiteSpace: 'pre', color: '#6EE7B7' }}>
+                      {JSON.stringify(lastDebug.pronConfigDecoded, null, 2)}
+                    </div>
+                  </Section>
+                )}
+
+                {/* ── SECTION: RESPONSE HEADERS ── */}
+                {debugMode && lastDebug.responseHeaders && (
+                  <Section label="RESPONSE HEADERS" color="#FBBF24">
+                    <Row label="HTTP Status" val={lastDebug.responseStatus} ok={lastDebug.responseStatus === 200} />
+                    {Object.entries(lastDebug.responseHeaders).map(([k, v]) => (
+                      <Row key={k} label={k} val={v} />
+                    ))}
+                  </Section>
+                )}
+
+                {/* ── SECTION: FULL RESPONSE BODY ── */}
+                <Section label={debugMode ? 'FULL RESPONSE BODY (Azure JSON)' : 'AZURE RESPONSE'} color="#FB923C">
+                  <Row label="RecognitionStatus" val={lastDebug.responseBody?.RecognitionStatus} ok={lastDebug.responseBody?.RecognitionStatus === 'Success'} />
+                  <Row label="DisplayText"       val={`"${lastDebug.responseBody?.DisplayText || ''}"`} />
+                  <Row label="NBest[0].PA present" val={String(!!pa)} ok={!!pa} critical={!pa} />
+                  {w0 && <>
+                    <Row label={`Words[0] "${w0.Word}"`} val={w0pa ? `score=${w0pa.AccuracyScore} err=${w0pa.ErrorType}` : '❌ NO PronunciationAssessment'} ok={!!w0pa} critical={!w0pa} />
+                    {w0.Phonemes?.length > 0 && <Row label="Phonemes count" val={w0.Phonemes.length} ok />}
+                  </>}
+                  {debugMode && (
+                    <div style={{ padding: '4px 12px', whiteSpace: 'pre', wordBreak: 'break-all', color: '#FED7AA', opacity: 0.85, maxHeight: 200, overflowY: 'auto' }}>
+                      {JSON.stringify(lastDebug.responseBody || lastDebug.azureRawResponse, null, 2)}
+                    </div>
+                  )}
+                </Section>
+
+                {/* ── SECTION: AUDIO ── */}
+                <Section label="AUDIO" color="#34D399">
+                  <Row label="sent to Azure" val={`${lastDebug.audioKB} KB`} ok={parseFloat(lastDebug.audioKB) > 2} critical={parseFloat(lastDebug.audioKB) < 2} />
+                  <Row label="converted (ffmpeg)" val={String(lastDebug.converted)} ok={lastDebug.converted} />
+                  <Row label="mime in"       val={lastDebug.mimeIn} />
+                </Section>
+
+                {/* ── SECTION: WORD SCORES ── */}
+                {lastDebug.wordScores?.length > 0 && (
+                  <Section label="WORD SCORES" color="#60A5FA">
+                    {lastDebug.wordScores.map((w, i) => (
+                      <div key={i} style={{ padding: '2px 12px', color: w.score >= 70 ? '#6EE7B7' : w.score >= 40 ? '#FCD34D' : '#FCA5A5' }}>
+                        {w.score >= 70 ? '✅' : w.score >= 40 ? '⚠️' : '❌'} "{w.word}": {w.score}% ({w.errorType})
+                        {w.phonemes?.length > 0 && <span style={{ color: '#94A3B8', marginLeft: 6 }}>
+                          [{w.phonemes.map(p => `${p.phoneme}:${p.score}%`).join(' ')}]
+                        </span>}
+                      </div>
+                    ))}
+                  </Section>
+                )}
+
+                {/* ── SECTION: PROPER NOUNS ── */}
+                {lastDebug.properNouns?.length > 0 && (
+                  <Section label="PROPER NOUNS" color="#F472B6">
+                    {lastDebug.properNouns.map((p, i) => <div key={i} style={{ padding: '2px 12px' }}>{p}</div>)}
+                  </Section>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

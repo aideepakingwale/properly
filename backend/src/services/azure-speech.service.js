@@ -179,12 +179,12 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
 
   // Step 4 — build Azure request
   const pronConfig = {
-    ReferenceText:   sanitisedText,
-    GradingSystem:   'HundredMark',
-    Granularity:     'Phoneme',
-    EnableMiscue:    true,
-    PhonemeAlphabet: 'IPA',
-    // Note: EnableProsodyAssessment omitted — only valid for en-US
+    ReferenceText:            sanitisedText,
+    GradingSystem:            'HundredMark',
+    Granularity:              'Phoneme',
+    EnableMiscue:             true,
+    PhonemeAlphabet:          'IPA',
+    EnableProsodyAssessment:  true,  // en-US supports prosody scoring
   };
   // CRITICAL: base64 must be a single line — some Node builds wrap at 76 chars
   // which breaks the HTTP header. Replace all whitespace/newlines from base64.
@@ -194,17 +194,36 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   const endpoint = `https://${AZURE_REGION}.stt.speech.microsoft.com` +
                    `/speech/recognition/conversation/cognitiveservices/v1`;
   // format=detailed is REQUIRED to get NBest array with PronunciationAssessment
-  const params   = new URLSearchParams({ language: 'en-GB', format: 'detailed' });
+  // IMPORTANT: Pronunciation Assessment only supports specific locales.
+  // en-GB is NOT in the supported list — Azure silently returns plain STT with no scores.
+  // en-US IS supported and phonics phonemes (CVC, digraphs etc.) are the same.
+  // TTS stays en-GB so the child hears British English for reading.
+  const params   = new URLSearchParams({ language: 'en-US', format: 'detailed' });
 
   // CRITICAL: Azure pronunciation assessment REST API requires this EXACT Content-Type
   // Plain "audio/wav" is rejected. Must specify codec and samplerate.
   const contentType = 'audio/wav; codecs=audio/pcm; samplerate=16000';
 
-  console.log(`[Azure] Assess: "${sanitisedText.slice(0, 60)}" — audio ${(audioToSend.length/1024).toFixed(1)} KB`);
-  console.log(`[Azure] PronConfig B64 len=${pronConfigB64.length} first5="${pronConfigB64.slice(0,5)}" hasNewline=${pronConfigB64.includes('\n')}`);
-  console.log(`[Azure] PronConfig: ${JSON.stringify(pronConfig)}`);
+  const fullUrl = `${endpoint}?${params}`;
+  const requestHeaders = {
+    'Ocp-Apim-Subscription-Key': AZURE_KEY.slice(0,4) + '****' + AZURE_KEY.slice(-4),
+    'Content-Type':              contentType,
+    'Pronunciation-Assessment':  pronConfigB64,
+    'Accept':                    'application/json',
+  };
 
-  const response = await fetch(`${endpoint}?${params}`, {
+  // ── FULL REQUEST LOG ─────────────────────────────────────────
+  console.log('\n========== AZURE REQUEST ==========');
+  console.log('URL:    ', fullUrl);
+  console.log('METHOD:  POST');
+  console.log('HEADERS:', JSON.stringify(requestHeaders, null, 2));
+  console.log('BODY:    <WAV audio buffer>', (audioToSend.length/1024).toFixed(1), 'KB');
+  console.log('PRON CONFIG (decoded):', JSON.stringify(pronConfig, null, 2));
+  console.log('PRON CONFIG B64 length:', pronConfigB64.length);
+  console.log('PRON CONFIG B64 (full):', pronConfigB64);
+  console.log('====================================\n');
+
+  const response = await fetch(fullUrl, {
     method: 'POST',
     headers: {
       'Ocp-Apim-Subscription-Key': AZURE_KEY,
@@ -216,13 +235,24 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
     signal: AbortSignal.timeout(30000),
   });
 
+  // ── FULL RESPONSE LOG ────────────────────────────────────────
+  const responseHeadersObj = {};
+  response.headers.forEach((val, key) => { responseHeadersObj[key] = val; });
+  console.log('\n========== AZURE RESPONSE ==========');
+  console.log('STATUS: ', response.status, response.statusText);
+  console.log('HEADERS:', JSON.stringify(responseHeadersObj, null, 2));
+
   if (!response.ok) {
     const errText = await response.text().catch(() => response.statusText);
-    console.error(`[Azure] HTTP ${response.status}: ${errText.slice(0, 200)}`);
-    throw new Error(`Azure STT ${response.status}: ${errText.slice(0, 120)}`);
+    console.log('BODY (error):', errText);
+    console.log('=====================================\n');
+    throw new Error(`Azure STT ${response.status}: ${errText.slice(0, 200)}`);
   }
 
   const result = await response.json();
+  console.log('BODY (JSON):');
+  console.log(JSON.stringify(result, null, 2));
+  console.log('=====================================\n');
 
   // Log recognition status for debugging
   const recognitionStatus = result.RecognitionStatus;
@@ -243,15 +273,35 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   // Step 4 — parse + remap
   const parsed = parseAzureResult(result, sanitisedWords, refWords, properNounMap);
   parsed._debug = {
-    endpoint: `${endpoint}?${params}`,
-    audioKB:  (audioToSend.length / 1024).toFixed(1),
-    mimeIn:   mimeType,
+    // ── REQUEST ──
+    requestUrl:     `${endpoint}?${params}`,
+    requestHeaders: {
+      'Ocp-Apim-Subscription-Key': AZURE_KEY.slice(0,4) + '****' + AZURE_KEY.slice(-4),
+      'Content-Type':              contentType,
+      'Pronunciation-Assessment':  pronConfigB64,
+      'Accept':                    'application/json',
+    },
+    requestBody:    `<WAV PCM 16kHz — ${(audioToSend.length/1024).toFixed(1)} KB>`,
+    pronConfigDecoded: pronConfig,
+    pronConfigB64Length: pronConfigB64.length,
+    pronConfigB64HasNewline: pronConfigB64.includes('\n'),
+    // ── AUDIO ──
+    audioKB:    (audioToSend.length / 1024).toFixed(1),
+    mimeIn:     mimeType,
     converted,
+    // ── RESPONSE ──
+    responseStatus:  response.status,
+    responseHeaders: responseHeadersObj,
+    responseBody:    result,
+    // ── PARSED ──
     refText:  referenceText,
     sanitised: sanitisedText,
     properNouns: Object.values(properNounMap).map(v => `${v.original} → "${v.phonetic}"`),
-    pronConfig,
     recognitionStatus,
+    nBestPAPresent:  !!result.NBest?.[0]?.PronunciationAssessment,
+    nBestAccuracy:   result.NBest?.[0]?.PronunciationAssessment?.AccuracyScore,
+    word0PAPresent:  !!result.NBest?.[0]?.Words?.[0]?.PronunciationAssessment,
+    word0Score:      result.NBest?.[0]?.Words?.[0]?.PronunciationAssessment?.AccuracyScore,
     azureRawResponse: result,
   };
   return parsed;
