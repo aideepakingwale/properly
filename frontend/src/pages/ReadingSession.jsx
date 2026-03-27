@@ -178,84 +178,116 @@ export default function ReadingSession() {
   const page = story?.pages?.[pageIdx];
 
   // ── PHONICS SOUND PLAYBACK ──────────────────────────────────
-  // Reads each grapheme's phoneme sound in sequence, lighting up the chunk as it speaks.
-  // Uses Web Speech API (no Azure cost) with careful timing so each grapheme tile
-  // highlights exactly when its sound is spoken.
-  const speakPhonics = useCallback(async () => {
+  // Reads each grapheme's phoneme sound in sequence, lighting up the tile as it speaks.
+  // Uses onend chaining (not setTimeout) so each sound plays FULLY before the next starts.
+  // synth.cancel() is called ONCE at the start — calling it per-item would kill the current utterance.
+  const speakPhonics = useCallback(() => {
     if (!page) return;
     const phase = child?.phase || 2;
     const pageWords = page.text.trim().split(/\s+/);
 
-    // Build a flat list of { wordIdx, chunkIdx, grapheme, phoneme, display } to speak
+    // Build flat list of speakable items, excluding silent letters
     const queue = [];
     pageWords.forEach((word, wi) => {
       const clean = word.replace(/[.,!?;:'"]/g, '');
       const chunks = analyseWord(clean, phase);
       chunks.forEach((chunk, ci) => {
         if (!chunk.isSilent) {
-          // Convert IPA /x/ → a speakable hint; fall back to letter name
-          const speakable = ipaToSpeakable(chunk.phoneme, chunk.grapheme);
-          queue.push({ wordIdx: wi, chunkIdx: ci, grapheme: chunk.grapheme, phoneme: chunk.phoneme, speakable });
+          queue.push({
+            wordIdx:   wi,
+            chunkIdx:  ci,
+            speakable: ipaToSpeakable(chunk.phoneme, chunk.grapheme),
+          });
         }
       });
-      // Tiny pause between words — add a silent placeholder
+      // Word boundary pause — represented as a null item
       queue.push({ wordIdx: wi, chunkIdx: -1, speakable: null, isPause: true });
     });
 
-    stop(); // stop any current speech
+    stop(); // stop Mrs Owl / Azure TTS audio element
+    const synth = window.speechSynthesis;
+    if (synth) synth.cancel(); // cancel ONCE, here — not per item
+    setSpeakingWordIdx(-1);
+    setSpeakingChunkKey(null);
 
-    // Play each item with staggered timing
-    // Short graphemes ~400ms, digraphs ~550ms, pauses ~200ms
-    let t = 0;
-    queue.forEach((item) => {
-      if (item.isPause) {
-        setTimeout(() => setSpeakingChunkKey(null), t);
-        t += 220;
+    let qIdx = 0;
+
+    const playNext = () => {
+      if (qIdx >= queue.length) {
+        setSpeakingChunkKey(null);
+        setSpeakingWordIdx(-1);
         return;
       }
-      const dur = item.grapheme.length >= 2 ? 600 : 420;
-      setTimeout(() => {
-        setSpeakingChunkKey(`${item.wordIdx}-${item.chunkIdx}`);
-        // Use browser speechSynthesis directly for phoneme sounds (faster, no API cost)
-        const synth = window.speechSynthesis;
-        if (synth) {
-          synth.cancel();
-          const u = new SpeechSynthesisUtterance(item.speakable);
-          u.lang = 'en-US';
-          u.rate = 0.7;
-          u.pitch = 1.15;
-          const voices = synth.getVoices();
-          const v = voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
-                  || voices.find(v => v.lang.startsWith('en-GB'))
-                  || voices.find(v => v.lang.startsWith('en'));
-          if (v) u.voice = v;
-          synth.speak(u);
-        }
-      }, t);
-      t += dur;
-    });
+      const item = queue[qIdx++];
 
-    // Clear highlight at end
-    setTimeout(() => { setSpeakingChunkKey(null); setSpeakingWordIdx(-1); }, t + 200);
+      if (item.isPause) {
+        // Word gap — clear highlight, pause briefly, then continue
+        setSpeakingChunkKey(null);
+        setTimeout(playNext, 260);
+        return;
+      }
+
+      setSpeakingChunkKey(`${item.wordIdx}-${item.chunkIdx}`);
+
+      if (!synth) { setTimeout(playNext, 420); return; }
+
+      const u      = new SpeechSynthesisUtterance(item.speakable);
+      u.lang       = 'en-GB';
+      u.rate       = 0.72;   // slow enough for children to hear each sound clearly
+      u.pitch      = 1.1;
+      const voices = synth.getVoices();
+      const v = voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
+              || voices.find(v => v.lang.startsWith('en-GB'))
+              || voices.find(v => v.lang.startsWith('en'));
+      if (v) u.voice = v;
+
+      // Chain to next sound when this one ends — gives natural gaps
+      u.onend   = () => setTimeout(playNext, 160);
+      u.onerror = () => setTimeout(playNext, 280); // continue even if a sound fails
+
+      synth.speak(u);
+    };
+
+    // Voices may not be loaded yet on first call (browser async)
+    if (!synth || synth.getVoices().length === 0) {
+      const resume = () => { if (synth) synth.onvoiceschanged = null; playNext(); };
+      if (synth) synth.onvoiceschanged = resume;
+      else resume();
+    } else {
+      playNext();
+    }
   }, [page, child, stop]);
 
-  // Convert IPA phoneme notation to something Web Speech API can pronounce clearly
+  // Convert IPA phoneme notation to something Web Speech API pronounces as a SOUND not a letter name.
+  // Plosives need a schwa suffix ("puh") — without it TTS reads the letter name ("pee").
+  // Fricatives are repeated ("sss") so the sustained sound is audible.
   function ipaToSpeakable(ipa, grapheme) {
     const map = {
-      '/tʃ/': 'ch',    '/ʃ/': 'sh',    '/ð/': 'th',    '/θ/': 'th',
-      '/ŋ/': 'ng',     '/ŋk/': 'nk',   '/dʒ/': 'j',    '/kw/': 'kw',
-      '/eɪ/': 'ay',    '/iː/': 'ee',   '/aɪ/': 'eye',  '/əʊ/': 'oh',
-      '/uː/': 'oo',    '/ɑː/': 'ar',   '/ɔː/': 'or',   '/ɜː/': 'er',
-      '/aʊ/': 'ow',    '/ɔɪ/': 'oi',   '/ɪə/': 'ear',  '/eə/': 'air',
-      '/ʊə/': 'oor',   '/æ/': 'a',     '/ɛ/': 'e',     '/ɪ/': 'i',
-      '/ɒ/': 'o',      '/ʌ/': 'u',     '/ʊ/': 'oo',    '/ə/': 'uh',
-      '/f/': 'ff',     '/s/': 'ss',    '/l/': 'll',    '/v/': 'vv',
-      '/z/': 'zz',     '/ks/': 'x',    '/j/': 'y',     '/w/': 'w',
-      '/juː/': 'you',  '/p/': 'p',     '/b/': 'b',     '/t/': 't',
-      '/d/': 'd',      '/k/': 'k',     '/g/': 'g',     '/m/': 'm',
-      '/n/': 'n',      '/r/': 'r',     '/h/': 'h',
+      // Digraphs / affricates
+      '/tch/': 'chuh', '/tʃ/': 'chuh', '/ʃ/':  'shh',  '/ð/':  'the',  '/θ/':  'thuh',
+      '/ŋ/':  'ing',   '/ŋk/': 'ink',  '/dʒ/': 'juh',  '/kw/': 'kwuh',
+      // Long vowels & diphthongs
+      '/eɪ/': 'ay',   '/iː/': 'ee',   '/aɪ/': 'I',    '/əʊ/': 'oh',
+      '/uː/': 'oo',   '/ɑː/': 'ar',   '/ɔː/': 'or',   '/ɜː/': 'er',
+      '/aʊ/': 'ow',   '/ɔɪ/': 'oy',   '/ɪə/': 'ear',  '/eə/': 'air',
+      '/ʊə/': 'oor',  '/juː/': 'you',
+      // Short vowels
+      '/æ/':  'a',    '/ɛ/':  'eh',   '/ɪ/':  'ih',
+      '/ɒ/':  'o',    '/ʌ/':  'uh',   '/ʊ/':  'oo',   '/ə/':  'uh',
+      // Plosives — schwa suffix forces TTS to produce the burst sound, not the letter name
+      '/p/':  'puh',  '/b/':  'buh',  '/t/':  'tuh',  '/d/':  'duh',
+      '/k/':  'kuh',  '/g/':  'guh',
+      // Fricatives — repeated for audibility
+      '/f/':  'fff',  '/v/':  'vvv',  '/s/':  'sss',  '/z/':  'zzz',
+      '/h/':  'huh',
+      // Nasals
+      '/m/':  'mmm',  '/n/':  'nnn',
+      // Approximants
+      '/l/':  'lll',  '/r/':  'rrr',  '/w/':  'wuh',  '/j/':  'yuh',
+      // Other
+      '/ks/': 'ks',
     };
-    return map[ipa] || grapheme || ipa.replace(/[/\[\]]/g, '');
+    return map[ipa] || grapheme || ipa.replace(/[/[\]]/g, '');
   }
 
   // ── CLOUD ASSESSMENT PIPELINE ──────────────────────────────
@@ -285,15 +317,10 @@ export default function ReadingSession() {
         wordScores,
         recognized: assessRes.data?.displayText,
       };
+      // debug already merges _debugInfo via ...(_debugInfo || {}) above,
+      // so this always captures full context regardless of whether Azure ran.
       setDebugInfo(debug);
       setLastDebug({ stage: 'done', ...debug });
-      setDebugInfo({
-        source, azureAssessed, overallAccuracy, overallFluency,
-        wordScores: wordScores?.slice(0,3),
-        displayText,
-        blobSizeKB: (audioBlob?.size / 1024).toFixed(1),
-        note: 'No _debugInfo returned — Azure may not have been called',
-      });
 
       setRevealedCount(0);
       setWordScores(wordScores);

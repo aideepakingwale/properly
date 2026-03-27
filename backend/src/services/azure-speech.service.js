@@ -179,12 +179,14 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
 
   // Step 4 — build Azure request
   const pronConfig = {
-    ReferenceText:            sanitisedText,
-    GradingSystem:            'HundredMark',
-    Granularity:              'Phoneme',
-    EnableMiscue:             true,
-    PhonemeAlphabet:          'IPA',
-    EnableProsodyAssessment:  true,  // en-US supports prosody scoring
+    ReferenceText:   sanitisedText,
+    GradingSystem:   'HundredMark',
+    Granularity:     'Phoneme',
+    EnableMiscue:    true,
+    PhonemeAlphabet: 'IPA',
+    // EnableProsodyAssessment is NOT sent — Azure only supports it in en-US + eastus/westus2.
+    // Sending it to uksouth silently drops the ENTIRE PronunciationAssessment block,
+    // causing every word to score 0. We return overallProsody:0 explicitly instead.
   };
   // CRITICAL: base64 must be a single line — some Node builds wrap at 76 chars
   // which breaks the HTTP header. Replace all whitespace/newlines from base64.
