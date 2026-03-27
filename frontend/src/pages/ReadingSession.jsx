@@ -101,6 +101,8 @@ export default function ReadingSession() {
   const [revealedCount, setRevealedCount]     = useState(0);   // scores revealed progressively after assessment
   const [providerInfo, setProviderInfo] = useState(null);
   const triesRef = useRef(0);
+  const [phonicsHearMode, setPhonicsHearMode] = useState(false);  // toggle: full sentence vs phoneme-by-phoneme
+  const [speakingChunkKey, setSpeakingChunkKey] = useState(null); // 'wordIdx-chunkIdx' currently playing
 
   const { startRecording, stopRecording, isRecording, error: micError } = useAudioRecorder();
 
@@ -174,6 +176,87 @@ export default function ReadingSession() {
   useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); }, [pageIdx]);
 
   const page = story?.pages?.[pageIdx];
+
+  // ── PHONICS SOUND PLAYBACK ──────────────────────────────────
+  // Reads each grapheme's phoneme sound in sequence, lighting up the chunk as it speaks.
+  // Uses Web Speech API (no Azure cost) with careful timing so each grapheme tile
+  // highlights exactly when its sound is spoken.
+  const speakPhonics = useCallback(async () => {
+    if (!page) return;
+    const phase = child?.phase || 2;
+    const pageWords = page.text.trim().split(/\s+/);
+
+    // Build a flat list of { wordIdx, chunkIdx, grapheme, phoneme, display } to speak
+    const queue = [];
+    pageWords.forEach((word, wi) => {
+      const clean = word.replace(/[.,!?;:'"]/g, '');
+      const chunks = analyseWord(clean, phase);
+      chunks.forEach((chunk, ci) => {
+        if (!chunk.isSilent) {
+          // Convert IPA /x/ → a speakable hint; fall back to letter name
+          const speakable = ipaToSpeakable(chunk.phoneme, chunk.grapheme);
+          queue.push({ wordIdx: wi, chunkIdx: ci, grapheme: chunk.grapheme, phoneme: chunk.phoneme, speakable });
+        }
+      });
+      // Tiny pause between words — add a silent placeholder
+      queue.push({ wordIdx: wi, chunkIdx: -1, speakable: null, isPause: true });
+    });
+
+    stop(); // stop any current speech
+
+    // Play each item with staggered timing
+    // Short graphemes ~400ms, digraphs ~550ms, pauses ~200ms
+    let t = 0;
+    queue.forEach((item) => {
+      if (item.isPause) {
+        setTimeout(() => setSpeakingChunkKey(null), t);
+        t += 220;
+        return;
+      }
+      const dur = item.grapheme.length >= 2 ? 600 : 420;
+      setTimeout(() => {
+        setSpeakingChunkKey(`${item.wordIdx}-${item.chunkIdx}`);
+        // Use browser speechSynthesis directly for phoneme sounds (faster, no API cost)
+        const synth = window.speechSynthesis;
+        if (synth) {
+          synth.cancel();
+          const u = new SpeechSynthesisUtterance(item.speakable);
+          u.lang = 'en-US';
+          u.rate = 0.7;
+          u.pitch = 1.15;
+          const voices = synth.getVoices();
+          const v = voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
+                  || voices.find(v => v.lang.startsWith('en-GB'))
+                  || voices.find(v => v.lang.startsWith('en'));
+          if (v) u.voice = v;
+          synth.speak(u);
+        }
+      }, t);
+      t += dur;
+    });
+
+    // Clear highlight at end
+    setTimeout(() => { setSpeakingChunkKey(null); setSpeakingWordIdx(-1); }, t + 200);
+  }, [page, child, stop]);
+
+  // Convert IPA phoneme notation to something Web Speech API can pronounce clearly
+  function ipaToSpeakable(ipa, grapheme) {
+    const map = {
+      '/tʃ/': 'ch',    '/ʃ/': 'sh',    '/ð/': 'th',    '/θ/': 'th',
+      '/ŋ/': 'ng',     '/ŋk/': 'nk',   '/dʒ/': 'j',    '/kw/': 'kw',
+      '/eɪ/': 'ay',    '/iː/': 'ee',   '/aɪ/': 'eye',  '/əʊ/': 'oh',
+      '/uː/': 'oo',    '/ɑː/': 'ar',   '/ɔː/': 'or',   '/ɜː/': 'er',
+      '/aʊ/': 'ow',    '/ɔɪ/': 'oi',   '/ɪə/': 'ear',  '/eə/': 'air',
+      '/ʊə/': 'oor',   '/æ/': 'a',     '/ɛ/': 'e',     '/ɪ/': 'i',
+      '/ɒ/': 'o',      '/ʌ/': 'u',     '/ʊ/': 'oo',    '/ə/': 'uh',
+      '/f/': 'ff',     '/s/': 'ss',    '/l/': 'll',    '/v/': 'vv',
+      '/z/': 'zz',     '/ks/': 'x',    '/j/': 'y',     '/w/': 'w',
+      '/juː/': 'you',  '/p/': 'p',     '/b/': 'b',     '/t/': 't',
+      '/d/': 'd',      '/k/': 'k',     '/g/': 'g',     '/m/': 'm',
+      '/n/': 'n',      '/r/': 'r',     '/h/': 'h',
+    };
+    return map[ipa] || grapheme || ipa.replace(/[/\[\]]/g, '');
+  }
 
   // ── CLOUD ASSESSMENT PIPELINE ──────────────────────────────
   const processAudio = useCallback(async (audioBlob, browserTranscript) => {
@@ -505,6 +588,8 @@ export default function ReadingSession() {
               isRevealed={i < revealedCount && wordScores.length > 0}
               dark={dark}
               compact={words.length > 8}
+              speakingChunkKey={speakingChunkKey}
+              wordIdx={i}
             />
           ))}
         </div>
@@ -640,15 +725,55 @@ export default function ReadingSession() {
         )}
 
         {wordScores.length === 0 && !isRecording && (
-          <button onClick={() => {
-              const pageWords = page.text.split(' ');
-              setSpeakingWordIdx(0);
-              pageWords.forEach((_, i) => setTimeout(() => setSpeakingWordIdx(i), i * 380));
-              setTimeout(() => setSpeakingWordIdx(-1), pageWords.length * 380 + 500);
-              speak(page.text);
-            }} style={{ background: 'var(--primary-10)', border: '1.5px solid var(--primary-25)', borderRadius: 50, padding: '7px 18px', color: 'var(--color-info)', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-body)', marginBottom: 8 }}>
-            🔊 Hear the sentence first
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+
+            {/* Toggle: Sentence mode vs Phonics mode */}
+            <div style={{ display: 'flex', background: dark ? 'var(--overlay-12)' : 'var(--bg-subtle)', borderRadius: 50, padding: 3, gap: 2 }}>
+              <button
+                onClick={() => setPhonicsHearMode(false)}
+                style={{ borderRadius: 50, padding: '4px 14px', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11, background: !phonicsHearMode ? 'var(--grad-primary)' : 'transparent', color: !phonicsHearMode ? 'white' : (dark ? 'var(--overlay-50)' : 'var(--text-muted)'), transition: 'all 0.2s' }}>
+                🔊 Full Sentence
+              </button>
+              <button
+                onClick={() => setPhonicsHearMode(true)}
+                style={{ borderRadius: 50, padding: '4px 14px', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11, background: phonicsHearMode ? 'var(--grad-primary)' : 'transparent', color: phonicsHearMode ? 'white' : (dark ? 'var(--overlay-50)' : 'var(--text-muted)'), transition: 'all 0.2s' }}>
+                🔤 Phonics Sounds
+              </button>
+            </div>
+
+            {/* Mode description */}
+            <div style={{ fontSize: 11, color: dark ? 'var(--overlay-40)' : 'var(--text-muted)', textAlign: 'center' }}>
+              {phonicsHearMode
+                ? 'Each sound played one by one — watch the tiles light up!'
+                : 'Listen to the full sentence, then try reading it yourself'}
+            </div>
+
+            {/* The hear button */}
+            <button
+              onClick={() => {
+                if (phonicsHearMode) {
+                  speakPhonics();
+                } else {
+                  const pageWords = page.text.split(' ');
+                  setSpeakingWordIdx(0);
+                  pageWords.forEach((_, i) => setTimeout(() => setSpeakingWordIdx(i), i * 420));
+                  setTimeout(() => setSpeakingWordIdx(-1), pageWords.length * 420 + 500);
+                  speak(page.text);
+                }
+              }}
+              style={{
+                background: phonicsHearMode ? 'var(--grad-accent)' : 'var(--primary-10)',
+                border: `1.5px solid ${phonicsHearMode ? 'var(--brand-accent)' : 'var(--primary-25)'}`,
+                borderRadius: 50, padding: '8px 22px',
+                color: phonicsHearMode ? '#fff' : 'var(--color-info)',
+                fontWeight: 800, fontSize: 13, cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+                boxShadow: phonicsHearMode ? 'var(--shadow-accent)' : 'none',
+                transition: 'all 0.2s',
+              }}>
+              {phonicsHearMode ? '🔤 Hear the Phonics Sounds' : '🔊 Hear the Sentence First'}
+            </button>
+          </div>
         )}
       </div>
 

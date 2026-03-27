@@ -39,6 +39,8 @@ export default function PhonicsWord({
   isRevealed = false,
   dark = false,
   compact = false,
+  speakingChunkKey = null,  // 'wordIdx-chunkIdx' — which grapheme is playing in phonics mode
+  wordIdx = 0,
 }) {
   const punctMatch = word.match(/([.,!?;:'"]+)$/);
   const punct      = punctMatch ? punctMatch[0] : '';
@@ -53,6 +55,8 @@ export default function PhonicsWord({
   }
 
   // Find worst-scoring chunk for attention pulse
+  // Determine which chunk (if any) is currently being spoken in phonics mode
+  const isChunkSpeaking = (ci) => speakingChunkKey === `${wordIdx}-${ci}`;
   const scoredChunks   = chunks.filter(c => c.score !== null && !c.isSilent);
   const worstScore     = scoredChunks.length ? Math.min(...scoredChunks.map(c => c.score)) : null;
   const worstChunkIdx  = worstScore !== null && worstScore < 70
@@ -108,33 +112,53 @@ export default function PhonicsWord({
               }}
             >
               {/* The grapheme letter(s) */}
+              {/* Phoneme label above chunk when it's currently speaking in phonics mode */}
+              {isChunkSpeaking(ci) && (
+                <span style={{
+                  position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%)',
+                  background: 'var(--brand-accent)', color: '#fff',
+                  borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 800,
+                  whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(251,191,36,0.5)',
+                  fontFamily: 'monospace', animation: 'fadeInUp 0.15s ease',
+                  zIndex: 10,
+                }}>
+                  {chunk.phoneme}
+                </span>
+              )}
               <span style={{
                 fontSize,
                 fontWeight:     800,
                 fontFamily:     'var(--font-display)',
                 letterSpacing:  '0.01em',
                 lineHeight:     1.3,
-                color:          isSpeaking
+                color:          isChunkSpeaking(ci)
+                  ? '#fff'
+                  : isSpeaking
                   ? 'var(--color-info)'
                   : isRevealed && chunkColor
                     ? chunkColor.text
                     : dark ? 'rgba(255,255,255,0.9)' : 'var(--text)',
-                background:     isSpeaking
+                background:     isChunkSpeaking(ci)
+                  ? 'var(--brand-accent)'
+                  : isSpeaking
                   ? 'var(--bg-info-light)'
                   : isRevealed && chunkColor
                     ? chunkColor.bg
                     : 'transparent',
-                border: isRevealed && chunkColor
+                border: isChunkSpeaking(ci)
+                  ? '2px solid var(--brand-accent)'
+                  : isRevealed && chunkColor
                   ? `1.5px solid ${chunkColor.border}`
                   : isTricky && !isRevealed
-                    ? `1.5px dashed ${phaseColor}60`  // dashed border for tricky graphemes
+                    ? `1.5px dashed ${phaseColor}60`
                     : 'none',
                 borderRadius:   6,
-                padding:        (isRevealed && chunkColor) || isSpeaking ? '1px 3px' : '1px 1px',
-                transition:     'all 0.22s ease',
+                padding:        isChunkSpeaking(ci) || (isRevealed && chunkColor) || isSpeaking ? '1px 5px' : '1px 1px',
+                transition:     'all 0.15s ease',
                 opacity:        chunk.isSilent ? 0.35 : 1,
-                // Pulse animation on worst chunk after reveal
-                animation:      isWorst ? 'pulse-chunk 1s ease-in-out 3' : 'none',
+                boxShadow:      isChunkSpeaking(ci) ? '0 0 14px rgba(251,191,36,0.6)' : 'none',
+                transform:      isChunkSpeaking(ci) ? 'scale(1.25) translateY(-2px)' : 'scale(1)',
+                animation:      isWorst && !isChunkSpeaking(ci) ? 'pulse-chunk 1s ease-in-out 3' : 'none',
               }}>
                 {chunk.grapheme}
               </span>
