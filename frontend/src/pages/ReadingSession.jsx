@@ -269,7 +269,8 @@ export default function ReadingSession() {
   const phonemeAudioRef      = useRef(null);
   const _reloadingPhonemes   = useRef(false);  // prevent multiple simultaneous preload calls
   const [phonemeDebugLog, setPhonemeDebugLog] = useState([]);
-  const [sdkLog, setSdkLog]             = useState([]);  // Azure Speech SDK log lines // [{ipa, grapheme, method, status, ms}]
+  const [sdkLog, setSdkLog]             = useState([]);
+  const [loadingChunkKey, setLoadingChunkKey] = useState(null); // shows spinner on tapped chunk // [{ipa, grapheme, method, status, ms}]
   const [showPhonemeDebug, setShowPhonemeDebug] = useState(false);
   const addPhonemeLog = (entry) => setPhonemeDebugLog(prev => [entry, ...prev].slice(0, 30));
 
@@ -469,6 +470,47 @@ export default function ReadingSession() {
   }, [page, child, stop]);
 
   // ── CLOUD ASSESSMENT PIPELINE ──────────────────────────────
+  // ── CHUNK TAP: play individual phoneme ─────────────────────────────────
+  const handleChunkTap = useCallback(async (chunk, chunkIdx, wIdx) => {
+    if (!chunk?.phoneme || chunk.isSilent) return;
+    const key = `${wIdx}-${chunkIdx}`;
+    setLoadingChunkKey(key);
+    setSpeakingChunkKey(null);
+    try {
+      await playPhoneme(chunk.phoneme, chunk.grapheme, key);
+    } finally {
+      setLoadingChunkKey(null);
+      // Clear the chunk highlight after a short delay
+      setTimeout(() => setSpeakingChunkKey(null), 400);
+    }
+  }, [playPhoneme]);
+
+  // ── WORD TAP: play full word pronunciation ─────────────────────────────
+  const handleWordTap = useCallback(async (word, wIdx) => {
+    const clean = word.replace(/[.,!?;:'"]/g, '');
+    if (!clean) return;
+    // Highlight the whole word while speaking
+    setSpeakingWordIdx(wIdx);
+    setSpeakingChunkKey(null);
+    await new Promise(resolve => {
+      const synth = window.speechSynthesis;
+      if (!synth) { setTimeout(resolve, 600); return; }
+      const u = new SpeechSynthesisUtterance(clean);
+      u.lang  = 'en-GB';
+      u.rate  = 0.72;     // slow and clear for a child learning
+      u.pitch = 1.1;
+      const voices = synth.getVoices();
+      const v = voices.find(v => v.lang === 'en-GB' && v.name.toLowerCase().includes('female'))
+              || voices.find(v => v.lang.startsWith('en-GB'))
+              || voices.find(v => v.lang.startsWith('en'));
+      if (v) u.voice = v;
+      u.onend   = resolve;
+      u.onerror = resolve;
+      synth.speak(u);
+    });
+    setSpeakingWordIdx(-1);
+  }, []);
+
   const processAudio = useCallback(async (audioBlob, browserTranscript) => {
     if (!page) return;
     setAssessing(true);
@@ -970,6 +1012,9 @@ export default function ReadingSession() {
               compact={words.length > 8}
               speakingChunkKey={speakingChunkKey}
               wordIdx={i}
+              onChunkTap={!isRecording && !assessing ? handleChunkTap : null}
+              onWordTap={!isRecording && !assessing ? handleWordTap : null}
+              loadingChunkKey={loadingChunkKey}
             />
           ))}
         </div>

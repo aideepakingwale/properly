@@ -39,8 +39,11 @@ export default function PhonicsWord({
   isRevealed = false,
   dark = false,
   compact = false,
-  speakingChunkKey = null,  // 'wordIdx-chunkIdx' — which grapheme is playing in phonics mode
+  speakingChunkKey = null,
   wordIdx = 0,
+  onChunkTap = null,    // (chunk, chunkIdx, wordIdx) → play phoneme sound
+  onWordTap  = null,    // (word, wordIdx)            → play whole word
+  loadingChunkKey = null, // 'wordIdx-chunkIdx' — shows spinner on fetching chunk
 }) {
   const punctMatch = word.match(/([.,!?;:'"]+)$/);
   const punct      = punctMatch ? punctMatch[0] : '';
@@ -76,18 +79,34 @@ export default function PhonicsWord({
       transition:     'transform 0.18s ease',
       transform:      isSpeaking ? 'scale(1.15) translateY(-4px)' : 'scale(1)',
     }}>
-      {/* Overall score badge — shown above word */}
-      {isRevealed && score !== null && (
-        <span style={{
-          fontSize:   11,
-          fontWeight: 900,
-          color:      score >= 80 ? 'var(--text-success)' : score >= 55 ? 'var(--color-accent-dark)' : 'var(--color-danger)',
-          lineHeight: 1,
-          animation:  'fadeInUp 0.25s ease',
-        }}>
-          {Math.round(score)}%
+      {/* Overall score badge OR word-tap button */}
+      {isRevealed && score !== null ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 900, lineHeight: 1, animation: 'fadeInUp 0.25s ease',
+            color: score >= 80 ? 'var(--text-success)' : score >= 55 ? 'var(--color-accent-dark)' : 'var(--color-danger)',
+          }}>{Math.round(score)}%</span>
+          {onWordTap && (
+            <button onClick={e => { e.stopPropagation(); onWordTap(word, wordIdx); }}
+              title={`Hear "${word}" spoken`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                fontSize: 9, lineHeight: 1, opacity: 0.6, transition: 'opacity 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity='1'}
+              onMouseLeave={e => e.currentTarget.style.opacity='0.6'}>
+              🔊
+            </button>
+          )}
         </span>
-      )}
+      ) : onWordTap ? (
+        <button onClick={e => { e.stopPropagation(); onWordTap(word, wordIdx); }}
+          title={`Hear "${word}" spoken`}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px',
+            fontSize: 10, lineHeight: 1, opacity: 0, transition: 'opacity 0.2s',
+            borderRadius: 50, color: 'var(--color-info)' }}
+          className="word-tap-btn">
+          🔊
+        </button>
+      ) : null}
 
       {/* ── GRAPHEME TILES ─────────────────────────────── */}
       <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 1, position: 'relative' }}>
@@ -121,26 +140,35 @@ export default function PhonicsWord({
           return (
             <span
               key={ci}
-              title={`${chunk.grapheme} = ${chunk.phoneme} (${chunk.label})`}
+              role={onChunkTap ? 'button' : undefined}
+              tabIndex={onChunkTap ? 0 : undefined}
+              title={`${chunk.grapheme} = /${chunk.phoneme}/ — tap to hear`}
+              onClick={onChunkTap && !chunk.isSilent
+                ? (e) => { e.stopPropagation(); onChunkTap(chunk, ci, wordIdx); }
+                : undefined}
+              onKeyDown={onChunkTap && !chunk.isSilent
+                ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChunkTap(chunk, ci, wordIdx); } }
+                : undefined}
               style={{
                 display:        'inline-flex',
                 flexDirection:  'column',
                 alignItems:     'center',
                 position:       'relative',
+                cursor:         onChunkTap && !chunk.isSilent ? 'pointer' : 'default',
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
               {/* The grapheme letter(s) */}
-              {/* Phoneme label above chunk when it's currently speaking in phonics mode */}
-              {isChunkSpeaking(ci) && (
+              {/* Phoneme label / loading indicator above chunk */}
+              {(isChunkSpeaking(ci) || loadingChunkKey === `${wordIdx}-${ci}`) && (
                 <span style={{
                   position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%)',
-                  background: 'var(--brand-accent)', color: '#fff',
-                  borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 800,
-                  whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(251,191,36,0.5)',
-                  fontFamily: 'monospace', animation: 'fadeInUp 0.15s ease',
-                  zIndex: 10,
+                  background: loadingChunkKey === `${wordIdx}-${ci}` ? 'var(--text-muted)' : 'var(--brand-accent)',
+                  color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 800,
+                  whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                  fontFamily: 'monospace', animation: 'fadeInUp 0.15s ease', zIndex: 10,
                 }}>
-                  {chunk.phoneme}
+                  {loadingChunkKey === `${wordIdx}-${ci}` ? '⏳' : chunk.phoneme}
                 </span>
               )}
               <span style={{
@@ -149,6 +177,8 @@ export default function PhonicsWord({
                 fontFamily:     'var(--font-display)',
                 letterSpacing:  '0.01em',
                 lineHeight:     1.3,
+                userSelect:     'none',
+                WebkitUserSelect: 'none',
                 color:          isChunkSpeaking(ci)
                   ? '#fff'
                   : isSpeaking
