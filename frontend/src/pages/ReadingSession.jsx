@@ -100,6 +100,8 @@ export default function ReadingSession() {
   const [speakingWordIdx, setSpeakingWordIdx] = useState(-1);  // word lit up during TTS playback
   const [revealedCount, setRevealedCount]     = useState(0);   // scores revealed progressively after assessment
   const [providerInfo, setProviderInfo] = useState(null);
+  const [lastDebug, setLastDebug]     = useState(null);  // always-visible debug panel
+  const [showDebug, setShowDebug]     = useState(false); // debug panel open/closed
   const triesRef = useRef(0);
   const [phonicsHearMode, setPhonicsHearMode] = useState(false);  // toggle: full sentence vs phoneme-by-phoneme
   const [speakingChunkKey, setSpeakingChunkKey] = useState(null); // 'wordIdx-chunkIdx' currently playing
@@ -511,8 +513,6 @@ export default function ReadingSession() {
   //  - Raw audio blob → sent to Azure for phoneme-level scoring (when key set)
   //  - Browser Web Speech transcript → used as fallback when Azure not configured
   const transcriptRef = useRef(null);
-  const [lastDebug, setLastDebug]     = useState(null);  // always-visible debug panel
-  const [showDebug, setShowDebug]     = useState(false); // toggle
 
   const handleMic = async () => {
     if (isRecording) {
