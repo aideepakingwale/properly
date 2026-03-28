@@ -83,6 +83,7 @@ export default function ReadingSession() {
 
   const [story, setStory]        = useState(null);
   const [pageIdx, setPageIdx]    = useState(0);
+  const [showNextButton, setShowNextButton] = useState(false);  // shown after good score
   const [wordScores, setWordScores] = useState([]);
   const [feedbackData, setFeedbackData] = useState(null); // { tip, source, provider }
   const [loadingFb, setLoadingFb]= useState(false);
@@ -139,6 +140,7 @@ export default function ReadingSession() {
     onError: (err) => {
       setLocalTranscript('');
     setSdkLog([]);
+    setShowNextButton(false);
       setLocalConfidence(0);
       transcriptResolveRef.current?.({ text: '', confidence: 0, error: err });
       transcriptResolveRef.current = null;
@@ -618,29 +620,22 @@ export default function ReadingSession() {
                   : 'Great effort! Keep going! 💪';
         await speak(msg);
 
-        setTimeout(async () => {
-          if (pageIdx < story.pages.length - 1) {
-            setPageIdx(p => p + 1);
-          } else {
-            // Complete session
-            if (sessionId && child) {
-              try {
-                const cRes = await progressAPI.completeSession(child.id, {
-                  sessionId, accuracy: overallAccuracy, acornsEarned: sessionAcorns + earnedThisPage,
-                });
-                if (cRes.success) {
-                  setNewAchievements(cRes.data.newAchievements || []);
-                  setStoryBonus(cRes.data.storyBonus || 0);
-                  setSessionAcorns(p => p + (cRes.data.storyBonus || 0));
-                  updateChildLocally({ acorns: cRes.data.child?.acorns, streak: cRes.data.child?.streak });
-                }
-              } catch {}
+        // Show Next button — user taps when ready (don't auto-advance)
+        setShowNextButton(true);
+
+        // If last page, complete session in background now (result shown when user taps Next)
+        if (pageIdx >= story.pages.length - 1 && sessionId && child) {
+          progressAPI.completeSession(child.id, {
+            sessionId, accuracy: overallAccuracy, acornsEarned: sessionAcorns + earnedThisPage,
+          }).then(cRes => {
+            if (cRes.success) {
+              setNewAchievements(cRes.data.newAchievements || []);
+              setStoryBonus(cRes.data.storyBonus || 0);
+              setSessionAcorns(p => p + (cRes.data.storyBonus || 0));
+              updateChildLocally({ acorns: cRes.data.child?.acorns, streak: cRes.data.child?.streak });
             }
-            await speak(`Amazing! You finished ${story.title}!`, {});
-            setTimeout(() => setShowComplete(true), 700);
-          }
-          setFeedbackData(null);
-        }, 2400);
+          }).catch(() => {});
+        }
       }
     } finally { setAssessing(false); }
   }, [page, pageIdx, story, sessionAcorns, sessionId, child, speak, updateChildLocally]);
@@ -1444,6 +1439,43 @@ export default function ReadingSession() {
         </p>
 
         {/* ── PAGE NAVIGATION ────────────────────────────────── */}
+        {/* ── NEXT PAGE PROMPT — shown after successful reading ── */}
+        {showNextButton && (
+          <div style={{ padding: '10px 18px 4px', display: 'flex', justifyContent: 'center' }}>
+            {pageIdx < (story?.pages?.length ?? 1) - 1 ? (
+              <button
+                onClick={() => { setShowNextButton(false); stop(); setPageIdx(p => p + 1); }}
+                style={{
+                  background: 'var(--grad-primary)', color: 'white', border: 'none',
+                  borderRadius: 50, padding: '10px 28px', fontFamily: 'var(--font-body)',
+                  fontWeight: 800, fontSize: 15, cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(124,58,237,0.45)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  animation: 'fadeInUp 0.4s ease',
+                }}>
+                Next Page ➡️
+              </button>
+            ) : (
+              <button
+                onClick={async () => {
+                  setShowNextButton(false);
+                  await speak(`Amazing! You finished ${story?.title}!`, {});
+                  setTimeout(() => setShowComplete(true), 700);
+                }}
+                style={{
+                  background: 'var(--grad-accent)', color: 'white', border: 'none',
+                  borderRadius: 50, padding: '10px 28px', fontFamily: 'var(--font-body)',
+                  fontWeight: 800, fontSize: 15, cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(251,191,36,0.5)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  animation: 'fadeInUp 0.4s ease',
+                }}>
+                🎉 Finish Story!
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Page dot strip — tap any dot to jump directly to that page */}
         <div style={{ width: '100%', marginTop: 14 }}>
           {/* Clickable page dots — each shows completion state */}

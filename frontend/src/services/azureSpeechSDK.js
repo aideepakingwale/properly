@@ -25,7 +25,7 @@ function loadSDK() {
   _sdkPromise = new Promise((resolve, reject) => {
     if (window.SpeechSDK) { resolve(window.SpeechSDK); return; }
     const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/microsoft-cognitiveservices-speech-sdk/1.36.0/microsoft.cognitiveservices.speech.sdk.bundle-min.js';
+    s.src = 'https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.36.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle.js';
     s.onload  = () => resolve(window.SpeechSDK);
     s.onerror = () => reject(new Error('Azure Speech SDK failed to load'));
     document.head.appendChild(s);
