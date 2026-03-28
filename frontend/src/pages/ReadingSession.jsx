@@ -183,87 +183,81 @@ export default function ReadingSession() {
   // Reads each grapheme's phoneme sound in sequence, lighting up the chunk as it speaks.
   // Uses Web Speech API (no Azure cost) with careful timing so each grapheme tile
   // highlights exactly when its sound is spoken.
-  // ── PHONICS SOUND MAP ────────────────────────────────────────
-  // Maps IPA phoneme → text that Web Speech API actually pronounces as that sound.
-  // KEY RULE: Consonants MUST have a trailing vowel sound to avoid being spoken as
-  // letter names ("see" instead of "kuh", "dee" instead of "duh").
-  // We use the schwa trick: "kuh", "tuh", "puh" etc. for consonant-only phonemes.
-  // Vowels are written as full phonetic spellings the TTS engine recognises.
-  // ── PHONICS SOUND ENGINE ─────────────────────────────────────
-  // Each phoneme maps to a word or phrase that the TTS engine will speak
-  // as THAT SOUND. The trick: use a real word that STARTS with the exact
-  // sound and is cut off early by the brevity, or use repeated consonants
-  // that force the correct fricative/stop sound.
-  //
-  // CRITICAL PHONICS RULE:
-  //   /k/ → "cup" (starts with kuh sound) NOT "key" (starts with kee sound)
-  //   /t/ → "top" NOT "tea"
-  //   /s/ → "sun" NOT "es"
-  //
-  // We pass the full word at very slow rate so only the onset is heard clearly.
-  const PHONEME_SPEAK = {
-    // ── CONSONANT STOPS (plosives) ─────────────────────────────
-    // Use words starting with the sound at rate 0.5 — only the onset matters
-    '/p/': { text: 'pup',      rate: 0.55, solo: true  },   // puh
-    '/b/': { text: 'bob',      rate: 0.55, solo: true  },   // buh
-    '/t/': { text: 'top',      rate: 0.55, solo: true  },   // tuh
-    '/d/': { text: 'dog',      rate: 0.55, solo: true  },   // duh
-    '/k/': { text: 'cup',      rate: 0.55, solo: true  },   // kuh — NOT "key"
-    '/g/': { text: 'got',      rate: 0.55, solo: true  },   // guh
-    // ── FRICATIVES ─────────────────────────────────────────────
-    '/f/': { text: 'fffff',    rate: 0.6,  solo: false },   // continuous fff sound
-    '/v/': { text: 'vvvv',     rate: 0.6,  solo: false },
-    '/s/': { text: 'ssss',     rate: 0.6,  solo: false },   // NOT "es"
-    '/z/': { text: 'zzzz',     rate: 0.6,  solo: false },
-    '/ʃ/': { text: 'shhhh',    rate: 0.6,  solo: false },   // shh sound
-    '/ð/': { text: 'the',      rate: 0.5,  solo: true  },   // voiced th
-    '/θ/': { text: 'thin',     rate: 0.5,  solo: true  },   // voiceless th
-    '/h/': { text: 'huh',      rate: 0.6,  solo: false },
-    // ── AFFRICATES ─────────────────────────────────────────────
-    '/tʃ/': { text: 'chip',    rate: 0.55, solo: true  },   // ch
-    '/dʒ/': { text: 'jump',    rate: 0.55, solo: true  },   // j
-    // ── NASALS ─────────────────────────────────────────────────
-    '/m/': { text: 'mmm',      rate: 0.6,  solo: false },
-    '/n/': { text: 'nnn',      rate: 0.6,  solo: false },
-    '/ŋ/': { text: 'ring',     rate: 0.6,  solo: true  },   // ng at end
-    '/ŋk/': { text: 'sink',    rate: 0.6,  solo: true  },
-    // ── APPROXIMANTS ───────────────────────────────────────────
-    '/l/': { text: 'lll',      rate: 0.6,  solo: false },
-    '/r/': { text: 'rrr',      rate: 0.6,  solo: false },
-    '/w/': { text: 'www',      rate: 0.6,  solo: false },
-    '/j/': { text: 'yes',      rate: 0.55, solo: true  },   // y sound
-    '/kw/': { text: 'queen',   rate: 0.55, solo: true  },
-    '/ks/': { text: 'ox',      rate: 0.6,  solo: true  },
-    // ── SHORT VOWELS (pure sounds — hold and extend) ───────────
-    '/æ/': { text: 'aaa',      rate: 0.5,  solo: false },   // "aah" as in cat
-    '/ɛ/': { text: 'egg',      rate: 0.5,  solo: true  },   // short e as in bed
-    '/ɪ/': { text: 'it',       rate: 0.5,  solo: true  },   // short i as in sit
-    '/ɒ/': { text: 'odd',      rate: 0.5,  solo: true  },   // short o as in dog
-    '/ʌ/': { text: 'up',       rate: 0.5,  solo: true  },   // short u as in cup
-    '/ʊ/': { text: 'book',     rate: 0.5,  solo: true  },   // short oo
-    '/ə/': { text: 'a',        rate: 0.5,  solo: false },   // schwa
-    // ── LONG VOWELS & DIPHTHONGS ───────────────────────────────
-    '/eɪ/': { text: 'rain',    rate: 0.6,  solo: true  },   // ay
-    '/iː/': { text: 'ee',      rate: 0.6,  solo: false },   // ee
-    '/aɪ/': { text: 'eye',     rate: 0.6,  solo: true  },   // igh
-    '/əʊ/': { text: 'oh',      rate: 0.6,  solo: false },   // oa
-    '/uː/': { text: 'oo',      rate: 0.6,  solo: false },   // oo
-    '/aʊ/': { text: 'ow',      rate: 0.6,  solo: false },   // ow
-    '/ɔɪ/': { text: 'oi',      rate: 0.6,  solo: false },   // oi
-    '/ɑː/': { text: 'ar',      rate: 0.6,  solo: false },   // ar
-    '/ɔː/': { text: 'or',      rate: 0.6,  solo: false },   // or
-    '/ɜː/': { text: 'er',      rate: 0.6,  solo: false },   // er
-    '/juː/': { text: 'you',    rate: 0.6,  solo: true  },   // ue
-    '/ɪə/': { text: 'ear',     rate: 0.6,  solo: true  },   // ear
-    '/eə/': { text: 'air',     rate: 0.6,  solo: true  },   // air
-    '/ʊə/': { text: 'tour',    rate: 0.6,  solo: true  },   // ure
+  // ── PHONEME AUDIO ENGINE ─────────────────────────────────────
+  // Uses Azure TTS with SSML <phoneme alphabet="ipa"> for exact sounds.
+  // Falls back to Web Speech with carefully chosen English key words.
+  // Each key word is the shortest common word that STARTS with that phoneme.
+
+  const phonemeAudioCache = useRef({});
+  const phonemeAudioRef   = useRef(null);
+
+  const fetchPhonemeAudio = useCallback(async (ipa, grapheme) => {
+    const key = ipa;
+    if (phonemeAudioCache.current[key]) return phonemeAudioCache.current[key];
+    try {
+      const token = localStorage.getItem('properly_token');
+      const rawBase = (typeof __API_URL__ !== 'undefined' && __API_URL__) ? __API_URL__ : '/api';
+      const base = rawBase.startsWith('http') ? rawBase.replace(/\/$/, '') : 'https://' + rawBase.replace(/\/$/, '');
+      const apiBase = base.endsWith('/api') ? base : base + '/api';
+      const res = await fetch(`${apiBase}/ai/phoneme`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body:    JSON.stringify({ ipa, grapheme, rate: 0.55 }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      phonemeAudioCache.current[key] = url;
+      return url;
+    } catch (e) {
+      console.warn('[PhonemeAudio] Azure failed for /' + ipa + '/ —', e.message);
+      return null;
+    }
+  }, []);
+
+  const playAudioUrl = (url) => new Promise(resolve => {
+    if (phonemeAudioRef.current) phonemeAudioRef.current.pause();
+    const a = new Audio(url);
+    phonemeAudioRef.current = a;
+    a.onended = resolve;
+    a.onerror = resolve;
+    a.play().catch(resolve);
+  });
+
+  // Key words: shortest common English word that STARTS with (or clearly contains) the phoneme
+  // Spoken at rate 0.5 — child hears the sound at the word boundary
+  const PHONEME_KEYWORDS = {
+    '/p/': 'pat',   '/b/': 'bat',   '/t/': 'tap',   '/d/': 'dad',
+    '/k/': 'cat',   '/g/': 'gap',   '/f/': 'fan',   '/v/': 'van',
+    '/s/': 'sat',   '/z/': 'zip',   '/ʃ/': 'ship',  '/h/': 'hop',
+    '/tʃ/': 'chip', '/dʒ/': 'jet',  '/m/': 'mat',   '/n/': 'nap',
+    '/ŋ/': 'ring',  '/ŋk/': 'sink', '/l/': 'lip',   '/r/': 'rat',
+    '/w/': 'wet',   '/j/': 'yes',   '/kw/': 'quick','/ks/': 'fox',
+    '/ð/': 'this',  '/θ/': 'thin',
+    '/æ/': 'ant',   '/ɛ/': 'egg',   '/ɪ/': 'ink',   '/ɒ/': 'on',
+    '/ʌ/': 'up',    '/ʊ/': 'book',  '/ə/': 'a',
+    '/eɪ/': 'aim',  '/iː/': 'eat',  '/aɪ/': 'ice',  '/əʊ/': 'oak',
+    '/uː/': 'ooze', '/aʊ/': 'out',  '/ɔɪ/': 'oil',  '/ɑː/': 'arm',
+    '/ɔː/': 'oar',  '/ɜː/': 'earn', '/juː/': 'use',
+    '/ɪə/': 'ear',  '/eə/': 'air',  '/ʊə/': 'tour',
   };
 
   function getPhonemeConfig(phoneme, grapheme) {
-    return PHONEME_SPEAK[phoneme] || { text: grapheme || phoneme.replace(/[/[\]]/g, ''), rate: 0.6, solo: false };
+    return { ipa: phoneme.replace(/^\/|\/$/g, ''), grapheme, keyword: PHONEME_KEYWORDS[phoneme] || grapheme };
   }
 
-  // Speak using Web Speech — returns estimated ms duration
+  const playPhoneme = useCallback(async (phoneme, grapheme) => {
+    const ipaClean = phoneme.replace(/^\/|\/$/g, '');
+    // 1. Azure TTS — exact IPA phoneme sound (best quality)
+    if (providerInfo?.azure?.available) {
+      const url = await fetchPhonemeAudio(ipaClean, grapheme);
+      if (url) { await playAudioUrl(url); return; }
+    }
+    // 2. Web Speech fallback — key word at very slow rate
+    const keyword = PHONEME_KEYWORDS[phoneme] || grapheme;
+    await sayWord(keyword, 0.5, 1.1);
+  }, [providerInfo, fetchPhonemeAudio]);
+
   // Promise-based speech — waits for onend before resolving
   function sayWord(text, rate = 0.78, pitch = 1.08) {
     return new Promise(resolve => {
@@ -318,7 +312,7 @@ export default function ReadingSession() {
         setSpeakingWordIdx(-1);
         setSpeakingChunkKey(`${wi}-${ci}`);
 
-        await sayWord(cfg.text, cfg.rate, 1.08);
+        await playPhoneme(chunk.phoneme, chunk.grapheme);
         // Brief gap between phonemes so sounds don't blur together
         await pause(chunk.grapheme.length >= 2 ? 180 : 100);
       }

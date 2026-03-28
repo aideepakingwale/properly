@@ -601,6 +601,48 @@ function stringSimilarity(a, b) {
 }
 
 // ── NEURAL TTS ────────────────────────────────────────────────
+
+/**
+ * Synthesise a single IPA phoneme using Azure TTS SSML <phoneme> tags.
+ * This produces the EXACT sound — not a letter name, not a word approximation.
+ * Used by the phonics mode to play each grapheme's real sound.
+ *
+ * @param {string} ipaPhoneme  - IPA symbol e.g. "æ", "tʃ", "ð"
+ * @param {string} grapheme    - Written letters e.g. "a", "ch", "th" (display text in SSML)
+ * @param {number} rate        - Speech rate: 0.5 = very slow (best for kids)
+ */
+export async function synthesisePhoneme(ipaPhoneme, grapheme, rate = 0.55) {
+  if (!azureAvailable()) throw new Error('Azure not configured');
+
+  // Strip surrounding / / from IPA if present
+  const ipa = ipaPhoneme.replace(/^\/|\/$/g, '');
+
+  // Build SSML with phoneme tag — Azure reads EXACTLY this IPA sound
+  // We wrap in a slow prosody so child can hear it clearly
+  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">
+    <voice name="en-GB-SoniaNeural">
+      <prosody rate="${rate}" pitch="+3%">
+        <phoneme alphabet="ipa" ph="${escapeXml(ipa)}">${escapeXml(grapheme)}</phoneme>
+      </prosody>
+    </voice>
+  </speak>`.trim();
+
+  const r = await fetch(
+    `https://${AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
+    {
+      method:  'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_KEY,
+        'Content-Type':              'application/ssml+xml',
+        'X-Microsoft-OutputFormat':  'audio-16khz-128kbitrate-mono-mp3',
+      },
+      body: ssml,
+    }
+  );
+  if (!r.ok) throw new Error(`Azure TTS phoneme ${r.status}: ${await r.text().catch(()=>'')}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
 export async function synthesizeSpeech(text, voice = 'en-GB-SoniaNeural') {
   if (!azureAvailable()) throw new Error('Azure not configured');
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">

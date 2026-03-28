@@ -123,6 +123,22 @@ router.post('/children/:childId/shop/buy',    authMiddleware, requireChild, purc
 // ── AI COACHING & TTS ─────────────────────────────────────────
 router.post('/ai/feedback', authMiddleware, getFeedback);
 router.post('/ai/tts',      authMiddleware, getTTS);
+router.post('/ai/phoneme',  authMiddleware, async (req, res) => {
+  // Returns MP3 audio of a single IPA phoneme spoken by Azure TTS
+  // Used by the phonics mode "Hear the Sounds" feature
+  const { ipa, grapheme, rate = 0.55 } = req.body;
+  if (!ipa || !grapheme) return res.status(400).json({ success: false, message: 'ipa and grapheme required' });
+  if (!azureAvail()) return res.status(503).json({ success: false, message: 'Azure TTS not configured' });
+  try {
+    const buf = await synthesisePhoneme(ipa, grapheme, rate);
+    res.set('Content-Type', 'audio/mpeg');
+    res.set('Cache-Control', 'public, max-age=31536000'); // cache 1 year — phonemes never change
+    res.send(buf);
+  } catch (e) {
+    console.error('[Phoneme TTS]', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 // ── SPEECH ────────────────────────────────────────────────────
 router.get('/speech/status',  getSpeechStatus);
