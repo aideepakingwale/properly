@@ -28,6 +28,11 @@ export const uploadMiddleware = upload.single('audio');
 
 export const assessSpeech = async (req, res) => {
   const { referenceText, transcript } = req.body;
+  // Log what we received so we can trace stale-reference bugs
+  console.log(`\n[Speech] ===== NEW ASSESSMENT REQUEST =====`);
+  console.log(`[Speech] referenceText: "${referenceText}"`);
+  console.log(`[Speech] audio size: ${req.file?.buffer?.length} bytes`);
+  console.log(`[Speech] mime: ${req.file?.mimetype}`);
   if (!referenceText) {
     return res.status(400).json({ success: false, message: 'referenceText required' });
   }

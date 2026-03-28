@@ -181,7 +181,9 @@ export default function ReadingSession() {
   // Reset on page change
   useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); }, [pageIdx]);
 
-  const page = story?.pages?.[pageIdx];
+  const page    = story?.pages?.[pageIdx];
+  const pageRef = useRef(page);
+  useEffect(() => { pageRef.current = page; }, [page]);  // always up to date
 
   // ── PHONICS SOUND PLAYBACK ──────────────────────────────────
   // Reads each grapheme's phoneme sound in sequence, lighting up the chunk as it speaks.
@@ -383,23 +385,27 @@ export default function ReadingSession() {
     try {
       // 1. Send audio to backend → Azure Pronunciation Assessment
       const blobKB = (audioBlob?.size / 1024).toFixed(1);
-      setLastDebug({ stage: 'sending', blobKB, mime: audioBlob?.type, ref: page.text });
-      const assessRes = await speechAPI.assess(audioBlob, page.text, browserTranscript || null);
+      setLastDebug({ stage: 'sending', blobKB, mime: audioBlob?.type, ref: pageRef.current?.text || page?.text });
+      // Use pageRef.current to avoid stale closure — always reads the current page
+      const currentPage = pageRef.current;
+      const assessRes = await speechAPI.assess(audioBlob, currentPage?.text || page?.text, browserTranscript || null);
       if (!assessRes.success) return;
 
       const { wordScores, overallAccuracy, overallFluency, overallCompleteness,
-              overallProsody, displayText, source, azureAssessed, _debugInfo } = assessRes.data;
+              overallProsody, displayText, source, azureAssessed, _debugInfo,
+              wrongSentence, sentenceSimilarity } = assessRes.data;
 
       // Always store last assessment debug info for the on-screen panel
       const debug = {
         ...(_debugInfo || {}),
-        // Always include response-level fields (not in _debugInfo)
         source, azureAssessed, overallAccuracy, overallFluency,
         displayText, wordCount: wordScores?.length,
         blobKB: (audioBlob?.size / 1024).toFixed(1),
         mime: audioBlob?.type,
         wordScores,
         recognized: assessRes.data?.displayText,
+        wrongSentence,
+        sentenceSimilarity,
       };
       setDebugInfo(debug);
       setLastDebug({ stage: 'done', ...debug });
@@ -417,6 +423,19 @@ export default function ReadingSession() {
           prosody: overallProsody,
           source: azureAssessed ? 'azure' : 'groq-whisper',
         });
+      }
+
+      // Wrong sentence detection — tell the child clearly
+      if (wrongSentence) {
+        setFeedbackData({
+          tip: `Hmm, that sounded like a different sentence! Let's try again — look at the words on screen and read THIS sentence. 👀`,
+          source: 'rules',
+          provider: 'rules',
+        });
+        setWordScores(wordScores);
+        setRevealedCount(wordScores.length);
+        setAssessing(false);
+        return;
       }
 
       // Submit page to backend
@@ -902,7 +921,8 @@ export default function ReadingSession() {
             onClick={() => setShowDebug(v => !v)}
             style={{ width: '100%', padding: '8px 14px', background: lastDebug.overallAccuracy > 0 ? 'var(--bg-success-light)' : 'var(--bg-danger-muted)', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11 }}>
             <span>
-              {lastDebug.overallAccuracy > 0 ? '✅' : '❌'} {lastDebug.overallAccuracy ?? '?'}% · {lastDebug.azureAssessed ? '☁️ Azure' : lastDebug.groqAssessed ? '🟢 Groq' : `Source: ${lastDebug.source || '?'}`} · Audio: {lastDebug.audioKB || lastDebug.blobKB || '?'}KB · PA: {lastDebug.nBestPAPresent ? '✅ present' : '❌ MISSING'}
+              {lastDebug.wrongSentence ? '⚠️ WRONG SENTENCE' : lastDebug.overallAccuracy > 0 ? '✅' : '❌'} {lastDebug.overallAccuracy ?? '?'}% · {lastDebug.azureAssessed ? '☁️ Azure' : lastDebug.groqAssessed ? '🟢 Groq' : `Source: ${lastDebug.source || '?'}`} · Audio: {lastDebug.audioKB || lastDebug.blobKB || '?'}KB · PA: {lastDebug.nBestPAPresent ? '✅ present' : '❌ MISSING'}
+              {lastDebug.wrongSentence && <span style={{ color: '#FCA5A5' }}> · Similarity: {lastDebug.sentenceSimilarity}%</span>}
             </span>
             <span style={{ whiteSpace: 'nowrap', marginLeft: 8 }}>{showDebug ? '▲' : '▼'} {debugMode ? 'Full Debug' : 'Details'}</span>
           </button>
@@ -920,8 +940,10 @@ export default function ReadingSession() {
                   <Row label="source"       val={lastDebug.source || lastDebug.stage || '?'} />
                   <Row label="azureAssessed" val={String(lastDebug.azureAssessed)} ok={lastDebug.azureAssessed} />
                   <Row label="heard"        val={`"${lastDebug.displayText || nb?.Display || nb?.Lexical || '(nothing)'}"`} ok={!!(lastDebug.displayText || nb?.Display)} />
-                  <Row label="reference"    val={`"${lastDebug.refText || lastDebug.sanitised || page?.text}"`} />
+                  <Row label="reference (sent to backend)" val={`"${lastDebug.referenceText || lastDebug.refText || lastDebug.sanitised || page?.text}"`} ok={!!lastDebug.referenceText} critical={!lastDebug.referenceText} />
+                  <Row label="current page.text"     val={`"${page?.text}"`} ok={page?.text === (lastDebug.referenceText || lastDebug.refText)} critical={page?.text !== (lastDebug.referenceText || lastDebug.refText)} />
                   <Row label="recognitionStatus" val={lastDebug.recognitionStatus || nb?.RecognitionStatus || lastDebug.responseBody?.RecognitionStatus || '?'} ok={lastDebug.recognitionStatus === 'Success'} />
+                  {lastDebug.wrongSentence && <Row label="⚠️ WRONG SENTENCE" val={`Similarity ${lastDebug.sentenceSimilarity}% — child read a different sentence`} critical />}
                   <Row label="PA present"   val={String(!!pa)} ok={!!pa} critical={!pa} />
                   {pa && <>
                     <Row label="AccuracyScore"    val={pa.AccuracyScore} ok={pa.AccuracyScore > 0} />

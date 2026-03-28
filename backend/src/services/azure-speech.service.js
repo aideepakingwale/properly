@@ -572,20 +572,20 @@ function parseGroqResult(result, referenceText) {
     }
 
     if (!bestMatch || bestScore < 0.3) {
-      // Word not found — child omitted it
       return { word: refWord, score: 0, rawScore: 0, errorType: 'Omission', phonemes: [],
-               groqConfidence: Math.round(confMultiplier * 100) };
+               groqConfidence: Math.round(confMultiplier * 100),
+               wrongSentence };
     }
 
     spokenPtr = bestMatch.idx + 1;
 
-    // Base score from string similarity (did they say roughly the right word?)
     const similarityScore = bestScore * 100;
-    // Modulate by Whisper's confidence in what it heard
-    const adjustedScore = Math.round(similarityScore * confMultiplier);
+    // Apply wrong-sentence penalty: cap at 20% if sentences don't match overall
+    const sentencePenalty  = wrongSentence ? 0.2 : 1.0;
+    const adjustedScore    = Math.round(similarityScore * confMultiplier * sentencePenalty);
 
-    const errorType = adjustedScore >= 85 ? 'None'
-                    : adjustedScore >= 50 ? 'Mispronunciation'
+    const errorType = wrongSentence         ? 'WrongSentence'
+                    : adjustedScore >= 85   ? 'None'
                     : 'Mispronunciation';
 
     return {
@@ -595,7 +595,8 @@ function parseGroqResult(result, referenceText) {
       errorType,
       groqTranscribed: bestMatch.spoken.rawWord,
       groqConfidence:  Math.round(confMultiplier * 100),
-      phonemes:        [],   // Whisper doesn't provide phoneme-level data
+      wrongSentence,
+      phonemes:        [],
     };
   });
 
@@ -603,19 +604,33 @@ function parseGroqResult(result, referenceText) {
     ? Math.round(wordScores.reduce((s, w) => s + w.score, 0) / wordScores.length)
     : 0;
 
+  // Apply wrong-sentence cap to overall scores
+  const cappedAccuracy = wrongSentence
+    ? Math.min(overallAccuracy, 20)
+    : overallAccuracy;
+
+  if (wrongSentence) {
+    console.warn(`[Groq] ⚠️ Wrong sentence detected (similarity=${(sentenceSimilarity*100).toFixed(0)}%) — capping score to ${cappedAccuracy}%`);
+  }
+
   return {
     wordScores,
-    overallAccuracy,
-    overallFluency:      Math.round(confMultiplier * 90),
-    overallCompleteness: Math.round((wordScores.filter(w => w.score > 0).length / refWords.length) * 100),
+    overallAccuracy:     cappedAccuracy,
+    overallFluency:      wrongSentence ? 0 : Math.round(confMultiplier * 90),
+    overallCompleteness: wrongSentence ? 0 : Math.round((wordScores.filter(w => w.score > 0).length / refWords.length) * 100),
     overallProsody:      0,
     displayText:         spokenText,
+    wrongSentence,
+    sentenceSimilarity:  Math.round(sentenceSimilarity * 100),
     _debug: {
-      groqRaw:        result,
+      groqRaw:            result,
+      referenceText,        // what was sent as reference from frontend
       refWords,
       spokenNorm,
-      confMultiplier: confMultiplier.toFixed(3),
+      confMultiplier:     confMultiplier.toFixed(3),
       segLogProb,
+      sentenceSimilarity: (sentenceSimilarity * 100).toFixed(0) + '%',
+      wrongSentence,
     },
   };
 }
