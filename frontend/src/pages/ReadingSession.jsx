@@ -116,6 +116,11 @@ export default function ReadingSession() {
   // PRIMARY ROLE: quality gate before Azure — if browser can't hear it, Azure won't either.
   // SECONDARY ROLE: fallback scoring when Azure not configured.
   const [localTranscript, setLocalTranscript] = useState('');
+  const [recordingSeconds, setRecordingSeconds] = useState(0);  // elapsed seconds while recording
+  const recordingTimerRef = useRef(null);   // interval for countdown
+  const autoStopTimerRef  = useRef(null);   // timeout for forced auto-stop
+  const isRecordingRef    = useRef(false);   // mirrors isRecording without stale closure risk
+  const allWordsCapturedRef = useRef(false); // true when browser has heard all ref words
   const [localConfidence, setLocalConfidence] = useState(0);
 
   // Promise-based transcript capture — resolves when onresult/onerror fires
@@ -232,6 +237,10 @@ export default function ReadingSession() {
     setSpeakingWordIdx(-1);
     setRevealedCount(0);
     transcriptRef.current  = null;
+    isRecordingRef.current = false;
+    clearInterval(recordingTimerRef.current);
+    clearTimeout(autoStopTimerRef.current);
+    setRecordingSeconds(0);
     // Cancel any pending transcript promise from previous page
     transcriptResolveRef.current?.({ text: '', confidence: 0, cancelled: true });
     transcriptResolveRef.current = null;
@@ -610,6 +619,12 @@ export default function ReadingSession() {
 
   const handleMic = async () => {
     if (isRecording) {
+      // Clear all auto-stop timers — user pressed stop manually (or auto-stop fired)
+      isRecordingRef.current = false;
+      clearInterval(recordingTimerRef.current);
+      clearTimeout(autoStopTimerRef.current);
+      clearInterval(recordingTimerRef._checkInterval);
+      setRecordingSeconds(0);
       // Stop both simultaneously
       stopRec();
       const blob = await stopRecording();
@@ -684,17 +699,72 @@ export default function ReadingSession() {
     window.speechSynthesis?.cancel();
     setSpeakingChunkKey(null);
     setSpeakingWordIdx(-1);
-    // Reset transcript state for new recording
+
+    // Reset all state
     setLocalTranscript('');
     setLocalConfidence(0);
+    setRecordingSeconds(0);
+    allWordsCapturedRef.current = false;
     transcriptRef.current = null;
-    // Cancel any pending transcript promise from a previous recording
     transcriptResolveRef.current?.({ text: '', confidence: 0, cancelled: true });
     transcriptResolveRef.current = null;
-    // Start browser speech recognition AND MediaRecorder in parallel
-    startRec((evt) => { /* state managed by isRecording */ });
+
+    // Clear any previous timers
+    clearInterval(recordingTimerRef.current);
+    clearTimeout(autoStopTimerRef.current);
+
     await startRecording();
+    startRec((evt) => { /* state managed by isRecording */ });
+    isRecordingRef.current = true;
+
+    // ── COUNTDOWN TIMER (shows elapsed seconds in UI) ─────────────────
+    let elapsed = 0;
+    recordingTimerRef.current = setInterval(() => {
+      elapsed++;
+      setRecordingSeconds(elapsed);
+    }, 1000);
+
+    // ── AUTO-STOP: check if browser has captured all reference words ──
+    // Poll every 400ms. If transcript covers all content words → auto-stop.
+    const MAX_DURATION_MS = 15000;  // hard cap — never record more than 15s
+    const refText    = pageRef.current?.text || '';
+    const refWordSet = new Set(
+      refText.toLowerCase().replace(/[.,!?;:'"]/g, '').split(/\s+/).filter(w => w.length > 1)
+    );
+
+    const checkAllWordsCaptured = setInterval(() => {
+      const t = (transcriptRef.current || '').toLowerCase().replace(/[.,!?;:'"]/g, '');
+      const heardSet = new Set(t.split(/\s+/).filter(w => w.length > 1));
+      const covered  = [...refWordSet].filter(w => heardSet.has(w)).length;
+      const pct      = refWordSet.size > 0 ? covered / refWordSet.size : 0;
+
+      if (pct >= 0.85 && !allWordsCapturedRef.current) {
+        allWordsCapturedRef.current = true;
+        clearInterval(checkAllWordsCaptured);
+        // Small grace period so the last word finishes speaking
+        setTimeout(() => {
+          if (isRecordingRef.current) handleMic();
+        }, 600);
+      }
+    }, 400);
+
+    // ── AUTO-STOP: hard timeout ───────────────────────────────────────
+    autoStopTimerRef.current = setTimeout(() => {
+      clearInterval(checkAllWordsCaptured);
+      if (isRecordingRef.current) handleMic();
+    }, MAX_DURATION_MS);
+
+    // Store cleanup refs so the stop-branch can clear them
+    recordingTimerRef._checkInterval = checkAllWordsCaptured;
   };
+
+  // Clean up timers on unmount
+  useEffect(() => () => {
+    clearInterval(recordingTimerRef.current);
+    clearTimeout(autoStopTimerRef.current);
+    clearInterval(recordingTimerRef._checkInterval);
+    transcriptResolveRef.current?.({ text: '', confidence: 0, cancelled: true });
+  }, []);
 
   if (loading) return (
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -1283,12 +1353,39 @@ export default function ReadingSession() {
             </button>
           </div>
         </div>
+        {/* Recording progress bar — fills red as time runs out */}
+        {isRecording && (
+          <div style={{ width: '100%', maxWidth: 280, height: 4, background: 'var(--overlay-8)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${Math.min(100, (recordingSeconds / 15) * 100)}%`,
+              background: recordingSeconds >= 12
+                ? 'linear-gradient(90deg, var(--color-warning), var(--color-danger))'
+                : 'linear-gradient(90deg, var(--color-primary), var(--color-info))',
+              borderRadius: 2,
+              transition: 'width 1s linear, background 0.3s',
+            }} />
+          </div>
+        )}
+
         <p style={{ fontSize: 13, fontWeight: 700, color: dark ? 'var(--overlay-60)' : 'var(--text-muted)' }}>
           {assessing
             ? (localTranscript
                 ? <>⚙️ Scoring… I heard: <em>"{localTranscript}"</em></>
                 : '⚙️ Analysing your reading…')
-            : isRecording ? '🔴 Recording… tap to stop'
+            : isRecording
+            ? <span style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                <span>🔴 Recording…</span>
+                <span style={{
+                  background: recordingSeconds >= 12 ? 'var(--color-danger)' : 'var(--overlay-12)',
+                  color: recordingSeconds >= 12 ? 'white' : 'var(--text-muted)',
+                  borderRadius: 50, padding: '1px 8px', fontSize: 11, fontWeight: 800,
+                  transition: 'all 0.3s',
+                }}>{recordingSeconds}s</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                  {recordingSeconds >= 12 ? '⚠️ stopping soon…' : 'tap ⏹ to stop'}
+                </span>
+              </span>
             : 'Tap 🎙️ and read the sentence aloud!'}
         </p>
         <p style={{ fontSize: 11, color: dark ? 'var(--overlay-25)' : 'var(--border-2)', marginTop: 2 }}>
