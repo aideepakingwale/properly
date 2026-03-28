@@ -340,6 +340,30 @@ function migrate(db) {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // Clean up duplicate story_pages rows (from old INSERT OR REPLACE bug)
+  // Keep only the row with the LOWEST id for each (story_id, page_index) pair
+  try {
+    const dupeCount = db.prepare(`
+      SELECT COUNT(*) as n FROM story_pages sp
+      WHERE id != (
+        SELECT MIN(id) FROM story_pages
+        WHERE story_id = sp.story_id AND page_index = sp.page_index
+      )
+    `).get().n;
+    if (dupeCount > 0) {
+      db.exec(`
+        DELETE FROM story_pages
+        WHERE id NOT IN (
+          SELECT MIN(id) FROM story_pages
+          GROUP BY story_id, page_index
+        )
+      `);
+      console.log(`✅ Migration: removed \${dupeCount} duplicate story_pages rows`);
+    }
+  } catch (e) {
+    console.warn('[Migration] Dupe cleanup failed:', e.message);
+  }
+
   console.log('✅ Migrations complete');
 }
 

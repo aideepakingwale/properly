@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS story_pages (
   text       TEXT NOT NULL,
   scene      TEXT NOT NULL DEFAULT '🌿',
   bg_class   TEXT NOT NULL DEFAULT 'bg-warm',
-  is_dark    INTEGER NOT NULL DEFAULT 0
+  is_dark    INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(story_id, page_index)
 );
 
 -- ── READING SESSIONS ─────────────────────────────────────────

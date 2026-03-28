@@ -264,95 +264,81 @@ export default function ReadingSession() {
   }
 
   // Speak using Web Speech — returns estimated ms duration
-  function sayWith(text, rate = 0.75, pitch = 1.1) {
-    const synth = window.speechSynthesis;
-    if (!synth) return 400;
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang  = 'en-GB';
-    u.rate  = rate;
-    u.pitch = pitch;
-    const voices = synth.getVoices();
-    const v = voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
-            || voices.find(v => v.lang.startsWith('en-GB'))
-            || voices.find(v => v.lang.startsWith('en'));
-    if (v) u.voice = v;
-    synth.speak(u);
-    return Math.max(350, text.length * 100 / rate);
+  // Promise-based speech — waits for onend before resolving
+  function sayWord(text, rate = 0.78, pitch = 1.08) {
+    return new Promise(resolve => {
+      const synth = window.speechSynthesis;
+      if (!synth) { setTimeout(resolve, 400); return; }
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang  = 'en-GB';
+      u.rate  = rate;
+      u.pitch = pitch;
+      const voices = synth.getVoices();
+      const v = voices.find(v => v.lang === 'en-GB' && v.name.toLowerCase().includes('female'))
+              || voices.find(v => v.lang.startsWith('en-GB'))
+              || voices.find(v => v.lang.startsWith('en-US'))
+              || voices[0];
+      if (v) u.voice = v;
+      u.onend   = resolve;
+      u.onerror = resolve;
+      synth.speak(u);
+    });
   }
+  function sayWith(text, rate = 0.78, pitch = 1.08) { return sayWord(text, rate, pitch); }
 
-  const speakPhonics = useCallback(() => {
+  // Running flag so we can cancel mid-playback
+  const phonicsPlayingRef = useRef(false);
+
+  const speakPhonics = useCallback(async () => {
     if (!page) return;
-    const phase     = child?.phase || 2;
-    const pageWords = page.text.trim().split(/\s+/);
     stop();
     window.speechSynthesis?.cancel();
+    phonicsPlayingRef.current = true;
 
-    // Build playback plan:
-    // For each word: [sound1, sound2, ...soundN, WORD, PAUSE_BETWEEN_WORDS]
-    // Each item: { type: 'chunk'|'word'|'pause', wordIdx, chunkIdx?, text, dur }
-    const plan = [];
+    const phase     = child?.phase || 2;
+    const pageWords = page.text.trim().split(/\s+/);
 
-    pageWords.forEach((rawWord, wi) => {
-      const clean  = rawWord.replace(/[.,!?;:'"]/g, '');
-      if (!clean) return;
+    // Helper: pause without speech
+    const pause = (ms) => new Promise(r => setTimeout(r, ms));
+
+    for (let wi = 0; wi < pageWords.length; wi++) {
+      if (!phonicsPlayingRef.current) break;
+      const rawWord = pageWords[wi];
+      const clean   = rawWord.replace(/[.,!?;:'"]/g, '');
+      if (!clean) continue;
+
       const chunks = analyseWord(clean, phase).filter(c => !c.isSilent);
 
-      // Individual phoneme sounds — each chunk gets its correct sound
-      chunks.forEach((chunk, ci) => {
-        const cfg  = getPhonemeConfig(chunk.phoneme, chunk.grapheme);
-        const dur  = chunk.grapheme.length >= 2 ? 750 : 550;
-        plan.push({ type: 'chunk', wordIdx: wi, chunkIdx: ci, text: cfg.text, rate: cfg.rate, dur });
-      });
+      // ── STEP 1: Sound out each grapheme ──────────────────────
+      for (let ci = 0; ci < chunks.length; ci++) {
+        if (!phonicsPlayingRef.current) break;
+        const chunk = chunks[ci];
+        const cfg   = getPhonemeConfig(chunk.phoneme, chunk.grapheme);
 
-      // "Blending pause" — short gap before saying the whole word
-      plan.push({ type: 'pause', wordIdx: wi, dur: 250 });
+        setSpeakingWordIdx(-1);
+        setSpeakingChunkKey(`${wi}-${ci}`);
 
-      // Say the complete word (highlight whole word, no chunk highlighted)
-      plan.push({ type: 'word', wordIdx: wi, text: clean, dur: 700 });
-
-      // Pause between words
-      plan.push({ type: 'pause', wordIdx: -1, dur: 400 });
-    });
-
-    // Execute plan with sequential setTimeout
-    let t = 0;
-    plan.forEach(item => {
-      if (item.type === 'pause') {
-        setTimeout(() => {
-          setSpeakingChunkKey(null);
-          if (item.wordIdx === -1) setSpeakingWordIdx(-1);
-        }, t);
-        t += item.dur;
-        return;
+        await sayWord(cfg.text, cfg.rate, 1.08);
+        // Brief gap between phonemes so sounds don't blur together
+        await pause(chunk.grapheme.length >= 2 ? 180 : 100);
       }
 
-      if (item.type === 'chunk') {
-        setTimeout(() => {
-          setSpeakingWordIdx(-1);
-          setSpeakingChunkKey(`${item.wordIdx}-${item.chunkIdx}`);
-          sayWith(item.text, item.rate || 0.6, 1.1);
-        }, t);
-        t += item.dur;
-        return;
-      }
+      if (!phonicsPlayingRef.current) break;
 
-      if (item.type === 'word') {
-        // Say the blended word — slightly emphasised, normal pace
-        setTimeout(() => {
-          setSpeakingChunkKey(null);
-          setSpeakingWordIdx(item.wordIdx);
-          sayWith(item.text, 0.82, 1.08);
-        }, t);
-        t += item.dur;
-      }
-    });
-
-    // Clear everything at the end
-    setTimeout(() => {
+      // ── STEP 2: Blending pause (chunk highlight cleared) ─────
       setSpeakingChunkKey(null);
+      await pause(300);
+
+      // ── STEP 3: Say the whole blended word ───────────────────
+      setSpeakingWordIdx(wi);
+      await sayWord(clean, 0.82, 1.05);
+      await pause(350);  // gap between words
       setSpeakingWordIdx(-1);
-    }, t + 300);
+    }
+
+    setSpeakingChunkKey(null);
+    setSpeakingWordIdx(-1);
+    phonicsPlayingRef.current = false;
   }, [page, child, stop]);
 
   // ── CLOUD ASSESSMENT PIPELINE ──────────────────────────────
@@ -526,6 +512,11 @@ export default function ReadingSession() {
       }
       return;
     }
+    // Cancel any phonics playback in progress
+    phonicsPlayingRef.current = false;
+    window.speechSynthesis?.cancel();
+    setSpeakingChunkKey(null);
+    setSpeakingWordIdx(-1);
     // Start both audio recorder AND speech recognition simultaneously
     transcriptRef.current = null;
     startRec((evt) => { /* state managed by isRecording below */ });

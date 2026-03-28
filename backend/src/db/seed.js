@@ -188,9 +188,12 @@ export function seed() {
     VALUES (@id, @phase, @title, @emoji, @cover, @acorns, @page_count, @sort_order)
     ON CONFLICT(id) DO UPDATE SET page_count=excluded.page_count, title=excluded.title, acorns=excluded.acorns
   `);
-  const insertPage = db.prepare(`
-    INSERT OR REPLACE INTO story_pages (story_id, page_index, text, scene, bg_class, is_dark)
+  const upsertPage = db.prepare(`
+    INSERT INTO story_pages (story_id, page_index, text, scene, bg_class, is_dark)
     VALUES (@story_id, @page_index, @text, @scene, @bg_class, @is_dark)
+    ON CONFLICT(story_id, page_index)
+    DO UPDATE SET text=excluded.text, scene=excluded.scene,
+                  bg_class=excluded.bg_class, is_dark=excluded.is_dark
   `);
   const insertShop = db.prepare(`
     INSERT OR IGNORE INTO shop_items (id, name, emoji, cost, category, description, sort_order)
@@ -214,7 +217,7 @@ export function seed() {
         sort_order: story.sort_order,
       });
       for (const page of story.pages) {
-        insertPage.run({
+        upsertPage.run({
           story_id: story.id,
           page_index: page.idx,
           text: page.text,
