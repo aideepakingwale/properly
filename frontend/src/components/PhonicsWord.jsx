@@ -79,34 +79,13 @@ export default function PhonicsWord({
       transition:     'transform 0.18s ease',
       transform:      isSpeaking ? 'scale(1.15) translateY(-4px)' : 'scale(1)',
     }}>
-      {/* Overall score badge OR word-tap button */}
-      {isRevealed && score !== null ? (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 900, lineHeight: 1, animation: 'fadeInUp 0.25s ease',
-            color: score >= 80 ? 'var(--text-success)' : score >= 55 ? 'var(--color-accent-dark)' : 'var(--color-danger)',
-          }}>{Math.round(score)}%</span>
-          {onWordTap && (
-            <button onClick={e => { e.stopPropagation(); onWordTap(word, wordIdx); }}
-              title={`Hear "${word}" spoken`}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                fontSize: 9, lineHeight: 1, opacity: 0.6, transition: 'opacity 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.opacity='1'}
-              onMouseLeave={e => e.currentTarget.style.opacity='0.6'}>
-              🔊
-            </button>
-          )}
-        </span>
-      ) : onWordTap ? (
-        <button onClick={e => { e.stopPropagation(); onWordTap(word, wordIdx); }}
-          title={`Hear "${word}" spoken`}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px',
-            fontSize: 10, lineHeight: 1, opacity: 0, transition: 'opacity 0.2s',
-            borderRadius: 50, color: 'var(--color-info)' }}
-          className="word-tap-btn">
-          🔊
-        </button>
-      ) : null}
+      {/* Score badge (post-assessment) */}
+      {isRevealed && score !== null && (
+        <span style={{
+          fontSize: 11, fontWeight: 900, lineHeight: 1, animation: 'fadeInUp 0.25s ease',
+          color: score >= 80 ? 'var(--text-success)' : score >= 55 ? 'var(--color-accent-dark)' : 'var(--color-danger)',
+        }}>{Math.round(score)}%</span>
+      )}
 
       {/* ── GRAPHEME TILES ─────────────────────────────── */}
       <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 1, position: 'relative' }}>
@@ -263,6 +242,35 @@ export default function PhonicsWord({
           </span>
         )}
       </span>
+
+      {/* 🔊 Word tap button — always visible below tiles, works on mobile */}
+      {onWordTap && (
+        <button
+          onClick={e => { e.stopPropagation(); onWordTap(word, wordIdx); }}
+          title={`Hear "${clean}" spoken aloud`}
+          style={{
+            background:  isSpeaking ? 'var(--bg-info-light)' : 'var(--overlay-6)',
+            border:      `1px solid ${isSpeaking ? 'var(--color-info)' : 'var(--border)'}`,
+            borderRadius: 50,
+            padding:     '1px 7px',
+            cursor:      'pointer',
+            fontSize:    9,
+            fontWeight:  700,
+            fontFamily:  'var(--font-body)',
+            color:       isSpeaking ? 'var(--color-info)' : 'var(--text-muted)',
+            lineHeight:  1.6,
+            display:     'flex',
+            alignItems:  'center',
+            gap:         3,
+            transition:  'all 0.15s',
+            marginTop:   1,
+            WebkitTapHighlightColor: 'transparent',
+            userSelect:  'none',
+          }}
+        >
+          🔊 <span style={{ letterSpacing: '0.01em' }}>{clean}</span>
+        </button>
+      )}
 
       {/* Worst chunk coaching hint — only shown post-reveal when score is bad */}
       {isRevealed && worstScore !== null && worstScore < 60 && chunks[worstChunkIdx] && (

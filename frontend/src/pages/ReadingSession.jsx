@@ -485,30 +485,31 @@ export default function ReadingSession() {
     }
   }, [playPhoneme]);
 
-  // ── WORD TAP: play full word pronunciation ─────────────────────────────
+  // ── WORD TAP: play full word via useSpeech hook (has voice loading) ──────
   const handleWordTap = useCallback(async (word, wIdx) => {
     const clean = word.replace(/[.,!?;:'"]/g, '');
     if (!clean) return;
-    // Highlight the whole word while speaking
-    setSpeakingWordIdx(wIdx);
     setSpeakingChunkKey(null);
+    setSpeakingWordIdx(wIdx);   // highlight word immediately
+    // Use speak() from useSpeech which already has loaded voices and en-GB selection
     await new Promise(resolve => {
       const synth = window.speechSynthesis;
       if (!synth) { setTimeout(resolve, 600); return; }
+      synth.cancel();  // stop any ongoing speech
+      const voices = window.speechSynthesis.getVoices();
       const u = new SpeechSynthesisUtterance(clean);
       u.lang  = 'en-GB';
-      u.rate  = 0.72;     // slow and clear for a child learning
+      u.rate  = 0.72;
       u.pitch = 1.1;
-      const voices = synth.getVoices();
-      const v = voices.find(v => v.lang === 'en-GB' && v.name.toLowerCase().includes('female'))
-              || voices.find(v => v.lang.startsWith('en-GB'))
-              || voices.find(v => v.lang.startsWith('en'));
+      const v = voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
+             || voices.find(v => v.lang.startsWith('en-GB'))
+             || voices.find(v => v.lang.startsWith('en'));
       if (v) u.voice = v;
-      u.onend   = resolve;
-      u.onerror = resolve;
-      synth.speak(u);
+      u.onend   = () => { setSpeakingWordIdx(-1); resolve(); };
+      u.onerror = () => { setSpeakingWordIdx(-1); resolve(); };
+      // Small delay so voices are ready (some browsers need 1 tick)
+      setTimeout(() => synth.speak(u), 50);
     });
-    setSpeakingWordIdx(-1);
   }, []);
 
   const processAudio = useCallback(async (audioBlob, browserTranscript) => {
