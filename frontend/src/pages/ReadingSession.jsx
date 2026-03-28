@@ -115,25 +115,45 @@ export default function ReadingSession() {
   // Browser speech recognition — captures transcript alongside audio recording.
   // PRIMARY ROLE: quality gate before Azure — if browser can't hear it, Azure won't either.
   // SECONDARY ROLE: fallback scoring when Azure not configured.
-  const [localTranscript, setLocalTranscript] = useState('');  // what browser heard
-  const [localConfidence, setLocalConfidence] = useState(0);   // 0-1 confidence
-  const [transcriptReady, setTranscriptReady] = useState(false); // transcript received
+  const [localTranscript, setLocalTranscript] = useState('');
+  const [localConfidence, setLocalConfidence] = useState(0);
+
+  // Promise-based transcript capture — resolves when onresult/onerror fires
+  // This eliminates the race condition where we check the ref before onresult fires
+  const transcriptResolveRef = useRef(null);
 
   const { start: startRec, stop: stopRec } = useSpeechRecognition({
     onResult: (text, confidence = 0.8) => {
       transcriptRef.current = text;
       setLocalTranscript(text);
       setLocalConfidence(confidence);
-      setTranscriptReady(true);
+      transcriptResolveRef.current?.({ text, confidence });  // resolve the waiting promise
+      transcriptResolveRef.current = null;
     },
     onError: (err) => {
-      // 'no-speech' means silence was recorded — clear confidence gate
-      if (err === 'no-speech' || err === 'audio-capture') {
-        setLocalTranscript('');
-        setLocalConfidence(0);
-        setTranscriptReady(true);  // mark as done even on error so handleMic can proceed
-      }
+      setLocalTranscript('');
+      setLocalConfidence(0);
+      transcriptResolveRef.current?.({ text: '', confidence: 0, error: err });
+      transcriptResolveRef.current = null;
     },
+  });
+
+  // Returns a promise that resolves with { text, confidence } when Web Speech fires
+  // Times out after maxMs (default 2500ms) so we never hang
+  const waitForTranscript = (maxMs = 2500) => new Promise(resolve => {
+    // If transcript already arrived (fast device), resolve immediately
+    if (transcriptRef.current != null) {
+      resolve({ text: transcriptRef.current, confidence: localConfidence });
+      return;
+    }
+    const timer = setTimeout(() => {
+      transcriptResolveRef.current = null;
+      resolve({ text: transcriptRef.current || '', confidence: 0, timedOut: true });
+    }, maxMs);
+    transcriptResolveRef.current = (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    };
   });
 
   // Load story + provider status
@@ -196,7 +216,7 @@ export default function ReadingSession() {
   }, [story, child]);
 
   // Reset on page change
-  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); setLocalTranscript(''); setLocalConfidence(0); setTranscriptReady(false); }, [pageIdx]);
+  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); setLocalTranscript(''); setLocalConfidence(0); transcriptRef.current = null; transcriptResolveRef.current = null; }, [pageIdx]);
 
   const page    = story?.pages?.[pageIdx];
   const pageRef = useRef(null);
@@ -587,31 +607,30 @@ export default function ReadingSession() {
       setLastAudioMime(blob.type);
       setLastAudioKB((blob.size / 1024).toFixed(1));
 
-      // ── QUALITY GATE: check browser transcript before calling Azure ──────
-      // Web Speech API ran in parallel during recording.
-      // If the browser heard nothing → the recording is likely silent/too quiet.
-      // Only proceed to Azure when we have confirmed speech.
-      const browserText    = transcriptRef.current || '';
-      const browserHeard   = browserText.trim().length > 0;
+      // ── QUALITY GATE: wait for Web Speech transcript, then gate Azure ────
+      // Web Speech API fired onresult ASYNCHRONOUSLY after stopRec().
+      // We MUST await it — checking transcriptRef.current immediately after
+      // stopRecording() is a race condition (it arrives 100-300ms later).
+      const { text: browserText, confidence: browserConf, timedOut } = await waitForTranscript(2500);
+      const browserHeard = browserText.trim().length > 0;
 
       if (!browserHeard) {
-        // No speech detected by the browser — don't waste an Azure API call.
-        // Show feedback and offer to retry.
         setLocalTranscript('');
         setFeedbackData({
-          tip: "Hmm, I didn't catch that! 🎙️ Try speaking a bit louder and closer to your microphone, then tap again.",
+          tip: timedOut
+            ? "Hmm, the microphone took too long to respond 🎙️ — try again!"
+            : "Hmm, I didn't catch that! Try speaking a bit louder and closer to your microphone, then tap 🎙️ again.",
           source: 'fallback',
           provider: 'rules',
         });
-        // Still show the recorded audio in debug so user can verify
-        setLastDebug({ stage: 'no-speech', blobKB: (blob.size/1024).toFixed(1), mime: blob.type, browserText: '(empty)', ref: pageRef.current?.text });
+        setLastDebug({ stage: 'no-speech', blobKB: (blob.size/1024).toFixed(1), mime: blob.type, browserText: timedOut ? '(timed out)' : '(empty)', ref: pageRef.current?.text });
         transcriptRef.current = null;
         return;
       }
 
-      // ── GATE PASSED: browser heard speech → proceed to Azure ─────────────
-      // Show "I heard you say…" feedback while Azure processes
+      // ── GATE PASSED: browser confirmed speech → send to Azure ────────────
       setLocalTranscript(browserText);
+      setLocalConfidence(browserConf);
       transcriptRef.current = browserText;
 
       await processAudio(blob, browserText);
@@ -627,8 +646,10 @@ export default function ReadingSession() {
     // Reset transcript state for new recording
     setLocalTranscript('');
     setLocalConfidence(0);
-    setTranscriptReady(false);
     transcriptRef.current = null;
+    // Cancel any pending transcript promise from a previous recording
+    transcriptResolveRef.current?.({ text: '', confidence: 0, cancelled: true });
+    transcriptResolveRef.current = null;
     // Start browser speech recognition AND MediaRecorder in parallel
     startRec((evt) => { /* state managed by isRecording */ });
     await startRecording();
