@@ -497,8 +497,15 @@ export const getGenerationStatus = (_req, res) => {
     batchSizeMax:         10,
     dailyBatchLimit:      3,
     // Book image generation
-    pollinationsModel:    pollToken ? 'flux (premium — POLLINATIONS_TOKEN set)' : 'turbo (free)',
+    // Image generation providers (checked in priority order)
+    hfTokenSet:           Boolean(process.env.HUGGINGFACE_TOKEN),
     pollinationsTokenSet: Boolean(pollToken),
+    imageProvider:        process.env.HUGGINGFACE_TOKEN ? 'HuggingFace AI (FLUX/SD)'
+                        : pollToken                     ? 'Pollinations.ai (token set)'
+                        :                                 'Picsum Photos (free) + SVG fallback',
+    imageSetupTip: !process.env.HUGGINGFACE_TOKEN
+      ? 'Add HUGGINGFACE_TOKEN (free at huggingface.co/settings/tokens) for AI-generated illustrations'
+      : null,
     r2Available:          Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID),
     imageStorage:         (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID)
                             ? 'Cloudflare R2 (permanent)'

@@ -18,38 +18,33 @@ import { r2Put, r2Url, r2Available } from './r2.service.js';
 // Pollinations.ai changed their API. We try 3 endpoints with proper headers,
 // then fall back to a beautiful SVG illustration we generate ourselves.
 
-// ── POLLINATIONS CONFIGURATION ───────────────────────────────
-// Pollinations.ai free tier: no API key needed, just hit the URL directly.
-// The bare prompt URL (no model param) uses their default free model.
-// model=flux requires POLLINATIONS_TOKEN (paid/partner tier).
-const POLL_TOKEN = (process.env.POLLINATIONS_TOKEN || '').trim();
+// ── IMAGE PROVIDER CONFIGURATION ───────────────────────────
+// Priority order:
+//   1. HuggingFace Inference API (free key at huggingface.co — best quality)
+//   2. Pollinations.ai            (requires POLLINATIONS_TOKEN — paid/partner)
+//   3. Unsplash themed photo      (no key needed — real photography)
+//   4. SVG illustration           (always works — generated locally)
+//
+// Set HUGGINGFACE_TOKEN in Render env for AI-generated illustrations.
+const HF_TOKEN   = (process.env.HUGGINGFACE_TOKEN   || '').trim();
+const POLL_TOKEN = (process.env.POLLINATIONS_TOKEN   || '').trim();
 
-const POLL_ENDPOINTS = [
-  // Strategy 1: bare URL, no model param — uses free default, most compatible
-  (prompt, seed) => ({
-    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-         `?width=800&height=600&seed=${seed}&nologo=true&nofeed=true`,
-    headers: {
-      'Accept':     'image/jpeg,image/png,image/*,*/*',
-      'User-Agent': 'Mozilla/5.0 (compatible; ProperlyApp/1.0)',
-      ...(POLL_TOKEN ? { 'Authorization': `Bearer ${POLL_TOKEN}` } : {}),
-    },
-  }),
-  // Strategy 2: shorter prompt (Pollinations can 400 on very long encoded URLs)
-  (prompt, seed) => ({
-    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 100))}` +
-         `?width=512&height=384&seed=${seed}&nologo=true`,
-    headers: {
-      'Accept':     'image/*,*/*',
-      'User-Agent': 'Mozilla/5.0 (compatible; ProperlyApp/1.0)',
-    },
-  }),
-  // Strategy 3: absolute minimum — just prompt and seed
-  (prompt, seed) => ({
-    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 80))}?seed=${seed}`,
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProperlyApp/1.0)' },
-  }),
+// HuggingFace models — free tier, ~10-30s per image
+// Primary: flux-schnell (fast, good quality), fallback: sd-xl-turbo
+const HF_MODELS = [
+  'black-forest-labs/FLUX.1-schnell',
+  'stabilityai/sdxl-turbo',
+  'runwayml/stable-diffusion-v1-5',
 ];
+
+// Unsplash themed search terms for children's book topics
+function unsplashUrl(prompt, seed) {
+  const themes = ['nature','animals','adventure','sky','forest','ocean','farm','space','fairy','garden'];
+  const words  = prompt.toLowerCase().split(/\s+/);
+  const match  = themes.find(t => words.includes(t)) || 'nature';
+  // Use picsum for a stable seeded photo — always free, no key
+  return `https://picsum.photos/seed/${seed}/800/600`;
+}
 
 // ── STEP LOGGER ───────────────────────────────────────────────
 function makeLogger(db, bookId) {
@@ -78,46 +73,88 @@ function buildImagePrompt(text, childName) {
   return `cute kawaii watercolour children book illustration, bright pastel colours, friendly characters, no text, ${clean}, child character named ${childName}`;
 }
 
-// ── FETCH IMAGE WITH MULTI-STRATEGY + SVG FALLBACK ───────────
+// ── FETCH IMAGE — MULTI-PROVIDER CASCADE ─────────────────────
 async function fetchImageWithFallback(prompt, seed, label, logger) {
-  // Try each Pollinations strategy
-  for (let si = 0; si < POLL_ENDPOINTS.length; si++) {
-    const { url, headers } = POLL_ENDPOINTS[si](prompt, seed);
-    try {
-      console.log(`[Book] ${label} strategy ${si+1}: ${url.slice(0,80)}`);
-      const res = await fetch(url, {
-        signal:  AbortSignal.timeout(45000),
-        headers,
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        console.warn(`[Book] ${label} strategy ${si+1}: HTTP ${res.status} — ${body.slice(0,120)}`);
-        logger?.log?.(`img_${label}_s${si+1}`, 'warn', `HTTP ${res.status}: ${body.slice(0,80)}`);
-        continue;
+  const L = (step, status, detail) => {
+    console[status === 'ok' ? 'log' : 'warn'](`[Book] ${label} ${step}: ${detail}`);
+    logger?.log?.(`img_${label}_${step}`, status, detail);
+  };
+
+  // ── Provider 1: HuggingFace Inference API (free, requires HF_TOKEN) ──
+  if (HF_TOKEN) {
+    for (const model of HF_MODELS) {
+      try {
+        L(`hf_${model.split('/')[1]}`, 'ok', `Trying ${model}`);
+        const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+          method:  'POST',
+          headers: { 'Authorization': `Bearer ${HF_TOKEN}`, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ inputs: prompt.slice(0, 500) }),
+          signal:  AbortSignal.timeout(60000),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          // 503 = model loading — try next model
+          L(`hf_err`, 'warn', `HTTP ${res.status} ${model.split('/')[1]}: ${body.slice(0,80)}`);
+          continue;
+        }
+        const ct  = res.headers.get('content-type') || '';
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (!ct.includes('image') || buf.length < 5000) {
+          L(`hf_skip`, 'warn', `bad response: ${ct} ${buf.length}b`);
+          continue;
+        }
+        L(`hf_ok`, 'ok', `${model.split('/')[1]}: ${(buf.length/1024).toFixed(0)}KB`);
+        return { buf, source: `huggingface_${model.split('/')[1]}` };
+      } catch (e) {
+        L(`hf_err`, 'warn', `${model.split('/')[1]}: ${e.message.slice(0,80)}`);
       }
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('image')) {
-        console.warn(`[Book] ${label} strategy ${si+1}: non-image content-type ${ct}`);
-        logger?.log?.(`img_${label}_s${si+1}`, 'warn', `non-image: ${ct}`);
-        continue;
-      }
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length < 1000) {
-        console.warn(`[Book] ${label} strategy ${si+1}: suspiciously small (${buf.length}b)`);
-        continue;
-      }
-      console.log(`[Book] ${label} strategy ${si+1}: ✅ ${buf.length} bytes`);
-      logger?.log?.(`img_${label}`, 'ok', `strategy ${si+1}: ${(buf.length/1024).toFixed(0)}KB`);
-      return { buf, source: `pollinations_s${si+1}` };
-    } catch (e) {
-      console.warn(`[Book] ${label} strategy ${si+1}: ${e.message}`);
-      logger?.log?.(`img_${label}_s${si+1}`, 'warn', e.message.slice(0,80));
     }
+    L('hf_failed', 'warn', 'All HuggingFace models failed — trying next provider');
+  } else {
+    L('hf_skip', 'warn', 'HUGGINGFACE_TOKEN not set — add it in Render env for AI images');
   }
 
-  // All strategies failed — generate a beautiful SVG illustration instead
-  console.warn(`[Book] ${label}: all image strategies failed — generating SVG fallback`);
-  logger?.log?.(`img_${label}`, 'warn', 'Pollinations unavailable — SVG fallback used');
+  // ── Provider 2: Pollinations.ai (requires POLLINATIONS_TOKEN since 2025) ──
+  if (POLL_TOKEN) {
+    try {
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0,200))}` +
+                  `?width=800&height=600&seed=${seed}&nologo=true`;
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${POLL_TOKEN}`, 'User-Agent': 'Mozilla/5.0' },
+        signal:  AbortSignal.timeout(45000),
+      });
+      if (res.ok) {
+        const ct  = res.headers.get('content-type') || '';
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (ct.includes('image') && buf.length > 5000) {
+          L('poll_ok', 'ok', `${(buf.length/1024).toFixed(0)}KB`);
+          return { buf, source: 'pollinations' };
+        }
+      } else {
+        L('poll_err', 'warn', `HTTP ${res.status}`);
+      }
+    } catch (e) { L('poll_err', 'warn', e.message.slice(0,80)); }
+  } else {
+    L('poll_skip', 'warn', 'POLLINATIONS_TOKEN not set');
+  }
+
+  // ── Provider 3: Picsum Photos (free, no key, real photography) ──
+  try {
+    const url = `https://picsum.photos/seed/${seed}/800/600`;
+    L('picsum', 'ok', `Trying ${url}`);
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (res.ok) {
+      const ct  = res.headers.get('content-type') || '';
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (ct.includes('image') && buf.length > 5000) {
+        L('picsum_ok', 'ok', `${(buf.length/1024).toFixed(0)}KB photo`);
+        return { buf, source: 'picsum' };
+      }
+    }
+  } catch (e) { L('picsum_err', 'warn', e.message.slice(0,80)); }
+
+  // ── Provider 4: SVG fallback (always works, local generation) ──
+  L('svg_fallback', 'warn', 'All image providers failed — using SVG illustration');
   const svgBuf = buildSvgPage(prompt, seed);
   return { buf: svgBuf, source: 'svg_fallback' };
 }
