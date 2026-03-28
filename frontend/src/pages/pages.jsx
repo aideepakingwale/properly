@@ -45,7 +45,7 @@ export function Shop() {
   }, [child?.id]);
 
   const buy = async (item) => {
-    if ((child?.acorns || 0) < item.cost) { showToast(`Need ${item.cost - child.acorns} more acorns!`, '🌰'); return; }
+    if ((child?.acorns || 0) < item.cost) { showToast(`Need ${item.cost - child?.acorns} more acorns!`, '🌰'); return; }
     try {
       const res = await shopAPI.buy(child.id, item.id);
       if (res.success) {
@@ -121,7 +121,7 @@ export function Trophies() {
       api.get('/achievements').then(r => { if (r.success) setAllAch(r.data); }).catch(() => {});
     });
     // Fallback: use hardcoded list from progress
-    if (progress?.achievements) setAllAch(prev => prev.length ? prev : progress.achievements);
+    if (progress?.achievements) setAllAch(prev => prev.length ? prev : progress?.achievements);
   }, [progress]);
 
   // Use achievements from progress if API not available
@@ -243,11 +243,11 @@ export function ParentDash() {
 
   const stats = [
     { e: '🌰', l: 'Total Acorns',  v: (child.totalAcorns || 0).toLocaleString(), c: 'var(--brand-accent)' },
-    { e: '💰', l: 'Balance',        v: (child.acorns || 0).toLocaleString(),      c: 'var(--color-success)' },
-    { e: '📖', l: 'Words Read',     v: (child.wordsRead || 0).toLocaleString(),   c: 'var(--color-info)' },
+    { e: '💰', l: 'Balance',        v: (child?.acorns || 0).toLocaleString(),      c: 'var(--color-success)' },
+    { e: '📖', l: 'Words Read',     v: (child?.wordsRead || 0).toLocaleString(),   c: 'var(--color-info)' },
     { e: '✨', l: 'AI Stories Done',v: ((progress?.aiStorySummary?.completed) || 0).toLocaleString(), c: 'var(--color-primary-light)' },
     { e: '⭐', l: 'Stories Done',   v: done.length,                               c: 'var(--color-primary-light)' },
-    { e: '🔥', l: 'Streak',         v: `${child.streak || 1}d`,                   c: 'var(--color-danger)' },
+    { e: '🔥', l: 'Streak',         v: `${child?.streak || 1}d`,                   c: 'var(--color-danger)' },
     { e: '🏆', l: 'Achievements',   v: `${progress?.achievements?.length || 0}`,  c: 'var(--brand-accent)' },
   ];
 
@@ -257,8 +257,8 @@ export function ParentDash() {
         <div style={{ maxWidth: 660, margin: '0 auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div style={{ fontSize: 11, color: 'var(--overlay-50)', fontWeight: 700, letterSpacing: '0.5px', marginBottom: 4 }}>PARENT DASHBOARD</div>
-            <h1 style={{ fontSize: 24, fontWeight: 900 }}>{child.name}'s Reading Journey</h1>
-            <p style={{ color: 'var(--brand-primary-light)', fontSize: 13, marginTop: 4 }}>Phase {child.phase} · Joined {new Date(child.createdAt || Date.now()).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>
+            <h1 style={{ fontSize: 24, fontWeight: 900 }}>{child?.name}'s Reading Journey</h1>
+            <p style={{ color: 'var(--brand-primary-light)', fontSize: 13, marginTop: 4 }}>Phase {child?.phase} · Joined {new Date(child.createdAt || Date.now()).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</p>
             {children && children.length > 1 && (
               <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
                 {children.map(c => (
@@ -270,7 +270,7 @@ export function ParentDash() {
               </div>
             )}
           </div>
-          <button onClick={() => nav('/home')} style={{ background: 'var(--overlay-12)', border: '1.5px solid var(--overlay-20)', borderRadius: 12, padding: '9px 18px', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>Back to {child.name}</button>
+          <button onClick={() => nav('/home')} style={{ background: 'var(--overlay-12)', border: '1.5px solid var(--overlay-20)', borderRadius: 12, padding: '9px 18px', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>Back to {child?.name}</button>
         </div>
       </div>
 
@@ -318,7 +318,7 @@ export function ParentDash() {
             {Object.entries(PHASE_META).map(([p, meta]) => {
               const ps = STORY_COUNTS[parseInt(p)] || 0;
               const pd = done.filter(c => c.storyId?.startsWith(`p${p}_`)).length;
-              const cur = parseInt(p) === child.phase;
+              const cur = parseInt(p) === child?.phase;
               return (
                 <div key={p} style={{ background: cur ? 'var(--bg-primary-light)' : 'var(--bg-muted)', borderRadius: 12, padding: '12px 14px', border: `1.5px solid ${cur ? 'var(--color-primary)' : 'transparent'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -341,8 +341,8 @@ export function ParentDash() {
         {/* Phase control */}
         <div style={{ background: 'white', borderRadius: 20, padding: 22, boxShadow: 'var(--shadow-sm)', marginBottom: 16 }}>
           <h3 style={{ fontWeight: 900, fontSize: 16, marginBottom: 6 }}>⚙️ Change Phonics Phase</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Move {child.name} to a different level as they progress.</p>
-          <select value={child.phase} onChange={e => changePhase(e.target.value)} disabled={savingPhase} style={{ width: '100%', padding: '12px 14px', border: '2px solid var(--border)', borderRadius: 14, fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: 700, color: 'var(--text)', background: 'var(--bg-muted)', cursor: 'pointer', outline: 'none' }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Move {child?.name} to a different level as they progress.</p>
+          <select value={child?.phase} onChange={e => changePhase(e.target.value)} disabled={savingPhase} style={{ width: '100%', padding: '12px 14px', border: '2px solid var(--border)', borderRadius: 14, fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: 700, color: 'var(--text)', background: 'var(--bg-muted)', cursor: 'pointer', outline: 'none' }}>
             {Object.entries(PHASE_META).map(([p, m]) => <option key={p} value={p}>Phase {p} — {m.label}</option>)}
           </select>
         </div>
@@ -353,7 +353,7 @@ export function ParentDash() {
         <div style={{ background:'var(--card)', borderRadius:18, padding:'20px', marginBottom:16 }}>
           <h3 style={{ fontSize:15, fontWeight:800, marginBottom:12 }}>Recent Reading</h3>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {progress.recentSessions.slice(0,5).map(s => (
+            {progress?.recentSessions.slice(0,5).map(s => (
               <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', background:'rgba(0,0,0,0.03)', borderRadius:10 }}>
                 <span style={{ fontSize:16 }}>{s.storyType==='ai'?'✨':'📚'}</span>
                 <div style={{ flex:1, minWidth:0 }}>
@@ -420,7 +420,7 @@ export function ParentDash() {
       {/* ── SETTINGS TAB ──────────────────────────────────────── */}
       {dashTab === 'settings' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {child && <InterestsPanel childId={child.id} childName={child.name} initialInterests={[]} onSaved={() => {}}/>}
+          {child && <InterestsPanel childId={child.id} childName={child?.name} initialInterests={[]} onSaved={() => {}}/>}
           <div style={{ marginTop: 4 }}>
             <KidsManager />
           </div>
@@ -447,18 +447,18 @@ export function ParentDash() {
             <div style={{ background: 'var(--grad-goal)', borderRadius: 16, padding: '16px 18px', border: '1.5px solid var(--accent-30)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 30 }}>{progress.customGoal.emoji}</span>
+                  <span style={{ fontSize: 30 }}>{progress?.customGoal.emoji}</span>
                   <div>
-                    <div style={{ fontWeight: 900, fontSize: 15, color: 'var(--text-warning-dark)' }}>{progress.customGoal.title}</div>
-                    <div style={{ fontSize: 12, color: 'var(--color-accent-dark)' }}>Goal: 🌰{progress.customGoal.cost.toLocaleString()}</div>
+                    <div style={{ fontWeight: 900, fontSize: 15, color: 'var(--text-warning-dark)' }}>{progress?.customGoal.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-accent-dark)' }}>Goal: 🌰{progress?.customGoal.cost.toLocaleString()}</div>
                   </div>
                 </div>
                 <button onClick={deleteGoal} style={{ background: 'transparent', border: 'none', color: 'var(--color-accent-dark)', fontSize: 18, cursor: 'pointer' }}>×</button>
               </div>
               <div style={{ background: 'rgba(146,64,14,0.15)', borderRadius: 50, height: 10, overflow: 'hidden', marginBottom: 4 }}>
-                <div style={{ height: '100%', background: 'linear-gradient(90deg,var(--color-accent-dark),var(--brand-accent))', borderRadius: 50, width: `${Math.min(100, Math.round((child.acorns || 0) / progress.customGoal.cost * 100))}%`, transition: 'width 0.5s' }} />
+                <div style={{ height: '100%', background: 'linear-gradient(90deg,var(--color-accent-dark),var(--brand-accent))', borderRadius: 50, width: `${Math.min(100, Math.round((child?.acorns || 0) / progress?.customGoal.cost * 100))}%`, transition: 'width 0.5s' }} />
               </div>
-              <div style={{ fontSize: 11, color: 'var(--color-accent-dark)', fontWeight: 700 }}>🌰 {Math.min(child.acorns || 0, progress.customGoal.cost)} / {progress.customGoal.cost}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-accent-dark)', fontWeight: 700 }}>🌰 {Math.min(child?.acorns || 0, progress?.customGoal.cost)} / {progress?.customGoal.cost}</div>
             </div>
           )}
         </div>

@@ -188,12 +188,11 @@ export function seed() {
     VALUES (@id, @phase, @title, @emoji, @cover, @acorns, @page_count, @sort_order)
     ON CONFLICT(id) DO UPDATE SET page_count=excluded.page_count, title=excluded.title, acorns=excluded.acorns
   `);
-  const upsertPage = db.prepare(`
+  // Delete existing pages for a story then re-insert — works with or without UNIQUE constraint
+  const deleteStoryPages = db.prepare('DELETE FROM story_pages WHERE story_id = ?');
+  const insertPage = db.prepare(`
     INSERT INTO story_pages (story_id, page_index, text, scene, bg_class, is_dark)
     VALUES (@story_id, @page_index, @text, @scene, @bg_class, @is_dark)
-    ON CONFLICT(story_id, page_index)
-    DO UPDATE SET text=excluded.text, scene=excluded.scene,
-                  bg_class=excluded.bg_class, is_dark=excluded.is_dark
   `);
   const insertShop = db.prepare(`
     INSERT OR IGNORE INTO shop_items (id, name, emoji, cost, category, description, sort_order)
@@ -216,8 +215,9 @@ export function seed() {
         page_count: story.pages.length,
         sort_order: story.sort_order,
       });
+      deleteStoryPages.run(story.id);
       for (const page of story.pages) {
-        upsertPage.run({
+        insertPage.run({
           story_id: story.id,
           page_index: page.idx,
           text: page.text,

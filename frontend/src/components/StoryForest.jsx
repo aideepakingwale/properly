@@ -118,8 +118,8 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
         )}
 
         <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:5 }}>
-          <AcornPill count={`+${story.acorns}`} />
-          <span style={{ fontSize:11, color:'var(--border-2)' }}>· {story.pageCount} pages</span>
+          <AcornPill count={`+${story?.acorns}`} />
+          <span style={{ fontSize:11, color:'var(--border-2)' }}>· {story?.pageCount} pages</span>
         </div>
       </div>
 
@@ -271,8 +271,8 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
       {/* ── AI PROVIDER CHIP ── */}
       {providerInfo && (
         <div style={{ marginBottom:10, display:'flex', gap:5, flexWrap:'wrap' }}>
-          <span style={{ fontSize:10, background:providerInfo.gemini?'rgba(20,184,166,0.2)':providerInfo.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo.gemini?'var(--provider-gemini)':providerInfo.groq?'var(--brand-pop1)':'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
-            {providerInfo.gemini ? '♊ Gemini AI (free)' : providerInfo.groq ? '⚡ Groq/Llama (free)' : '📚 Built-in templates'}
+          <span style={{ fontSize:10, background:providerInfo?.gemini?'rgba(20,184,166,0.2)':providerInfo?.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo?.gemini?'var(--provider-gemini)':providerInfo?.groq?'var(--brand-pop1)':'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
+            {providerInfo?.gemini ? '♊ Gemini AI (free)' : providerInfo?.groq ? '⚡ Groq/Llama (free)' : '📚 Built-in templates'}
           </span>
           {interests.length > 0 && (
             <span style={{ fontSize:10, background:'var(--overlay-8)', color:'var(--overlay-50)', borderRadius:50, padding:'3px 9px', fontWeight:600 }}>

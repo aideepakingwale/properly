@@ -40,8 +40,7 @@ export default function Home() {
   const { toast, showToast, hideToast } = useToast();
   const nav = useNavigate();
 
-  // If authenticated but no child profile, redirect to setup
-  if (!child) return <Navigate to="/setup-child" replace />;
+  // Guard moved below all hooks — React rules of hooks require hooks before conditionals
 
   const phase  = child?.phase || 2;
   const meta   = PHASE_META[phase] || PHASE_META[2];
@@ -70,6 +69,9 @@ export default function Home() {
       nav(`/read/${story.id}`);
     }
   }, [nav, child?.id]);
+
+  // Must be after all hooks
+  if (!child) return <Navigate to="/setup-child" replace />;
 
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,var(--bg-dark) 0%,var(--bg-dark-mid) 15%,var(--brand-primary-darker) 40%,var(--color-primary) 65%,var(--brand-indigo-light) 85%,var(--color-primary-pale) 100%)', position:'relative', overflow:'hidden' }}>
@@ -209,12 +211,12 @@ export default function Home() {
         {progress?.customGoal && (
           <div style={{ marginTop:16, background:'var(--grad-goal)', borderRadius:20, padding:'14px 18px', border:'1.5px solid var(--accent-30)', boxShadow:'0 8px 24px rgba(245,158,11,0.25)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <span style={{ fontSize:30 }}>{progress.customGoal.emoji}</span>
+              <span style={{ fontSize:30 }}>{progress?.customGoal?.emoji}</span>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontWeight:900, fontSize:14, color:'var(--text-warning-dark)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{progress.customGoal.title}</div>
-                <ProgressBar value={Math.min(child?.acorns||0,progress.customGoal.cost)} max={progress.customGoal.cost} color="var(--brand-accent)" height={7}/>
+                <div style={{ fontWeight:900, fontSize:14, color:'var(--text-warning-dark)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{progress?.customGoal?.title}</div>
+                <ProgressBar value={Math.min(child?.acorns||0,progress?.customGoal?.cost)} max={progress?.customGoal?.cost} color="var(--brand-accent)" height={7}/>
                 <div style={{ fontSize:11, color:'var(--color-accent-dark)', fontWeight:700, marginTop:4 }}>
-                  🌰 {Math.min(child?.acorns||0,progress.customGoal.cost).toLocaleString()} / {progress.customGoal.cost.toLocaleString()}
+                  🌰 {Math.min(child?.acorns||0,progress?.customGoal?.cost).toLocaleString()} / {progress?.customGoal?.cost.toLocaleString()}
                 </div>
               </div>
             </div>
