@@ -19,13 +19,19 @@ import { r2Put, r2Url, r2Available } from './r2.service.js';
 // then fall back to a beautiful SVG illustration we generate ourselves.
 
 // ── IMAGE PROVIDER CONFIGURATION ───────────────────────────
-// Priority order:
-//   1. HuggingFace Inference API (free key at huggingface.co — best quality)
-//   2. Pollinations.ai            (requires POLLINATIONS_TOKEN — paid/partner)
-//   3. Unsplash themed photo      (no key needed — real photography)
-//   4. SVG illustration           (always works — generated locally)
+// Priority order (first with a key wins, Picsum always available as fallback):
 //
-// Set HUGGINGFACE_TOKEN in Render env for AI-generated illustrations.
+//   1. Pollinations.ai  — FASTEST ~5s. Free key at: pollinations.ai → Settings → API Key
+//                         Add POLLINATIONS_TOKEN to Render env.
+//
+//   2. HuggingFace AI   — BEST QUALITY ~15-30s. Free key at: huggingface.co/settings/tokens
+//                         Add HUGGINGFACE_TOKEN to Render env.
+//
+//   3. Picsum Photos    — ALWAYS FREE, no key. Real photography, seeded by story ID.
+//
+//   4. SVG Illustration — LOCAL fallback, no external calls needed.
+//
+// RECOMMENDATION: Add POLLINATIONS_TOKEN first (fastest), HUGGINGFACE_TOKEN for best quality.
 const HF_TOKEN   = (process.env.HUGGINGFACE_TOKEN   || '').trim();
 const POLL_TOKEN = (process.env.POLLINATIONS_TOKEN   || '').trim();
 
@@ -114,28 +120,50 @@ async function fetchImageWithFallback(prompt, seed, label, logger) {
     L('hf_skip', 'warn', 'HUGGINGFACE_TOKEN not set — add it in Render env for AI images');
   }
 
-  // ── Provider 2: Pollinations.ai (requires POLLINATIONS_TOKEN since 2025) ──
+  // ── Provider 2: Pollinations.ai (free key at pollinations.ai/settings) ──
   if (POLL_TOKEN) {
-    try {
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0,200))}` +
-                  `?width=800&height=600&seed=${seed}&nologo=true`;
-      const res = await fetch(url, {
+    // Try both auth methods — Pollinations accepts Bearer header OR ?token= param
+    const pollAttempts = [
+      {
+        url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0,200))}` +
+             `?width=800&height=600&seed=${seed}&nologo=true&nofeed=true`,
         headers: { 'Authorization': `Bearer ${POLL_TOKEN}`, 'User-Agent': 'Mozilla/5.0' },
-        signal:  AbortSignal.timeout(45000),
-      });
-      if (res.ok) {
+        label: 'bearer',
+      },
+      {
+        url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0,200))}` +
+             `?width=800&height=600&seed=${seed}&nologo=true&token=${POLL_TOKEN}`,
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        label: 'query-token',
+      },
+    ];
+
+    for (const attempt of pollAttempts) {
+      try {
+        L(`poll_${attempt.label}`, 'ok', attempt.url.slice(0, 80));
+        const res = await fetch(attempt.url, {
+          headers: attempt.headers,
+          signal:  AbortSignal.timeout(45000),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          L(`poll_${attempt.label}_err`, 'warn', `HTTP ${res.status}: ${body.slice(0,80)}`);
+          continue;
+        }
         const ct  = res.headers.get('content-type') || '';
         const buf = Buffer.from(await res.arrayBuffer());
         if (ct.includes('image') && buf.length > 5000) {
-          L('poll_ok', 'ok', `${(buf.length/1024).toFixed(0)}KB`);
-          return { buf, source: 'pollinations' };
+          L('poll_ok', 'ok', `[${attempt.label}] ${(buf.length/1024).toFixed(0)}KB`);
+          return { buf, source: `pollinations_${attempt.label}` };
         }
-      } else {
-        L('poll_err', 'warn', `HTTP ${res.status}`);
+        L(`poll_${attempt.label}_skip`, 'warn', `bad response: ${ct} ${buf.length}b`);
+      } catch (e) {
+        L(`poll_${attempt.label}_err`, 'warn', e.message.slice(0,80));
       }
-    } catch (e) { L('poll_err', 'warn', e.message.slice(0,80)); }
+    }
+    L('poll_failed', 'warn', 'Both Pollinations auth methods failed — trying next provider');
   } else {
-    L('poll_skip', 'warn', 'POLLINATIONS_TOKEN not set');
+    L('poll_skip', 'warn', 'POLLINATIONS_TOKEN not set — add free key from pollinations.ai');
   }
 
   // ── Provider 3: Picsum Photos (free, no key, real photography) ──

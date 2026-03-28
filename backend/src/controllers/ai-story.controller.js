@@ -498,14 +498,17 @@ export const getGenerationStatus = (_req, res) => {
     dailyBatchLimit:      3,
     // Book image generation
     // Image generation providers (checked in priority order)
-    hfTokenSet:           Boolean(process.env.HUGGINGFACE_TOKEN),
     pollinationsTokenSet: Boolean(pollToken),
-    imageProvider:        process.env.HUGGINGFACE_TOKEN ? 'HuggingFace AI (FLUX/SD)'
-                        : pollToken                     ? 'Pollinations.ai (token set)'
-                        :                                 'Picsum Photos (free) + SVG fallback',
-    imageSetupTip: !process.env.HUGGINGFACE_TOKEN
-      ? 'Add HUGGINGFACE_TOKEN (free at huggingface.co/settings/tokens) for AI-generated illustrations'
-      : null,
+    hfTokenSet:           Boolean(process.env.HUGGINGFACE_TOKEN),
+    imageProvider:        pollToken                     ? '🌸 Pollinations.ai (fastest ~5s)'
+                        : process.env.HUGGINGFACE_TOKEN ? '🤗 HuggingFace AI (best quality)'
+                        :                                 '📷 Picsum Photos (free placeholder)',
+    imageProviderActive:  pollToken ? 'pollinations'
+                        : process.env.HUGGINGFACE_TOKEN ? 'huggingface' : 'picsum',
+    imageSetupTips: {
+      pollinations:  pollToken   ? null : 'Get free key: pollinations.ai → Login → Settings → API Key → add as POLLINATIONS_TOKEN',
+      huggingface:   process.env.HUGGINGFACE_TOKEN ? null : 'Get free key: huggingface.co/settings/tokens → New token → add as HUGGINGFACE_TOKEN',
+    },
     r2Available:          Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID),
     imageStorage:         (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID)
                             ? 'Cloudflare R2 (permanent)'

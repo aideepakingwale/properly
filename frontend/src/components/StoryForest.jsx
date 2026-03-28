@@ -373,14 +373,25 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
         <div style={{ marginBottom:10, display:'flex', gap:5, flexWrap:'wrap' }}>
           <span style={{ fontSize:10, background:providerInfo?.gemini?'rgba(20,184,166,0.2)':providerInfo?.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo?.gemini?'var(--provider-gemini)':providerInfo?.groq?'var(--brand-pop1)':'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
             {providerInfo?.gemini ? '♊ Gemini AI (free)' : providerInfo?.groq ? '⚡ Groq/Llama (free)' : '📚 Built-in templates'}
+          {/* Image provider chip */}
           {providerInfo?.imageProvider && (
-            <span style={{ fontSize:10, background: providerInfo.hfTokenSet?'rgba(251,191,36,0.2)':'rgba(100,116,139,0.2)', color: providerInfo.hfTokenSet?'#D97706':'var(--text-muted)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
-              🖼 {providerInfo.hfTokenSet ? '🤗 HuggingFace AI' : providerInfo.pollinationsTokenSet ? '🌸 Pollinations' : '📷 Picsum photos'}
+            <span style={{
+              fontSize:10, borderRadius:50, padding:'3px 9px', fontWeight:700,
+              background: providerInfo.pollinationsTokenSet ? 'rgba(236,72,153,0.18)'
+                        : providerInfo.hfTokenSet           ? 'rgba(251,191,36,0.2)'
+                        :                                     'rgba(100,116,139,0.2)',
+              color:      providerInfo.pollinationsTokenSet ? '#EC4899'
+                        : providerInfo.hfTokenSet           ? '#D97706'
+                        :                                     'var(--text-muted)',
+            }}>
+              {providerInfo.imageProvider}
             </span>
           )}
-          {providerInfo?.imageSetupTip && (
-            <span style={{ fontSize:10, background:'rgba(245,158,11,0.15)', color:'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:600 }}>
-              ⚠️ No AI images — add HUGGINGFACE_TOKEN
+          {/* Setup nudge when no AI image provider configured */}
+          {providerInfo && !providerInfo.pollinationsTokenSet && !providerInfo.hfTokenSet && (
+            <span title="Add POLLINATIONS_TOKEN or HUGGINGFACE_TOKEN in Render env for AI images"
+              style={{ fontSize:10, background:'rgba(245,158,11,0.15)', color:'#D97706', borderRadius:50, padding:'3px 9px', fontWeight:600, cursor:'help' }}>
+              ⚠️ No AI images — add API key
             </span>
           )}
           {providerInfo?.imageStorage && (
