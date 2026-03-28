@@ -25,7 +25,7 @@ import {
 } from '../controllers/progress.controller.js';
 import { getShopItems, getOwnedItems, purchaseItem }               from '../controllers/shop.controller.js';
 import { getFeedback, getTTS }                                      from '../services/ai.service.js';
-import { assessSpeech, uploadMiddleware, getSpeechToken, getSpeechStatus, testAzureConnectivity } from '../controllers/speech.controller.js';
+import { assessSpeech, uploadMiddleware, getSpeechToken, getSpeechStatus, testAzureConnectivity, preloadPhonemes, getPhoneme } from '../controllers/speech.controller.js';
 import {
   generateAiStoryBatch, getAiStories, getAiStory, deleteAiStory,
   getAiStoryProgress, getThemes, getPhaseInfo,
@@ -123,93 +123,9 @@ router.post('/children/:childId/shop/buy',    authMiddleware, requireChild, purc
 // ── AI COACHING & TTS ─────────────────────────────────────────
 router.post('/ai/feedback', authMiddleware, getFeedback);
 router.post('/ai/tts',      authMiddleware, getTTS);
-// ── PHONEME PRELOAD — all 44 phonemes in one request ────────────
-// Called once at app startup. Returns { '/k/': '<base64 mp3>', ... }
-// Client caches in localStorage — zero API calls during reading sessions.
-router.get('/ai/phonemes/preload', authMiddleware, async (req, res) => {
-  if (!azureAvail()) {
-    return res.json({ success: false, message: 'Azure TTS not configured', data: {} });
-  }
+router.get('/ai/phonemes/preload', authMiddleware, preloadPhonemes);
+router.post('/ai/phoneme',        authMiddleware, getPhoneme);
 
-  // All IPA phonemes used in DfE Letters & Sounds Phase 2–6
-  const PHONEMES = [
-    // Consonant stops
-    { ipa: 'p', grapheme: 'p' }, { ipa: 'b', grapheme: 'b' },
-    { ipa: 't', grapheme: 't' }, { ipa: 'd', grapheme: 'd' },
-    { ipa: 'k', grapheme: 'c' }, { ipa: 'g', grapheme: 'g' },
-    // Fricatives
-    { ipa: 'f', grapheme: 'f' }, { ipa: 'v', grapheme: 'v' },
-    { ipa: 's', grapheme: 's' }, { ipa: 'z', grapheme: 'z' },
-    { ipa: 'ʃ', grapheme: 'sh'}, { ipa: 'h', grapheme: 'h' },
-    { ipa: 'ð', grapheme: 'th'}, { ipa: 'θ', grapheme: 'th'},
-    // Affricates
-    { ipa: 'tʃ', grapheme: 'ch'}, { ipa: 'dʒ', grapheme: 'j' },
-    // Nasals & approximants
-    { ipa: 'm', grapheme: 'm' }, { ipa: 'n', grapheme: 'n' },
-    { ipa: 'ŋ', grapheme: 'ng'}, { ipa: 'l', grapheme: 'l' },
-    { ipa: 'r', grapheme: 'r' }, { ipa: 'w', grapheme: 'w' },
-    { ipa: 'j', grapheme: 'y' }, { ipa: 'kw',grapheme: 'qu'},
-    { ipa: 'ks',grapheme: 'x' },
-    // Short vowels
-    { ipa: 'æ', grapheme: 'a' }, { ipa: 'ɛ', grapheme: 'e' },
-    { ipa: 'ɪ', grapheme: 'i' }, { ipa: 'ɒ', grapheme: 'o' },
-    { ipa: 'ʌ', grapheme: 'u' }, { ipa: 'ʊ', grapheme: 'oo'},
-    { ipa: 'ə', grapheme: 'a' },
-    // Long vowels & diphthongs
-    { ipa: 'eɪ', grapheme: 'ai' }, { ipa: 'iː', grapheme: 'ee' },
-    { ipa: 'aɪ', grapheme: 'igh'}, { ipa: 'əʊ', grapheme: 'oa' },
-    { ipa: 'uː', grapheme: 'oo' }, { ipa: 'aʊ', grapheme: 'ow' },
-    { ipa: 'ɔɪ', grapheme: 'oi' }, { ipa: 'ɑː', grapheme: 'ar' },
-    { ipa: 'ɔː', grapheme: 'or' }, { ipa: 'ɜː', grapheme: 'ur' },
-    { ipa: 'juː',grapheme: 'ue' }, { ipa: 'ɪə', grapheme: 'ear'},
-    { ipa: 'eə', grapheme: 'air'}, { ipa: 'ʊə', grapheme: 'ure'},
-  ];
-
-  // Fetch all phonemes in parallel (Azure TTS is fast per request ~200-400ms)
-  const results = {};
-  const errors  = [];
-
-  await Promise.allSettled(
-    PHONEMES.map(async ({ ipa, grapheme }) => {
-      try {
-        const buf = await synthesisePhoneme(ipa, grapheme, 0.55);
-        results[ipa] = buf.toString('base64');
-      } catch (e) {
-        errors.push({ ipa, error: e.message });
-      }
-    })
-  );
-
-  console.log(`[Phoneme Preload] ${Object.keys(results).length}/${PHONEMES.length} phonemes generated. ${errors.length} errors.`);
-  if (errors.length) console.warn('[Phoneme Preload] Errors:', errors);
-
-  res.json({
-    success: true,
-    data: {
-      phonemes: results,
-      count:    Object.keys(results).length,
-      errors,
-      generatedAt: new Date().toISOString(),
-    },
-  });
-});
-
-router.post('/ai/phoneme',  authMiddleware, async (req, res) => {
-  // Returns MP3 audio of a single IPA phoneme spoken by Azure TTS
-  // Used by the phonics mode "Hear the Sounds" feature
-  const { ipa, grapheme, rate = 0.55 } = req.body;
-  if (!ipa || !grapheme) return res.status(400).json({ success: false, message: 'ipa and grapheme required' });
-  if (!azureAvail()) return res.status(503).json({ success: false, message: 'Azure TTS not configured' });
-  try {
-    const buf = await synthesisePhoneme(ipa, grapheme, rate);
-    res.set('Content-Type', 'audio/mpeg');
-    res.set('Cache-Control', 'public, max-age=31536000'); // cache 1 year — phonemes never change
-    res.send(buf);
-  } catch (e) {
-    console.error('[Phoneme TTS]', e.message);
-    res.status(500).json({ success: false, message: e.message });
-  }
-});
 
 // ── SPEECH ────────────────────────────────────────────────────
 router.get('/speech/status',  getSpeechStatus);

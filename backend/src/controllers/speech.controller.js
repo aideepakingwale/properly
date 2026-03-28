@@ -12,7 +12,7 @@
 
 import multer from 'multer';
 import getDb from '../db/database.js';
-import { assessPronunciation, azureAvailable, getAzureSasToken, assessWithGroqWhisper, groqAvailable } from '../services/azure-speech.service.js';
+import { assessPronunciation, azureAvailable, getAzureSasToken, assessWithGroqWhisper, groqAvailable, synthesisePhoneme } from '../services/azure-speech.service.js';
 
 // Multer: store audio in memory (max 10 MB)
 const upload = multer({
@@ -341,5 +341,72 @@ export const testAzureConnectivity = async (req, res) => {
     });
   } catch (e) {
     res.json({ success: false, message: e.message });
+  }
+};
+
+// ── PHONEME PRELOAD ───────────────────────────────────────────
+const PHONEME_LIST = [
+  { ipa: 'p', grapheme: 'p' }, { ipa: 'b', grapheme: 'b' },
+  { ipa: 't', grapheme: 't' }, { ipa: 'd', grapheme: 'd' },
+  { ipa: 'k', grapheme: 'c' }, { ipa: 'g', grapheme: 'g' },
+  { ipa: 'f', grapheme: 'f' }, { ipa: 'v', grapheme: 'v' },
+  { ipa: 's', grapheme: 's' }, { ipa: 'z', grapheme: 'z' },
+  { ipa: 'ʃ', grapheme: 'sh'}, { ipa: 'h', grapheme: 'h' },
+  { ipa: 'ð', grapheme: 'th'}, { ipa: 'θ', grapheme: 'th'},
+  { ipa: 'tʃ', grapheme: 'ch'}, { ipa: 'dʒ', grapheme: 'j' },
+  { ipa: 'm', grapheme: 'm' }, { ipa: 'n', grapheme: 'n' },
+  { ipa: 'ŋ', grapheme: 'ng'}, { ipa: 'l', grapheme: 'l' },
+  { ipa: 'r', grapheme: 'r' }, { ipa: 'w', grapheme: 'w' },
+  { ipa: 'j', grapheme: 'y' }, { ipa: 'kw', grapheme: 'qu'},
+  { ipa: 'ks', grapheme: 'x' },
+  { ipa: 'æ', grapheme: 'a' }, { ipa: 'ɛ', grapheme: 'e' },
+  { ipa: 'ɪ', grapheme: 'i' }, { ipa: 'ɒ', grapheme: 'o' },
+  { ipa: 'ʌ', grapheme: 'u' }, { ipa: 'ʊ', grapheme: 'oo'},
+  { ipa: 'ə', grapheme: 'a' },
+  { ipa: 'eɪ', grapheme: 'ai' }, { ipa: 'iː', grapheme: 'ee' },
+  { ipa: 'aɪ', grapheme: 'igh'}, { ipa: 'əʊ', grapheme: 'oa' },
+  { ipa: 'uː', grapheme: 'oo' }, { ipa: 'aʊ', grapheme: 'ow' },
+  { ipa: 'ɔɪ', grapheme: 'oi' }, { ipa: 'ɑː', grapheme: 'ar' },
+  { ipa: 'ɔː', grapheme: 'or' }, { ipa: 'ɜː', grapheme: 'ur' },
+  { ipa: 'juː', grapheme: 'ue'}, { ipa: 'ɪə', grapheme: 'ear'},
+  { ipa: 'eə', grapheme: 'air'}, { ipa: 'ʊə', grapheme: 'ure'},
+];
+
+export const preloadPhonemes = async (req, res) => {
+  if (!azureAvailable()) {
+    return res.json({ success: false, message: 'Azure TTS not configured', data: { phonemes: {} } });
+  }
+  res.setTimeout(30000);
+  const results = {};
+  const errors  = [];
+  const BATCH   = 6;
+  for (let i = 0; i < PHONEME_LIST.length; i += BATCH) {
+    await Promise.allSettled(
+      PHONEME_LIST.slice(i, i + BATCH).map(async ({ ipa, grapheme }) => {
+        try {
+          const buf = await synthesisePhoneme(ipa, grapheme, 0.55);
+          results[ipa] = buf.toString('base64');
+        } catch (e) {
+          errors.push({ ipa, error: e.message });
+        }
+      })
+    );
+  }
+  console.log(`[Phoneme Preload] ${Object.keys(results).length}/${PHONEME_LIST.length} generated, ${errors.length} errors`);
+  res.json({ success: true, data: { phonemes: results, count: Object.keys(results).length, errors, generatedAt: new Date().toISOString() } });
+};
+
+export const getPhoneme = async (req, res) => {
+  const { ipa, grapheme, rate = 0.55 } = req.body;
+  if (!ipa || !grapheme) return res.status(400).json({ success: false, message: 'ipa and grapheme required' });
+  if (!azureAvailable()) return res.status(503).json({ success: false, message: 'Azure TTS not configured' });
+  try {
+    const buf = await synthesisePhoneme(ipa, grapheme, rate);
+    res.set('Content-Type', 'audio/mpeg');
+    res.set('Cache-Control', 'public, max-age=31536000');
+    res.send(buf);
+  } catch (e) {
+    console.error('[Phoneme TTS]', e.message);
+    res.status(500).json({ success: false, message: e.message });
   }
 };
