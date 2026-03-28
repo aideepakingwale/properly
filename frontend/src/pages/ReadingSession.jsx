@@ -178,117 +178,180 @@ export default function ReadingSession() {
   const page = story?.pages?.[pageIdx];
 
   // ── PHONICS SOUND PLAYBACK ──────────────────────────────────
-  // Reads each grapheme's phoneme sound in sequence, lighting up the tile as it speaks.
-  // Uses onend chaining (not setTimeout) so each sound plays FULLY before the next starts.
-  // synth.cancel() is called ONCE at the start — calling it per-item would kill the current utterance.
+  // Reads each grapheme's phoneme sound in sequence, lighting up the chunk as it speaks.
+  // Uses Web Speech API (no Azure cost) with careful timing so each grapheme tile
+  // highlights exactly when its sound is spoken.
+  // ── PHONICS SOUND MAP ────────────────────────────────────────
+  // Maps IPA phoneme → text that Web Speech API actually pronounces as that sound.
+  // KEY RULE: Consonants MUST have a trailing vowel sound to avoid being spoken as
+  // letter names ("see" instead of "kuh", "dee" instead of "duh").
+  // We use the schwa trick: "kuh", "tuh", "puh" etc. for consonant-only phonemes.
+  // Vowels are written as full phonetic spellings the TTS engine recognises.
+  // ── PHONICS SOUND ENGINE ─────────────────────────────────────
+  // Each phoneme maps to a word or phrase that the TTS engine will speak
+  // as THAT SOUND. The trick: use a real word that STARTS with the exact
+  // sound and is cut off early by the brevity, or use repeated consonants
+  // that force the correct fricative/stop sound.
+  //
+  // CRITICAL PHONICS RULE:
+  //   /k/ → "cup" (starts with kuh sound) NOT "key" (starts with kee sound)
+  //   /t/ → "top" NOT "tea"
+  //   /s/ → "sun" NOT "es"
+  //
+  // We pass the full word at very slow rate so only the onset is heard clearly.
+  const PHONEME_SPEAK = {
+    // ── CONSONANT STOPS (plosives) ─────────────────────────────
+    // Use words starting with the sound at rate 0.5 — only the onset matters
+    '/p/': { text: 'pup',      rate: 0.55, solo: true  },   // puh
+    '/b/': { text: 'bob',      rate: 0.55, solo: true  },   // buh
+    '/t/': { text: 'top',      rate: 0.55, solo: true  },   // tuh
+    '/d/': { text: 'dog',      rate: 0.55, solo: true  },   // duh
+    '/k/': { text: 'cup',      rate: 0.55, solo: true  },   // kuh — NOT "key"
+    '/g/': { text: 'got',      rate: 0.55, solo: true  },   // guh
+    // ── FRICATIVES ─────────────────────────────────────────────
+    '/f/': { text: 'fffff',    rate: 0.6,  solo: false },   // continuous fff sound
+    '/v/': { text: 'vvvv',     rate: 0.6,  solo: false },
+    '/s/': { text: 'ssss',     rate: 0.6,  solo: false },   // NOT "es"
+    '/z/': { text: 'zzzz',     rate: 0.6,  solo: false },
+    '/ʃ/': { text: 'shhhh',    rate: 0.6,  solo: false },   // shh sound
+    '/ð/': { text: 'the',      rate: 0.5,  solo: true  },   // voiced th
+    '/θ/': { text: 'thin',     rate: 0.5,  solo: true  },   // voiceless th
+    '/h/': { text: 'huh',      rate: 0.6,  solo: false },
+    // ── AFFRICATES ─────────────────────────────────────────────
+    '/tʃ/': { text: 'chip',    rate: 0.55, solo: true  },   // ch
+    '/dʒ/': { text: 'jump',    rate: 0.55, solo: true  },   // j
+    // ── NASALS ─────────────────────────────────────────────────
+    '/m/': { text: 'mmm',      rate: 0.6,  solo: false },
+    '/n/': { text: 'nnn',      rate: 0.6,  solo: false },
+    '/ŋ/': { text: 'ring',     rate: 0.6,  solo: true  },   // ng at end
+    '/ŋk/': { text: 'sink',    rate: 0.6,  solo: true  },
+    // ── APPROXIMANTS ───────────────────────────────────────────
+    '/l/': { text: 'lll',      rate: 0.6,  solo: false },
+    '/r/': { text: 'rrr',      rate: 0.6,  solo: false },
+    '/w/': { text: 'www',      rate: 0.6,  solo: false },
+    '/j/': { text: 'yes',      rate: 0.55, solo: true  },   // y sound
+    '/kw/': { text: 'queen',   rate: 0.55, solo: true  },
+    '/ks/': { text: 'ox',      rate: 0.6,  solo: true  },
+    // ── SHORT VOWELS (pure sounds — hold and extend) ───────────
+    '/æ/': { text: 'aaa',      rate: 0.5,  solo: false },   // "aah" as in cat
+    '/ɛ/': { text: 'egg',      rate: 0.5,  solo: true  },   // short e as in bed
+    '/ɪ/': { text: 'it',       rate: 0.5,  solo: true  },   // short i as in sit
+    '/ɒ/': { text: 'odd',      rate: 0.5,  solo: true  },   // short o as in dog
+    '/ʌ/': { text: 'up',       rate: 0.5,  solo: true  },   // short u as in cup
+    '/ʊ/': { text: 'book',     rate: 0.5,  solo: true  },   // short oo
+    '/ə/': { text: 'a',        rate: 0.5,  solo: false },   // schwa
+    // ── LONG VOWELS & DIPHTHONGS ───────────────────────────────
+    '/eɪ/': { text: 'rain',    rate: 0.6,  solo: true  },   // ay
+    '/iː/': { text: 'ee',      rate: 0.6,  solo: false },   // ee
+    '/aɪ/': { text: 'eye',     rate: 0.6,  solo: true  },   // igh
+    '/əʊ/': { text: 'oh',      rate: 0.6,  solo: false },   // oa
+    '/uː/': { text: 'oo',      rate: 0.6,  solo: false },   // oo
+    '/aʊ/': { text: 'ow',      rate: 0.6,  solo: false },   // ow
+    '/ɔɪ/': { text: 'oi',      rate: 0.6,  solo: false },   // oi
+    '/ɑː/': { text: 'ar',      rate: 0.6,  solo: false },   // ar
+    '/ɔː/': { text: 'or',      rate: 0.6,  solo: false },   // or
+    '/ɜː/': { text: 'er',      rate: 0.6,  solo: false },   // er
+    '/juː/': { text: 'you',    rate: 0.6,  solo: true  },   // ue
+    '/ɪə/': { text: 'ear',     rate: 0.6,  solo: true  },   // ear
+    '/eə/': { text: 'air',     rate: 0.6,  solo: true  },   // air
+    '/ʊə/': { text: 'tour',    rate: 0.6,  solo: true  },   // ure
+  };
+
+  function getPhonemeConfig(phoneme, grapheme) {
+    return PHONEME_SPEAK[phoneme] || { text: grapheme || phoneme.replace(/[/[\]]/g, ''), rate: 0.6, solo: false };
+  }
+
+  // Speak using Web Speech — returns estimated ms duration
+  function sayWith(text, rate = 0.75, pitch = 1.1) {
+    const synth = window.speechSynthesis;
+    if (!synth) return 400;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang  = 'en-GB';
+    u.rate  = rate;
+    u.pitch = pitch;
+    const voices = synth.getVoices();
+    const v = voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
+            || voices.find(v => v.lang.startsWith('en-GB'))
+            || voices.find(v => v.lang.startsWith('en'));
+    if (v) u.voice = v;
+    synth.speak(u);
+    return Math.max(350, text.length * 100 / rate);
+  }
+
   const speakPhonics = useCallback(() => {
     if (!page) return;
-    const phase = child?.phase || 2;
+    const phase     = child?.phase || 2;
     const pageWords = page.text.trim().split(/\s+/);
+    stop();
+    window.speechSynthesis?.cancel();
 
-    // Build flat list of speakable items, excluding silent letters
-    const queue = [];
-    pageWords.forEach((word, wi) => {
-      const clean = word.replace(/[.,!?;:'"]/g, '');
-      const chunks = analyseWord(clean, phase);
+    // Build playback plan:
+    // For each word: [sound1, sound2, ...soundN, WORD, PAUSE_BETWEEN_WORDS]
+    // Each item: { type: 'chunk'|'word'|'pause', wordIdx, chunkIdx?, text, dur }
+    const plan = [];
+
+    pageWords.forEach((rawWord, wi) => {
+      const clean  = rawWord.replace(/[.,!?;:'"]/g, '');
+      if (!clean) return;
+      const chunks = analyseWord(clean, phase).filter(c => !c.isSilent);
+
+      // Individual phoneme sounds — each chunk gets its correct sound
       chunks.forEach((chunk, ci) => {
-        if (!chunk.isSilent) {
-          queue.push({
-            wordIdx:   wi,
-            chunkIdx:  ci,
-            speakable: ipaToSpeakable(chunk.phoneme, chunk.grapheme),
-          });
-        }
+        const cfg  = getPhonemeConfig(chunk.phoneme, chunk.grapheme);
+        const dur  = chunk.grapheme.length >= 2 ? 750 : 550;
+        plan.push({ type: 'chunk', wordIdx: wi, chunkIdx: ci, text: cfg.text, rate: cfg.rate, dur });
       });
-      // Word boundary pause — represented as a null item
-      queue.push({ wordIdx: wi, chunkIdx: -1, speakable: null, isPause: true });
+
+      // "Blending pause" — short gap before saying the whole word
+      plan.push({ type: 'pause', wordIdx: wi, dur: 250 });
+
+      // Say the complete word (highlight whole word, no chunk highlighted)
+      plan.push({ type: 'word', wordIdx: wi, text: clean, dur: 700 });
+
+      // Pause between words
+      plan.push({ type: 'pause', wordIdx: -1, dur: 400 });
     });
 
-    stop(); // stop Mrs Owl / Azure TTS audio element
-    const synth = window.speechSynthesis;
-    if (synth) synth.cancel(); // cancel ONCE, here — not per item
-    setSpeakingWordIdx(-1);
-    setSpeakingChunkKey(null);
-
-    let qIdx = 0;
-
-    const playNext = () => {
-      if (qIdx >= queue.length) {
-        setSpeakingChunkKey(null);
-        setSpeakingWordIdx(-1);
-        return;
-      }
-      const item = queue[qIdx++];
-
-      if (item.isPause) {
-        // Word gap — clear highlight, pause briefly, then continue
-        setSpeakingChunkKey(null);
-        setTimeout(playNext, 260);
+    // Execute plan with sequential setTimeout
+    let t = 0;
+    plan.forEach(item => {
+      if (item.type === 'pause') {
+        setTimeout(() => {
+          setSpeakingChunkKey(null);
+          if (item.wordIdx === -1) setSpeakingWordIdx(-1);
+        }, t);
+        t += item.dur;
         return;
       }
 
-      setSpeakingChunkKey(`${item.wordIdx}-${item.chunkIdx}`);
+      if (item.type === 'chunk') {
+        setTimeout(() => {
+          setSpeakingWordIdx(-1);
+          setSpeakingChunkKey(`${item.wordIdx}-${item.chunkIdx}`);
+          sayWith(item.text, item.rate || 0.6, 1.1);
+        }, t);
+        t += item.dur;
+        return;
+      }
 
-      if (!synth) { setTimeout(playNext, 420); return; }
+      if (item.type === 'word') {
+        // Say the blended word — slightly emphasised, normal pace
+        setTimeout(() => {
+          setSpeakingChunkKey(null);
+          setSpeakingWordIdx(item.wordIdx);
+          sayWith(item.text, 0.82, 1.08);
+        }, t);
+        t += item.dur;
+      }
+    });
 
-      const u      = new SpeechSynthesisUtterance(item.speakable);
-      u.lang       = 'en-GB';
-      u.rate       = 0.72;   // slow enough for children to hear each sound clearly
-      u.pitch      = 1.1;
-      const voices = synth.getVoices();
-      const v = voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
-              || voices.find(v => v.lang.startsWith('en-GB'))
-              || voices.find(v => v.lang.startsWith('en'));
-      if (v) u.voice = v;
-
-      // Chain to next sound when this one ends — gives natural gaps
-      u.onend   = () => setTimeout(playNext, 160);
-      u.onerror = () => setTimeout(playNext, 280); // continue even if a sound fails
-
-      synth.speak(u);
-    };
-
-    // Voices may not be loaded yet on first call (browser async)
-    if (!synth || synth.getVoices().length === 0) {
-      const resume = () => { if (synth) synth.onvoiceschanged = null; playNext(); };
-      if (synth) synth.onvoiceschanged = resume;
-      else resume();
-    } else {
-      playNext();
-    }
+    // Clear everything at the end
+    setTimeout(() => {
+      setSpeakingChunkKey(null);
+      setSpeakingWordIdx(-1);
+    }, t + 300);
   }, [page, child, stop]);
-
-  // Convert IPA phoneme notation to something Web Speech API pronounces as a SOUND not a letter name.
-  // Plosives need a schwa suffix ("puh") — without it TTS reads the letter name ("pee").
-  // Fricatives are repeated ("sss") so the sustained sound is audible.
-  function ipaToSpeakable(ipa, grapheme) {
-    const map = {
-      // Digraphs / affricates
-      '/tch/': 'chuh', '/tʃ/': 'chuh', '/ʃ/':  'shh',  '/ð/':  'the',  '/θ/':  'thuh',
-      '/ŋ/':  'ing',   '/ŋk/': 'ink',  '/dʒ/': 'juh',  '/kw/': 'kwuh',
-      // Long vowels & diphthongs
-      '/eɪ/': 'ay',   '/iː/': 'ee',   '/aɪ/': 'I',    '/əʊ/': 'oh',
-      '/uː/': 'oo',   '/ɑː/': 'ar',   '/ɔː/': 'or',   '/ɜː/': 'er',
-      '/aʊ/': 'ow',   '/ɔɪ/': 'oy',   '/ɪə/': 'ear',  '/eə/': 'air',
-      '/ʊə/': 'oor',  '/juː/': 'you',
-      // Short vowels
-      '/æ/':  'a',    '/ɛ/':  'eh',   '/ɪ/':  'ih',
-      '/ɒ/':  'o',    '/ʌ/':  'uh',   '/ʊ/':  'oo',   '/ə/':  'uh',
-      // Plosives — schwa suffix forces TTS to produce the burst sound, not the letter name
-      '/p/':  'puh',  '/b/':  'buh',  '/t/':  'tuh',  '/d/':  'duh',
-      '/k/':  'kuh',  '/g/':  'guh',
-      // Fricatives — repeated for audibility
-      '/f/':  'fff',  '/v/':  'vvv',  '/s/':  'sss',  '/z/':  'zzz',
-      '/h/':  'huh',
-      // Nasals
-      '/m/':  'mmm',  '/n/':  'nnn',
-      // Approximants
-      '/l/':  'lll',  '/r/':  'rrr',  '/w/':  'wuh',  '/j/':  'yuh',
-      // Other
-      '/ks/': 'ks',
-    };
-    return map[ipa] || grapheme || ipa.replace(/[/[\]]/g, '');
-  }
 
   // ── CLOUD ASSESSMENT PIPELINE ──────────────────────────────
   const processAudio = useCallback(async (audioBlob, browserTranscript) => {
@@ -317,10 +380,15 @@ export default function ReadingSession() {
         wordScores,
         recognized: assessRes.data?.displayText,
       };
-      // debug already merges _debugInfo via ...(_debugInfo || {}) above,
-      // so this always captures full context regardless of whether Azure ran.
       setDebugInfo(debug);
       setLastDebug({ stage: 'done', ...debug });
+      else setDebugInfo({
+        source, azureAssessed, overallAccuracy, overallFluency,
+        wordScores: wordScores?.slice(0,3),
+        displayText,
+        blobSizeKB: (audioBlob?.size / 1024).toFixed(1),
+        note: 'No _debugInfo returned — Azure may not have been called',
+      });
 
       setRevealedCount(0);
       setWordScores(wordScores);

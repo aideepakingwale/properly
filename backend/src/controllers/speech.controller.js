@@ -304,9 +304,9 @@ export const testAzureConnectivity = async (req, res) => {
   };
 
   try {
-    const endpoint = `https://${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`;
+    const endpoint = `https://\${region}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`;
     const params   = new URLSearchParams({ language: 'en-US', format: 'detailed' });
-    const r = await fetch(`${endpoint}?${params}`, {
+    const r = await fetch(`\${endpoint}?\${params}`, {
       method: 'POST',
       headers: {
         'Ocp-Apim-Subscription-Key': key,
