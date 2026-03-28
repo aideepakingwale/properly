@@ -14,7 +14,40 @@
 import { getDb }                     from '../db/database.js';
 import { r2Put, r2Url, r2Available } from './r2.service.js';
 
-const POLL_BASE = 'https://image.pollinations.ai/prompt';
+// ── IMAGE GENERATION STRATEGIES ──────────────────────────────
+// Pollinations.ai changed their API. We try 3 endpoints with proper headers,
+// then fall back to a beautiful SVG illustration we generate ourselves.
+
+// ── POLLINATIONS CONFIGURATION ───────────────────────────────
+// model=turbo   — FREE, no API key, good quality, ~5s/image
+// model=flux    — requires POLLINATIONS_TOKEN (paid/partner tier)
+// Set POLLINATIONS_TOKEN in Render env to unlock flux quality images.
+const POLL_TOKEN = (process.env.POLLINATIONS_TOKEN || '').trim();
+const POLL_MODEL = POLL_TOKEN ? 'flux' : 'turbo';  // auto-select based on token
+
+const POLL_ENDPOINTS = [
+  // Strategy 1: image.pollinations.ai with optional Bearer token
+  (prompt, seed) => ({
+    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+         `?width=800&height=600&seed=${seed}&model=${POLL_MODEL}&nologo=true&nofeed=true`,
+    headers: {
+      'Accept':   'image/jpeg,image/png,image/*',
+      'Referer':  'https://properly.app',
+      ...(POLL_TOKEN ? { 'Authorization': `Bearer ${POLL_TOKEN}` } : {}),
+    },
+  }),
+  // Strategy 2: turbo fallback (always free, no token needed)
+  (prompt, seed) => ({
+    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+         `?width=800&height=600&seed=${seed}&model=turbo&nologo=true`,
+    headers: { 'Accept': 'image/*', 'Referer': 'https://properly.app' },
+  }),
+  // Strategy 3: minimal URL — no model specified (server picks default)
+  (prompt, seed) => ({
+    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0,150))}?seed=${seed}`,
+    headers: { 'Accept': 'image/*' },
+  }),
+];
 
 // ── STEP LOGGER ───────────────────────────────────────────────
 function makeLogger(db, bookId) {
@@ -38,37 +71,139 @@ function safeSeed(bookId, offset) {
   return (parseInt(hex, 16) + offset) % 2147483647;
 }
 
-function pollinationsUrl(prompt, seed) {
-  return `${POLL_BASE}/${encodeURIComponent(prompt)}?width=800&height=600&seed=${seed}&model=flux&enhance=false`;
-}
-
 function buildImagePrompt(text, childName) {
   const clean = (text || '').replace(/['"]/g, '').trim().slice(0, 180);
   return `cute kawaii watercolour children book illustration, bright pastel colours, friendly characters, no text, ${clean}, child character named ${childName}`;
 }
 
-async function fetchImage(url, label) {
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(50000),
-      headers: { Accept: 'image/png,image/jpeg,image/*' },
-    });
-    if (!res.ok) {
-      console.warn(`[Book] ${label}: HTTP ${res.status}`);
-      return null;
+// ── FETCH IMAGE WITH MULTI-STRATEGY + SVG FALLBACK ───────────
+async function fetchImageWithFallback(prompt, seed, label, logger) {
+  // Try each Pollinations strategy
+  for (let si = 0; si < POLL_ENDPOINTS.length; si++) {
+    const { url, headers } = POLL_ENDPOINTS[si](prompt, seed);
+    try {
+      console.log(`[Book] ${label} strategy ${si+1}: ${url.slice(0,80)}`);
+      const res = await fetch(url, {
+        signal:  AbortSignal.timeout(45000),
+        headers,
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.warn(`[Book] ${label} strategy ${si+1}: HTTP ${res.status} — ${body.slice(0,120)}`);
+        logger?.log?.(`img_${label}_s${si+1}`, 'warn', `HTTP ${res.status}: ${body.slice(0,80)}`);
+        continue;
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('image')) {
+        console.warn(`[Book] ${label} strategy ${si+1}: non-image content-type ${ct}`);
+        logger?.log?.(`img_${label}_s${si+1}`, 'warn', `non-image: ${ct}`);
+        continue;
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length < 1000) {
+        console.warn(`[Book] ${label} strategy ${si+1}: suspiciously small (${buf.length}b)`);
+        continue;
+      }
+      console.log(`[Book] ${label} strategy ${si+1}: ✅ ${buf.length} bytes`);
+      logger?.log?.(`img_${label}`, 'ok', `strategy ${si+1}: ${(buf.length/1024).toFixed(0)}KB`);
+      return { buf, source: `pollinations_s${si+1}` };
+    } catch (e) {
+      console.warn(`[Book] ${label} strategy ${si+1}: ${e.message}`);
+      logger?.log?.(`img_${label}_s${si+1}`, 'warn', e.message.slice(0,80));
     }
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('image')) {
-      console.warn(`[Book] ${label}: unexpected content-type: ${ct}`);
-      return null;
-    }
-    const buf = Buffer.from(await res.arrayBuffer());
-    console.log(`[Book] ${label}: ${buf.length} bytes OK`);
-    return buf;
-  } catch (e) {
-    console.warn(`[Book] ${label}: ${e.message}`);
-    return null;
   }
+
+  // All strategies failed — generate a beautiful SVG illustration instead
+  console.warn(`[Book] ${label}: all image strategies failed — generating SVG fallback`);
+  logger?.log?.(`img_${label}`, 'warn', 'Pollinations unavailable — SVG fallback used');
+  const svgBuf = buildSvgPage(prompt, seed);
+  return { buf: svgBuf, source: 'svg_fallback' };
+}
+
+// ── SVG PAGE ILLUSTRATION FALLBACK ───────────────────────────
+// Generates a beautiful, colourful SVG page for children's books.
+// Used when Pollinations.ai is unavailable. Includes randomised shapes,
+// theme-appropriate colours, and decorative elements.
+function buildSvgPage(text, seed) {
+  const n   = typeof seed === 'number' ? seed : 42;
+  const rng = (lo, hi) => lo + ((n * 1103515245 + 12345) & 0x7fffffff) % (hi - lo + 1);
+
+  const PALETTES = [
+    ['#FFD166','#EF476F','#06D6A0','#118AB2','#073B4C'],  // vibrant
+    ['#F9C74F','#F8961E','#F3722C','#90BE6D','#43AA8B'],  // warm sunset
+    ['#9B5DE5','#F15BB5','#FEE440','#00BBF9','#00F5D4'],  // pastel candy
+    ['#264653','#2A9D8F','#E9C46A','#F4A261','#E76F51'],  // earth tones
+  ];
+  const palette = PALETTES[Math.abs(n) % PALETTES.length];
+  const bg      = palette[0];
+  const acc1    = palette[1];
+  const acc2    = palette[2];
+  const acc3    = palette[3];
+
+  // Extract a short excerpt for display (no more than 6 words)
+  const snippet = (text || '')
+    .replace(/[^a-zA-Z0-9 ]/g, '')
+    .trim()
+    .split(' ')
+    .slice(0, 6)
+    .join(' ');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="${palette[4] || '#fff'}" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="${bg}"/>
+    </radialGradient>
+    <filter id="soft">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="${bg}" opacity="0.6"/>
+
+  <!-- Decorative blobs -->
+  <ellipse cx="${150 + rng(0,50)}" cy="${80 + rng(0,40)}"  rx="${80+rng(0,40)}" ry="${60+rng(0,30)}" fill="${acc1}" opacity="0.35" filter="url(#soft)"/>
+  <ellipse cx="${620 + rng(0,60)}" cy="${120 + rng(0,50)}" rx="${90+rng(0,50)}" ry="${70+rng(0,30)}" fill="${acc2}" opacity="0.3"  filter="url(#soft)"/>
+  <ellipse cx="${400}"             cy="${520}"               rx="${200}"          ry="${80}"           fill="${acc3}" opacity="0.25" filter="url(#soft)"/>
+
+  <!-- Central illustration area -->
+  <circle cx="400" cy="280" r="160" fill="white" opacity="0.18"/>
+  <circle cx="400" cy="280" r="140" fill="${acc1}" opacity="0.22"/>
+
+  <!-- Character silhouette — simplified child figure -->
+  <ellipse cx="400" cy="220" rx="38" ry="42" fill="white" opacity="0.85"/>
+  <rect x="364" y="258" width="72" height="80" rx="18" fill="white" opacity="0.85"/>
+  <rect x="342" y="266" width="28" height="55" rx="12" fill="white" opacity="0.75"/>
+  <rect x="430" y="266" width="28" height="55" rx="12" fill="white" opacity="0.75"/>
+  <rect x="372" y="334" width="26" height="52" rx="12" fill="white" opacity="0.75"/>
+  <rect x="402" y="334" width="26" height="52" rx="12" fill="white" opacity="0.75"/>
+
+  <!-- Stars and sparkles -->
+  <text x="180" y="160" font-size="28" opacity="0.7" fill="${acc2}">⭐</text>
+  <text x="580" y="180" font-size="22" opacity="0.6" fill="${acc3}">✨</text>
+  <text x="120" y="420" font-size="20" opacity="0.5" fill="white">🌟</text>
+  <text x="650" y="400" font-size="24" opacity="0.55" fill="${acc1}">💫</text>
+
+  <!-- Decorative dots -->
+  ${[...Array(12)].map((_, i) => {
+    const cx = 80 + (i * 60);
+    const cy = 550 + (i % 3) * 12;
+    return `<circle cx="${cx}" cy="${cy}" r="5" fill="white" opacity="${0.3 + (i%3)*0.2}"/>`;
+  }).join('
+  ')}
+
+  <!-- Page text area -->
+  <rect x="60" y="420" width="680" height="90" rx="18" fill="white" opacity="0.82"/>
+  <text x="400" y="448" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#374151" font-style="italic" opacity="0.6">Illustrated Story Page</text>
+  <text x="400" y="472" text-anchor="middle" font-family="Georgia, serif" font-size="17" fill="#1F2937" font-weight="bold">${snippet}</text>
+
+  <!-- Frame border -->
+  <rect x="12" y="12" width="776" height="576" rx="28" fill="none" stroke="white" stroke-width="3" stroke-dasharray="8 5" opacity="0.4"/>
+</svg>`;
+
+  return Buffer.from(svg, 'utf8');
 }
 
 // ── PDF GENERATION ────────────────────────────────────────────
@@ -214,47 +349,67 @@ export async function generateBook(bookId) {
     const childName = child?.name || 'Reader';
     const imgBufs   = [];
 
-    // Cover
-    const coverPrompt = `enchanted magical book cover for children, bright colours, friendly, no text, adventure, for the story "${story.title||childName+"'s Story"}"`;
-    const coverUrl    = pollinationsUrl(coverPrompt, safeSeed(bookId, 0));
-    db.prepare(`UPDATE story_books SET cover_r2_key=? WHERE id=?`).run(coverUrl, bookId);
-    logger.log('cover_url', 'ok', coverUrl.slice(0, 90));
+    // ── COVER IMAGE ─────────────────────────────────────────────
+    const coverPrompt = `enchanted magical book cover for children, bright pastel colours, friendly, no text, adventure theme, for the story "${story.title || childName + "'s Story"}", kawaii illustration style`;
+    logger.log('cover_start', 'ok', 'Generating cover illustration');
 
-    const coverBuf = await fetchImage(coverUrl, 'cover');
-    if (coverBuf && r2Available()) {
+    const { buf: coverBuf, source: coverSrc } = await fetchImageWithFallback(
+      coverPrompt, safeSeed(bookId, 0), 'cover', logger
+    );
+    const coverMime = coverSrc === 'svg_fallback' ? 'image/svg+xml' : 'image/png';
+    const coverExt  = coverSrc === 'svg_fallback' ? 'svg' : 'png';
+
+    if (r2Available()) {
       try {
-        const key = `books/${bookId}/cover.png`;
-        await r2Put(key, coverBuf, 'image/png');
+        const key = `books/${bookId}/cover.${coverExt}`;
+        await r2Put(key, coverBuf, coverMime);
         db.prepare(`UPDATE story_books SET cover_r2_key=? WHERE id=?`).run(key, bookId);
-        logger.log('cover_r2', 'ok', `${coverBuf.length}b → ${key}`);
+        logger.log('cover_r2', 'ok', `${(coverBuf.length/1024).toFixed(0)}KB → ${key} [${coverSrc}]`);
       } catch (e) { logger.log('cover_r2', 'warn', e.message); }
     } else {
-      logger.log('cover_fetch', coverBuf ? 'warn' : 'warn', coverBuf ? 'R2 unavailable' : 'Fetch returned null — URL fallback used');
+      // Store SVG inline as a data URL if R2 not available
+      if (coverSrc === 'svg_fallback') {
+        const dataUrl = `data:image/svg+xml;base64,${coverBuf.toString('base64')}`;
+        db.prepare(`UPDATE story_books SET cover_r2_key=? WHERE id=?`).run(dataUrl, bookId);
+      }
+      logger.log('cover_r2', 'warn', 'R2 not configured — image stored inline');
     }
     imgBufs.push(coverBuf);
 
-    // Story pages
+    // ── STORY PAGE IMAGES ────────────────────────────────────────
     for (let i = 0; i < pages.length; i++) {
       const page   = pages[i];
       const seed   = safeSeed(bookId, i + 1);
       const prompt = buildImagePrompt(page.text, childName);
-      const url    = pollinationsUrl(prompt, seed);
 
-      db.prepare(`UPDATE story_book_pages SET image_url=? WHERE book_id=? AND page_num=?`)
-        .run(url, bookId, page.page_index);
-      logger.log(`p${i+1}_url`, 'ok', `page ${i+1}/${pages.length} URL stored`);
+      logger.log(`p${i+1}_start`, 'ok', `Illustrating page ${i+1}/${pages.length}`);
 
-      const buf = await fetchImage(url, `page ${i+1}`);
-      if (buf && r2Available()) {
+      const { buf, source: imgSrc } = await fetchImageWithFallback(prompt, seed, `p${i+1}`, logger);
+      const imgMime = imgSrc === 'svg_fallback' ? 'image/svg+xml' : 'image/png';
+      const imgExt  = imgSrc === 'svg_fallback' ? 'svg' : 'png';
+
+      if (r2Available()) {
         try {
-          const key = `books/${bookId}/page_${i+1}.png`;
-          await r2Put(key, buf, 'image/png');
+          const key = `books/${bookId}/page_${i+1}.${imgExt}`;
+          await r2Put(key, buf, imgMime);
           db.prepare(`UPDATE story_book_pages SET image_r2_key=? WHERE book_id=? AND page_num=?`)
             .run(key, bookId, page.page_index);
-          logger.log(`p${i+1}_r2`, 'ok', `${buf.length}b → ${key}`);
-        } catch (e) { logger.log(`p${i+1}_r2`, 'warn', e.message); }
+          logger.log(`p${i+1}_r2`, 'ok', `${(buf.length/1024).toFixed(0)}KB → ${key} [${imgSrc}]`);
+        } catch (e) {
+          logger.log(`p${i+1}_r2`, 'warn', e.message);
+          // Store inline as fallback
+          const dataUrl = `data:${imgMime};base64,${buf.toString('base64')}`;
+          db.prepare(`UPDATE story_book_pages SET image_url=? WHERE book_id=? AND page_num=?`)
+            .run(dataUrl.slice(0, 2000), bookId, page.page_index);
+        }
       } else {
-        logger.log(`p${i+1}_fetch`, 'warn', buf ? 'R2 unavailable' : 'Fetch null — URL fallback');
+        // No R2 — store as data URL (SVG is compact, PNG too large for DB so just store empty)
+        if (imgSrc === 'svg_fallback') {
+          const dataUrl = `data:image/svg+xml;base64,${buf.toString('base64')}`;
+          db.prepare(`UPDATE story_book_pages SET image_url=? WHERE book_id=? AND page_num=?`)
+            .run(dataUrl, bookId, page.page_index);
+        }
+        logger.log(`p${i+1}_r2`, 'warn', 'R2 not configured');
       }
       imgBufs.push(buf);
     }

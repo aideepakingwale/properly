@@ -490,10 +490,18 @@ export const getStruggles = (req, res) => {
 
 // ── GENERATION STATUS ─────────────────────────────────────────
 export const getGenerationStatus = (_req, res) => {
+  const pollToken = (process.env.POLLINATIONS_TOKEN || '').trim();
   res.json({ success: true, data: {
-    geminiAvailable: Boolean(process.env.GEMINI_API_KEY),
-    groqAvailable:   Boolean(process.env.GROQ_API_KEY),
-    batchSizeMax: 10,
-    dailyBatchLimit: 3,
+    geminiAvailable:      Boolean(process.env.GEMINI_API_KEY),
+    groqAvailable:        Boolean(process.env.GROQ_API_KEY),
+    batchSizeMax:         10,
+    dailyBatchLimit:      3,
+    // Book image generation
+    pollinationsModel:    pollToken ? 'flux (premium — POLLINATIONS_TOKEN set)' : 'turbo (free)',
+    pollinationsTokenSet: Boolean(pollToken),
+    r2Available:          Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID),
+    imageStorage:         (process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID)
+                            ? 'Cloudflare R2 (permanent)'
+                            : 'inline data URLs (SVG only — add R2 env vars for full storage)',
   }});
 };

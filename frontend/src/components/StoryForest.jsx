@@ -373,6 +373,16 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
         <div style={{ marginBottom:10, display:'flex', gap:5, flexWrap:'wrap' }}>
           <span style={{ fontSize:10, background:providerInfo?.gemini?'rgba(20,184,166,0.2)':providerInfo?.groq?'rgba(249,115,22,0.15)':'rgba(245,158,11,0.2)', color:providerInfo?.gemini?'var(--provider-gemini)':providerInfo?.groq?'var(--brand-pop1)':'var(--color-accent)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
             {providerInfo?.gemini ? '♊ Gemini AI (free)' : providerInfo?.groq ? '⚡ Groq/Llama (free)' : '📚 Built-in templates'}
+          {providerInfo?.pollinationsModel && (
+            <span style={{ fontSize:10, background:providerInfo.pollinationsTokenSet?'rgba(124,58,237,0.2)':'rgba(59,130,246,0.15)', color:providerInfo.pollinationsTokenSet?'var(--color-primary)':'var(--color-info)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
+              🖼 {providerInfo.pollinationsTokenSet ? 'Flux (premium)' : 'Turbo (free)'}
+            </span>
+          )}
+          {providerInfo?.imageStorage && (
+            <span style={{ fontSize:10, background:'rgba(16,185,129,0.15)', color:'var(--color-success)', borderRadius:50, padding:'3px 9px', fontWeight:700 }}>
+              💾 {providerInfo.imageStorage?.includes('R2') ? '☁️ R2 storage' : '⚠️ No R2'}
+            </span>
+          )}
           </span>
           {interests.length > 0 && (
             <span style={{ fontSize:10, background:'var(--overlay-8)', color:'var(--overlay-50)', borderRadius:50, padding:'3px 9px', fontWeight:600 }}>
