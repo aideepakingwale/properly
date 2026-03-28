@@ -103,6 +103,9 @@ export default function ReadingSession() {
   const [providerInfo, setProviderInfo] = useState(null);
   const [lastDebug, setLastDebug]     = useState(null);  // always-visible debug panel
   const [showDebug, setShowDebug]     = useState(false); // debug panel open/closed
+  const [lastAudioUrl, setLastAudioUrl] = useState(null);  // blob URL of last recording
+  const [lastAudioMime, setLastAudioMime] = useState(null);
+  const [lastAudioKB, setLastAudioKB]   = useState(null);
   const triesRef = useRef(0);
   const [phonicsHearMode, setPhonicsHearMode] = useState(false);  // toggle: full sentence vs phoneme-by-phoneme
   const [speakingChunkKey, setSpeakingChunkKey] = useState(null); // 'wordIdx-chunkIdx' currently playing
@@ -535,6 +538,12 @@ export default function ReadingSession() {
       stopRec();                          // stop Web Speech recognition
       const blob = await stopRecording(); // stop MediaRecorder, get audio blob
       if (blob && blob.size > 300) {  // 300 bytes minimum — even 0.5s of audio is valid
+        // Save blob as playable URL for the debug panel
+        if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl); // free previous
+        const audioUrl = URL.createObjectURL(blob);
+        setLastAudioUrl(audioUrl);
+        setLastAudioMime(blob.type);
+        setLastAudioKB((blob.size / 1024).toFixed(1));
         await processAudio(blob, transcriptRef.current);
         transcriptRef.current = null;
       } else {
@@ -978,7 +987,39 @@ export default function ReadingSession() {
                   <Row label="sent to Azure" val={`${lastDebug.audioKB} KB`} ok={parseFloat(lastDebug.audioKB) > 2} critical={parseFloat(lastDebug.audioKB) < 2} />
                   <Row label="converted (ffmpeg)" val={String(lastDebug.converted)} ok={lastDebug.converted} />
                   <Row label="mime in"       val={lastDebug.mimeIn} />
+                  <Row label="recorded"      val={lastAudioKB ? `${lastAudioKB} KB (${lastAudioMime?.split(';')[0]})` : '—'} />
                 </Section>
+
+                {/* ── SECTION: RECORDED AUDIO PLAYER ── */}
+                {lastAudioUrl && (
+                  <Section label="RECORDED AUDIO — PLAYBACK & DOWNLOAD" color="#FB923C">
+                    <div style={{ padding: '8px 12px' }}>
+                      {/* Native HTML5 audio player */}
+                      <audio
+                        controls
+                        src={lastAudioUrl}
+                        style={{ width: '100%', height: 36, borderRadius: 8, outline: 'none', filter: 'invert(1) hue-rotate(180deg)' }}
+                      />
+                      <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        {/* Download raw recorded file */}
+                        <a
+                          href={lastAudioUrl}
+                          download={`properly-recording-${Date.now()}.webm`}
+                          style={{ background: '#1E293B', color: '#93C5FD', borderRadius: 6, padding: '4px 12px', fontSize: 10, fontWeight: 700, textDecoration: 'none', fontFamily: 'monospace', border: '1px solid #334155', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          ⬇ Download ({lastAudioMime?.split(';')[0] || 'webm'}, {lastAudioKB}KB)
+                        </a>
+                        {/* Info about the file */}
+                        <span style={{ fontSize: 9, color: '#64748B', alignSelf: 'center', fontFamily: 'monospace' }}>
+                          This is what was sent to ffmpeg → Azure. If it plays correctly here, the mic recording worked.
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 9, color: '#475569', fontFamily: 'monospace' }}>
+                        💡 Play this back — if you can hear your voice clearly, ffmpeg conversion is the potential issue.{' '}
+                        If silent/garbled, the browser microphone capture failed.
+                      </div>
+                    </div>
+                  </Section>
+                )}
 
                 {/* ── SECTION: WORD SCORES ── */}
                 {lastDebug.wordScores?.length > 0 && (

@@ -410,3 +410,95 @@ export const getPhoneme = async (req, res) => {
     res.status(500).json({ success: false, message: e.message });
   }
 };
+
+/**
+ * GET /api/speech/test-pa
+ * Tests Pronunciation Assessment with a programmatically generated WAV
+ * (440Hz sine wave tone = clearly not speech → should return InitialSilenceTimeout or NoMatch)
+ * vs real speech through Azure TTS.
+ * This isolates whether PA works at all with our key/region.
+ */
+export const testPronunciationAssessment = async (req, res) => {
+  if (!azureAvailable()) {
+    return res.json({ success: false, message: 'AZURE_SPEECH_KEY not set' });
+  }
+
+  const key    = (process.env.AZURE_SPEECH_KEY    || '').trim();
+  const region = (process.env.AZURE_SPEECH_REGION || 'uksouth').trim();
+
+  // Build a real speech WAV using Azure TTS so we KNOW the audio is valid
+  // This tests: can we synthesise speech AND assess it in one round-trip?
+  try {
+    // Step 1: Generate "the cat sat" via Azure TTS
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">
+      <voice name="en-GB-SoniaNeural"><prosody rate="0.85">the cat sat on the mat</prosody></voice>
+    </speak>`.trim();
+
+    const ttsRes = await fetch(
+      `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
+      { method: 'POST', headers: {
+        'Ocp-Apim-Subscription-Key': key,
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': 'riff-16khz-16bit-mono-pcm',  // WAV PCM directly!
+      }, body: ssml }
+    );
+
+    if (!ttsRes.ok) {
+      return res.json({ success: false, step: 'tts', status: ttsRes.status, error: await ttsRes.text().catch(()=>'') });
+    }
+    const wavBuf = Buffer.from(await ttsRes.arrayBuffer());
+
+    // Step 2: Run PA on the TTS output
+    const pronConfig = {
+      ReferenceText:   'the cat sat on the mat',
+      GradingSystem:   'HundredMark',
+      Granularity:     'Phoneme',
+      EnableMiscue:    true,
+      PhonemeAlphabet: 'IPA',
+    };
+    const pronB64 = Buffer.from(JSON.stringify(pronConfig)).toString('base64').replace(/[\r\n\s=]/g, '');
+
+    const paRes = await fetch(
+      `https://${region}.stt.speech.microsoft.com/speech/recognition/interactive/cognitiveservices/v1?language=en-US&format=detailed`,
+      { method: 'POST', headers: {
+        'Ocp-Apim-Subscription-Key': key,
+        'Content-Type':              'audio/wav; codecs=audio/pcm; samplerate=16000',
+        'Pronunciation-Assessment':  pronB64,
+        'Accept':                    'application/json',
+      }, body: wavBuf, signal: AbortSignal.timeout(20000) }
+    );
+
+    const paStatus = paRes.status;
+    const paBody   = await paRes.json().catch(async () => ({ raw: await paRes.text().catch(()=>'') }));
+    const nb       = paBody?.NBest?.[0];
+    const paResult = nb?.PronunciationAssessment;
+
+    res.json({
+      success: true,
+      data: {
+        wavKB:              (wavBuf.length / 1024).toFixed(1),
+        paHttpStatus:       paStatus,
+        recognitionStatus:  paBody.RecognitionStatus,
+        displayText:        paBody.DisplayText,
+        nBestCount:         paBody.NBest?.length ?? 0,
+        paPresent:          !!paResult,
+        accuracyScore:      paResult?.AccuracyScore,
+        fluencyScore:       paResult?.FluencyScore,
+        word0:              nb?.Words?.[0]?.Word,
+        word0PA:            !!nb?.Words?.[0]?.PronunciationAssessment,
+        word0Score:         nb?.Words?.[0]?.PronunciationAssessment?.AccuracyScore,
+        pronConfigB64:      pronB64,
+        pronConfigDecoded:  pronConfig,
+        region,
+        keyPreview:         key.slice(0,4) + '****' + key.slice(-4),
+        interpretation:     paResult
+          ? `✅ PA WORKS! Accuracy=${paResult.AccuracyScore} Fluency=${paResult.FluencyScore}`
+          : paBody.RecognitionStatus === 'Success'
+            ? '❌ PA MISSING — header ignored. Check region/tier support.'
+            : `⚠️ ${paBody.RecognitionStatus}`,
+      },
+    });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+};

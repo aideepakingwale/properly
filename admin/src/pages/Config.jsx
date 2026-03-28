@@ -120,6 +120,19 @@ export default function Config() {
   const [azureConnTest, setAzureConnTest] = useState(null);
   const [testingConn, setTestingConn]     = useState(false);
 
+  const [paTest, setPaTest]           = useState(null);
+  const [testingPA, setTestingPA]     = useState(false);
+
+  const testPronunciationAssessment = async () => {
+    setTestingPA(true); setPaTest(null);
+    try {
+      const r = await api.get('/speech/test-pa');
+      setPaTest(r.data);
+    } catch (e) {
+      setPaTest({ success: false, message: e.message });
+    } finally { setTestingPA(false); }
+  };
+
   const testAzureLive = async () => {
     setTestingConn(true); setAzureConnTest(null);
     try {
