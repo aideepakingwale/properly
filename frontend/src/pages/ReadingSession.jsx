@@ -112,11 +112,28 @@ export default function ReadingSession() {
 
   const { startRecording, stopRecording, isRecording, error: micError } = useAudioRecorder();
 
-  // Browser speech recognition — captures transcript alongside audio
-  // Used as fallback scoring when Azure is not configured
+  // Browser speech recognition — captures transcript alongside audio recording.
+  // PRIMARY ROLE: quality gate before Azure — if browser can't hear it, Azure won't either.
+  // SECONDARY ROLE: fallback scoring when Azure not configured.
+  const [localTranscript, setLocalTranscript] = useState('');  // what browser heard
+  const [localConfidence, setLocalConfidence] = useState(0);   // 0-1 confidence
+  const [transcriptReady, setTranscriptReady] = useState(false); // transcript received
+
   const { start: startRec, stop: stopRec } = useSpeechRecognition({
-    onResult: (text) => { transcriptRef.current = text; },
-    onError:  () => {},
+    onResult: (text, confidence = 0.8) => {
+      transcriptRef.current = text;
+      setLocalTranscript(text);
+      setLocalConfidence(confidence);
+      setTranscriptReady(true);
+    },
+    onError: (err) => {
+      // 'no-speech' means silence was recorded — clear confidence gate
+      if (err === 'no-speech' || err === 'audio-capture') {
+        setLocalTranscript('');
+        setLocalConfidence(0);
+        setTranscriptReady(true);  // mark as done even on error so handleMic can proceed
+      }
+    },
   });
 
   // Load story + provider status
@@ -179,7 +196,7 @@ export default function ReadingSession() {
   }, [story, child]);
 
   // Reset on page change
-  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); }, [pageIdx]);
+  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); setLocalTranscript(''); setLocalConfidence(0); setTranscriptReady(false); }, [pageIdx]);
 
   const page    = story?.pages?.[pageIdx];
   const pageRef = useRef(null);
@@ -554,30 +571,66 @@ export default function ReadingSession() {
 
   const handleMic = async () => {
     if (isRecording) {
-      stopRec();                          // stop Web Speech recognition
-      const blob = await stopRecording(); // stop MediaRecorder, get audio blob
-      if (blob && blob.size > 300) {  // 300 bytes minimum — even 0.5s of audio is valid
-        // Save blob as playable URL for the debug panel
-        if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl); // free previous
-        const audioUrl = URL.createObjectURL(blob);
-        setLastAudioUrl(audioUrl);
-        setLastAudioMime(blob.type);
-        setLastAudioKB((blob.size / 1024).toFixed(1));
-        await processAudio(blob, transcriptRef.current);
-        transcriptRef.current = null;
-      } else {
-        setFeedbackData({ tip: "I couldn't hear that clearly — try again! 🎙️", source: 'fallback', provider: 'rules' });
+      // Stop both simultaneously
+      stopRec();
+      const blob = await stopRecording();
+
+      if (!blob || blob.size < 300) {
+        setFeedbackData({ tip: "I couldn't hear anything — tap 🎙️ and try again!", source: 'fallback', provider: 'rules' });
+        return;
       }
+
+      // Save blob URL for debug panel playback
+      if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
+      const audioUrl = URL.createObjectURL(blob);
+      setLastAudioUrl(audioUrl);
+      setLastAudioMime(blob.type);
+      setLastAudioKB((blob.size / 1024).toFixed(1));
+
+      // ── QUALITY GATE: check browser transcript before calling Azure ──────
+      // Web Speech API ran in parallel during recording.
+      // If the browser heard nothing → the recording is likely silent/too quiet.
+      // Only proceed to Azure when we have confirmed speech.
+      const browserText    = transcriptRef.current || '';
+      const browserHeard   = browserText.trim().length > 0;
+
+      if (!browserHeard) {
+        // No speech detected by the browser — don't waste an Azure API call.
+        // Show feedback and offer to retry.
+        setLocalTranscript('');
+        setFeedbackData({
+          tip: "Hmm, I didn't catch that! 🎙️ Try speaking a bit louder and closer to your microphone, then tap again.",
+          source: 'fallback',
+          provider: 'rules',
+        });
+        // Still show the recorded audio in debug so user can verify
+        setLastDebug({ stage: 'no-speech', blobKB: (blob.size/1024).toFixed(1), mime: blob.type, browserText: '(empty)', ref: pageRef.current?.text });
+        transcriptRef.current = null;
+        return;
+      }
+
+      // ── GATE PASSED: browser heard speech → proceed to Azure ─────────────
+      // Show "I heard you say…" feedback while Azure processes
+      setLocalTranscript(browserText);
+      transcriptRef.current = browserText;
+
+      await processAudio(blob, browserText);
+      transcriptRef.current = null;
       return;
     }
-    // Cancel any phonics playback in progress
+
+    // ── START RECORDING ──────────────────────────────────────────────────────
     phonicsPlayingRef.current = false;
     window.speechSynthesis?.cancel();
     setSpeakingChunkKey(null);
     setSpeakingWordIdx(-1);
-    // Start both audio recorder AND speech recognition simultaneously
+    // Reset transcript state for new recording
+    setLocalTranscript('');
+    setLocalConfidence(0);
+    setTranscriptReady(false);
     transcriptRef.current = null;
-    startRec((evt) => { /* state managed by isRecording below */ });
+    // Start browser speech recognition AND MediaRecorder in parallel
+    startRec((evt) => { /* state managed by isRecording */ });
     await startRecording();
   };
 
@@ -939,7 +992,8 @@ export default function ReadingSession() {
                   <Row label="status"       val={`${lastDebug.overallAccuracy > 0 ? '✅' : '❌'} ${lastDebug.overallAccuracy ?? '?'}%`} ok={lastDebug.overallAccuracy > 0} />
                   <Row label="source"       val={lastDebug.source || lastDebug.stage || '?'} />
                   <Row label="azureAssessed" val={String(lastDebug.azureAssessed)} ok={lastDebug.azureAssessed} />
-                  <Row label="heard"        val={`"${lastDebug.displayText || nb?.Display || nb?.Lexical || '(nothing)'}"`} ok={!!(lastDebug.displayText || nb?.Display)} />
+                  <Row label="browser heard" val={`"${localTranscript || '(nothing)'}"`} ok={!!localTranscript} critical={!localTranscript} />
+                  <Row label="azure heard"   val={`"${lastDebug.displayText || nb?.Display || nb?.Lexical || '(nothing)'}"`} ok={!!(lastDebug.displayText || nb?.Display)} />
                   <Row label="reference (sent to backend)" val={`"${lastDebug.referenceText || lastDebug.refText || lastDebug.sanitised || page?.text}"`} ok={!!lastDebug.referenceText} critical={!lastDebug.referenceText} />
                   <Row label="current page.text"     val={`"${page?.text}"`} ok={page?.text === (lastDebug.referenceText || lastDebug.refText)} critical={page?.text !== (lastDebug.referenceText || lastDebug.refText)} />
                   <Row label="recognitionStatus" val={lastDebug.recognitionStatus || nb?.RecognitionStatus || lastDebug.responseBody?.RecognitionStatus || '?'} ok={lastDebug.recognitionStatus === 'Success'} />
@@ -1168,9 +1222,12 @@ export default function ReadingSession() {
           </div>
         </div>
         <p style={{ fontSize: 13, fontWeight: 700, color: dark ? 'var(--overlay-60)' : 'var(--text-muted)' }}>
-          {assessing ? '⚙️ Analysing your reading…'
-           : isRecording ? '🔴 Recording… tap to stop'
-           : 'Tap 🎙️ and read the sentence aloud!'}
+          {assessing
+            ? (localTranscript
+                ? <>⚙️ Scoring… I heard: <em>"{localTranscript}"</em></>
+                : '⚙️ Analysing your reading…')
+            : isRecording ? '🔴 Recording… tap to stop'
+            : 'Tap 🎙️ and read the sentence aloud!'}
         </p>
         <p style={{ fontSize: 11, color: dark ? 'var(--overlay-25)' : 'var(--border-2)', marginTop: 2 }}>
           {scoringMode === 'azure'

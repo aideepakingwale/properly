@@ -136,10 +136,10 @@ export const speechAPI = {
       form.append('audio', audioBlob, `rec.${ext}`);
     }
     if (transcript) form.append('transcript', transcript);
-    return api.post('/speech/assess', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 25000,
-    });
+    // DO NOT set Content-Type manually — Axios must auto-set it with the
+    // multipart boundary: 'multipart/form-data; boundary=----WebKitFormBoundaryXXX'
+    // Without the boundary, multer cannot parse the body and req.file is undefined.
+    return api.post('/speech/assess', form, { timeout: 25000 });
   },
 };
 
