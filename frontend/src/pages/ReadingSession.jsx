@@ -27,6 +27,7 @@ import { AcornPill, Modal, Confetti, ProgressBar, Button, Spinner } from '../com
 import PhonicsWord from '../components/PhonicsWord';
 import { analyseWord, getPhonemeHint } from '../utils/phonicsAnalyser';
 import { getPhonemeUrl, isCacheLoaded, getCacheStats } from '../services/phonemeCache';
+import { assessWithSDK } from '../services/azureSpeechSDK';
 
 // Colour coding for Azure error types
 function getErrorBadge(errorType) {
@@ -137,6 +138,7 @@ export default function ReadingSession() {
     },
     onError: (err) => {
       setLocalTranscript('');
+    setSdkLog([]);
       setLocalConfidence(0);
       transcriptResolveRef.current?.({ text: '', confidence: 0, error: err });
       transcriptResolveRef.current = null;
@@ -262,7 +264,8 @@ export default function ReadingSession() {
   const phonemeAudioCache    = useRef({});
   const phonemeAudioRef      = useRef(null);
   const _reloadingPhonemes   = useRef(false);  // prevent multiple simultaneous preload calls
-  const [phonemeDebugLog, setPhonemeDebugLog] = useState([]); // [{ipa, grapheme, method, status, ms}]
+  const [phonemeDebugLog, setPhonemeDebugLog] = useState([]);
+  const [sdkLog, setSdkLog]             = useState([]);  // Azure Speech SDK log lines // [{ipa, grapheme, method, status, ms}]
   const [showPhonemeDebug, setShowPhonemeDebug] = useState(false);
   const addPhonemeLog = (entry) => setPhonemeDebugLog(prev => [entry, ...prev].slice(0, 30));
 
@@ -451,9 +454,40 @@ export default function ReadingSession() {
       // 1. Send audio to backend → Azure Pronunciation Assessment
       const blobKB = (audioBlob?.size / 1024).toFixed(1);
       setLastDebug({ stage: 'sending', blobKB, mime: audioBlob?.type, ref: pageRef.current?.text || page?.text });
-      // Use pageRef.current to avoid stale closure — always reads the current page
       const currentPage = pageRef.current;
-      const assessRes = await speechAPI.assess(audioBlob, currentPage?.text || page?.text, browserTranscript || null);
+      const refText     = currentPage?.text || page?.text || '';
+      const jwtToken    = localStorage.getItem('properly_token');
+
+      // ── AZURE SPEECH SDK (primary path — WebSocket, 100% reliable PA) ──
+      // Try SDK first. Falls back to REST API if SDK fails (SDK load error, etc.)
+      let assessRes = null;
+      let sdkUsed   = false;
+
+      if (providerInfo?.azure?.available) {
+        try {
+          setSdkLog(['🔄 Loading Azure Speech SDK…']);
+          const sdkResult = await assessWithSDK(
+            audioBlob, refText, jwtToken,
+            (msg) => setSdkLog(prev => [...prev.slice(-4), msg])
+          );
+          if (sdkResult) {
+            // SDK returned PA scores — wrap in assessRes shape
+            assessRes  = { success: true, data: { ...sdkResult, _debugInfo: sdkResult._debug } };
+            sdkUsed    = true;
+            setSdkLog(prev => [...prev, `✅ PA: ${sdkResult.overallAccuracy}% accuracy`]);
+          } else {
+            setSdkLog(prev => [...prev, '⚠️ SDK: no speech detected — falling back to REST']);
+          }
+        } catch (sdkErr) {
+          setSdkLog(prev => [...prev, `❌ SDK failed: ${sdkErr.message} — falling back to REST`]);
+          console.warn('[processAudio] SDK failed:', sdkErr.message);
+        }
+      }
+
+      // ── REST API fallback (Groq Whisper / text-comparison) ───────────────
+      if (!assessRes) {
+        assessRes = await speechAPI.assess(audioBlob, refText, browserTranscript || null);
+      }
       if (!assessRes.success) return;
 
       const { wordScores, overallAccuracy, overallFluency, overallCompleteness,
@@ -1191,6 +1225,15 @@ export default function ReadingSession() {
                 </Section>
 
                 {/* ── SECTION: AUDIO ── */}
+                {/* ── SDK LOG ── */}
+                {sdkLog.length > 0 && (
+                  <Section label="AZURE SPEECH SDK LOG" color="#A78BFA">
+                    {sdkLog.map((l, i) => (
+                      <div key={i} style={{ padding: '1px 12px', fontFamily: 'monospace', fontSize: 10, color: l.startsWith('✅') ? '#6EE7B7' : l.startsWith('❌') ? '#FCA5A5' : '#C4B5FD' }}>{l}</div>
+                    ))}
+                  </Section>
+                )}
+
                 <Section label="AUDIO" color="#34D399">
                   <Row label="sent to Azure" val={`${lastDebug.audioKB} KB`} ok={parseFloat(lastDebug.audioKB) > 2} critical={parseFloat(lastDebug.audioKB) < 2} />
                   <Row label="converted (ffmpeg)" val={String(lastDebug.converted)} ok={lastDebug.converted} />
