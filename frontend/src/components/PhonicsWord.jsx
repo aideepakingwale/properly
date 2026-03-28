@@ -90,7 +90,26 @@ export default function PhonicsWord({
 
       {/* ── GRAPHEME TILES ─────────────────────────────── */}
       <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 1 }}>
-        {chunks.map((chunk, ci) => {
+        {/* Wrap in relative container so blend arcs can be positioned absolutely */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: compact ? 1 : 2 }}>
+      {/* Blend group brackets — SVG arc drawn over the blend letters */}
+      {blendGroups.map((bg, bgi) => {
+        const tileW  = compact ? 26 : 32;
+        const gapW   = compact ? 1 : 2;
+        const totalW = bg.length * tileW + (bg.length - 1) * gapW;
+        const leftOff = bg.startChunkIdx * (tileW + gapW);
+        return (
+          <svg key={bgi}
+            style={{ position: 'absolute', top: -10, left: leftOff, pointerEvents: 'none', overflow: 'visible', zIndex: 2 }}
+            width={totalW} height={10}>
+            <path
+              d={`M 2 9 Q ${totalW/2} 0 ${totalW - 2} 9`}
+              fill="none" stroke="#0EA5E9" strokeWidth="1.5" strokeDasharray="3 2"
+            />
+          </svg>
+        );
+      })}
+      {chunks.map((chunk, ci) => {
           const isWorst    = ci === worstChunkIdx;
           const chunkColor = isRevealed && chunk.score !== null
             ? graphemeScoreColor(chunk.score)
