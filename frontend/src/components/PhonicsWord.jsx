@@ -16,7 +16,7 @@
  * @license     Proprietary
  */
 
-import { analyseWord, mergePhonemeScores, graphemeScoreColor } from '../utils/phonicsAnalyser';
+import { analyseWord, mergePhonemeScores, graphemeScoreColor, getBlendGroups } from '../utils/phonicsAnalyser';
 
 /**
  * PhonicsWord — renders a single word as a row of grapheme tiles.
@@ -48,6 +48,7 @@ export default function PhonicsWord({
 
   // Analyse into grapheme chunks
   let chunks = analyseWord(clean, phase);
+  const blendGroups = getBlendGroups(chunks);
 
   // Merge Azure phoneme scores if available
   if (isRevealed && azurePhonemes?.length > 0) {
@@ -89,10 +90,8 @@ export default function PhonicsWord({
       )}
 
       {/* ── GRAPHEME TILES ─────────────────────────────── */}
-      <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 1 }}>
-        {/* Wrap in relative container so blend arcs can be positioned absolutely */}
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: compact ? 1 : 2 }}>
-      {/* Blend group brackets — SVG arc drawn over the blend letters */}
+      <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 1, position: 'relative' }}>
+        {/* Blend arc SVGs — positioned absolute relative to the parent span */}
       {blendGroups.map((bg, bgi) => {
         const tileW  = compact ? 26 : 32;
         const gapW   = compact ? 1 : 2;
