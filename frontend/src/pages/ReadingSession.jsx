@@ -190,26 +190,41 @@ export default function ReadingSession() {
 
   const phonemeAudioCache = useRef({});
   const phonemeAudioRef   = useRef(null);
+  const [phonemeDebugLog, setPhonemeDebugLog] = useState([]); // [{ipa, grapheme, method, status, ms}]
+  const [showPhonemeDebug, setShowPhonemeDebug] = useState(false);
+  const addPhonemeLog = (entry) => setPhonemeDebugLog(prev => [entry, ...prev].slice(0, 30));
 
   const fetchPhonemeAudio = useCallback(async (ipa, grapheme) => {
     const key = ipa;
-    if (phonemeAudioCache.current[key]) return phonemeAudioCache.current[key];
+    if (phonemeAudioCache.current[key]) {
+      addPhonemeLog({ ipa, grapheme, method: 'azure-cached', status: '✅ cache hit', ms: 0 });
+      return phonemeAudioCache.current[key];
+    }
+    const t0 = Date.now();
     try {
       const token = localStorage.getItem('properly_token');
       const rawBase = (typeof __API_URL__ !== 'undefined' && __API_URL__) ? __API_URL__ : '/api';
       const base = rawBase.startsWith('http') ? rawBase.replace(/\/$/, '') : 'https://' + rawBase.replace(/\/$/, '');
       const apiBase = base.endsWith('/api') ? base : base + '/api';
-      const res = await fetch(`${apiBase}/ai/phoneme`, {
+      const url_called = `${apiBase}/ai/phoneme`;
+      const res = await fetch(url_called, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body:    JSON.stringify({ ipa, grapheme, rate: 0.55 }),
       });
-      if (!res.ok) throw new Error(`${res.status}`);
+      const ms = Date.now() - t0;
+      if (!res.ok) {
+        const errText = await res.text().catch(() => res.statusText);
+        addPhonemeLog({ ipa, grapheme, method: 'azure-tts', status: `❌ HTTP ${res.status}: ${errText.slice(0,60)}`, ms, url: url_called });
+        throw new Error(`${res.status}: ${errText.slice(0,80)}`);
+      }
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       phonemeAudioCache.current[key] = url;
+      addPhonemeLog({ ipa, grapheme, method: 'azure-tts', status: `✅ ${(blob.size/1024).toFixed(1)}KB MP3`, ms, url: url_called });
       return url;
     } catch (e) {
+      addPhonemeLog({ ipa, grapheme, method: 'azure-tts', status: `❌ ${e.message}`, ms: Date.now()-t0 });
       console.warn('[PhonemeAudio] Azure failed for /' + ipa + '/ —', e.message);
       return null;
     }
@@ -226,36 +241,60 @@ export default function ReadingSession() {
 
   // Key words: shortest common English word that STARTS with (or clearly contains) the phoneme
   // Spoken at rate 0.5 — child hears the sound at the word boundary
-  const PHONEME_KEYWORDS = {
-    '/p/': 'pat',   '/b/': 'bat',   '/t/': 'tap',   '/d/': 'dad',
-    '/k/': 'cat',   '/g/': 'gap',   '/f/': 'fan',   '/v/': 'van',
-    '/s/': 'sat',   '/z/': 'zip',   '/ʃ/': 'ship',  '/h/': 'hop',
-    '/tʃ/': 'chip', '/dʒ/': 'jet',  '/m/': 'mat',   '/n/': 'nap',
-    '/ŋ/': 'ring',  '/ŋk/': 'sink', '/l/': 'lip',   '/r/': 'rat',
-    '/w/': 'wet',   '/j/': 'yes',   '/kw/': 'quick','/ks/': 'fox',
-    '/ð/': 'this',  '/θ/': 'thin',
-    '/æ/': 'ant',   '/ɛ/': 'egg',   '/ɪ/': 'ink',   '/ɒ/': 'on',
-    '/ʌ/': 'up',    '/ʊ/': 'book',  '/ə/': 'a',
-    '/eɪ/': 'aim',  '/iː/': 'eat',  '/aɪ/': 'ice',  '/əʊ/': 'oak',
-    '/uː/': 'ooze', '/aʊ/': 'out',  '/ɔɪ/': 'oil',  '/ɑː/': 'arm',
-    '/ɔː/': 'oar',  '/ɜː/': 'earn', '/juː/': 'use',
-    '/ɪə/': 'ear',  '/eə/': 'air',  '/ʊə/': 'tour',
+  // ── PHONEME SOUNDS ────────────────────────────────────────────
+  // Web Speech CANNOT isolate a phoneme from a whole word.
+  // "cat" → TTS reads "cat". We need just the /k/ onset.
+  //
+  // Trick: feed Web Speech a CVC syllable using only the target phoneme
+  // + a neutral "uh" vowel. The schwa "uh" is the most neutral English vowel.
+  // Spoken at rate 0.5, only the onset consonant is perceptible.
+  //
+  // For VOWELS: feed just the vowel sound written phonetically.
+  // /æ/ → "ah" (not "aaa", not "ant") — "ah" as in "ah yes"
+  // /ɛ/ → "eh" (not "egg")
+  //
+  // When Azure is configured: always use SSML <phoneme> tags for exact IPA sound.
+
+  const PHONEME_SPEECH = {
+    // ── CONSONANT STOPS — short schwa syllable, cut off after onset ──
+    '/p/': 'puh',    '/b/': 'buh',    '/t/': 'tuh',    '/d/': 'duh',
+    '/k/': 'kuh',    '/g/': 'guh',
+    // ── FRICATIVES — continuous sounds, written to extend naturally ──
+    '/f/': 'fffff',  '/v/': 'vvvvv',  '/s/': 'sss',    '/z/': 'zzz',
+    '/ʃ/': 'shh',    '/h/': 'huh',    '/ð/': 'thuh',   '/θ/': 'thh',
+    // ── AFFRICATES ─────────────────────────────────────────────────
+    '/tʃ/': 'chuh',  '/dʒ/': 'juh',
+    // ── NASALS & APPROXIMANTS ───────────────────────────────────────
+    '/m/': 'mmm',    '/n/': 'nnn',    '/ŋ/': 'nng',    '/ŋk/': 'ngk',
+    '/l/': 'lll',    '/r/': 'rr',     '/w/': 'wuh',    '/j/': 'yuh',
+    '/kw/': 'kwuh',  '/ks/': 'ks',
+    // ── SHORT VOWELS — pure vowel sound, no surrounding consonants ──
+    '/æ/': 'ah',     '/ɛ/': 'eh',     '/ɪ/': 'ih',     '/ɒ/': 'oh',
+    '/ʌ/': 'uh',     '/ʊ/': 'oo',     '/ə/': 'uh',
+    // ── LONG VOWELS & DIPHTHONGS ────────────────────────────────────
+    '/eɪ/': 'ay',    '/iː/': 'ee',    '/aɪ/': 'eye',   '/əʊ/': 'oh',
+    '/uː/': 'oo',    '/aʊ/': 'ow',    '/ɔɪ/': 'oy',
+    '/ɑː/': 'ah',    '/ɔː/': 'aw',    '/ɜː/': 'ur',    '/juː/': 'yoo',
+    '/ɪə/': 'ear',   '/eə/': 'air',   '/ʊə/': 'oor',
   };
 
   function getPhonemeConfig(phoneme, grapheme) {
-    return { ipa: phoneme.replace(/^\/|\/$/g, ''), grapheme, keyword: PHONEME_KEYWORDS[phoneme] || grapheme };
+    return { ipa: phoneme.replace(/^\/|\/$/g, ''), grapheme, speech: PHONEME_SPEECH[phoneme] || grapheme };
   }
 
   const playPhoneme = useCallback(async (phoneme, grapheme) => {
     const ipaClean = phoneme.replace(/^\/|\/$/g, '');
-    // 1. Azure TTS — exact IPA phoneme sound (best quality)
+
+    // 1. Azure TTS with SSML <phoneme alphabet="ipa"> — EXACT sound (best quality)
     if (providerInfo?.azure?.available) {
       const url = await fetchPhonemeAudio(ipaClean, grapheme);
       if (url) { await playAudioUrl(url); return; }
     }
-    // 2. Web Speech fallback — key word at very slow rate
-    const keyword = PHONEME_KEYWORDS[phoneme] || grapheme;
-    await sayWord(keyword, 0.5, 1.1);
+
+    // 2. Web Speech fallback — phonetic syllable designed to isolate the target sound
+    const speech = PHONEME_SPEECH[phoneme] || grapheme;
+    addPhonemeLog({ ipa: ipaClean, grapheme, method: 'web-speech', status: `▶ "${speech}"`, ms: 0 });
+    await sayWord(speech, 0.5, 1.1);
   }, [providerInfo, fetchPhonemeAudio]);
 
   // Promise-based speech — waits for onend before resolving
@@ -967,6 +1006,66 @@ export default function ReadingSession() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ── PHONEME TTS DEBUG PANEL ── */}
+      {(phonemeDebugLog.length > 0 || showPhonemeDebug) && (
+        <div style={{ margin: '0 0 8px', borderRadius: 14, overflow: 'hidden', border: '1.5px solid var(--brand-accent)', fontSize: 11 }}>
+          <button
+            onClick={() => setShowPhonemeDebug(v => !v)}
+            style={{ width: '100%', padding: '7px 14px', background: 'rgba(251,191,36,0.12)', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11 }}>
+            <span>
+              🔤 Phoneme TTS Debug — {phonemeDebugLog.length} calls
+              {phonemeDebugLog.some(l => l.status?.startsWith('❌')) ? ' ❌ errors' : phonemeDebugLog.some(l => l.method === 'azure-tts' && l.status?.startsWith('✅')) ? ' ✅ Azure working' : ''}
+            </span>
+            <span>{showPhonemeDebug ? '▲' : '▼'}</span>
+          </button>
+
+          {showPhonemeDebug && (
+            <div style={{ background: '#0B0F1A', padding: '8px 0', maxHeight: 300, overflowY: 'auto' }}>
+              {/* Header row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '60px 60px 90px 1fr 50px', gap: 4, padding: '2px 12px 6px', borderBottom: '1px solid rgba(255,255,255,0.08)', fontFamily: 'monospace', fontSize: 9, color: '#FCD34D', fontWeight: 700 }}>
+                <span>IPA</span><span>grapheme</span><span>method</span><span>status</span><span>ms</span>
+              </div>
+              {phonemeDebugLog.length === 0 ? (
+                <div style={{ padding: '10px 12px', color: '#64748B', fontFamily: 'monospace', fontSize: 10 }}>
+                  No phoneme calls yet — tap "🔤 Hear the Phonics Sounds" to test
+                </div>
+              ) : phonemeDebugLog.map((entry, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 60px 90px 1fr 50px', gap: 4, padding: '2px 12px', fontFamily: 'monospace', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.04)', color: entry.status?.startsWith('✅') ? '#6EE7B7' : entry.status?.startsWith('❌') ? '#FCA5A5' : '#93C5FD' }}>
+                  <span style={{ fontWeight: 700 }}>/{entry.ipa}/</span>
+                  <span style={{ color: '#FCD34D' }}>{entry.grapheme}</span>
+                  <span style={{ color: entry.method === 'azure-tts' ? '#A78BFA' : entry.method === 'azure-cached' ? '#34D399' : '#F97316' }}>
+                    {entry.method === 'azure-tts' ? '☁️ Azure' : entry.method === 'azure-cached' ? '💾 cached' : '📱 WebSpeech'}
+                  </span>
+                  <span style={{ wordBreak: 'break-all' }}>{entry.status}</span>
+                  <span style={{ color: '#64748B', textAlign: 'right' }}>{entry.ms > 0 ? `${entry.ms}ms` : '—'}</span>
+                </div>
+              ))}
+              {/* Summary */}
+              {phonemeDebugLog.length > 0 && (() => {
+                const azureCalls  = phonemeDebugLog.filter(l => l.method === 'azure-tts');
+                const azureOk     = azureCalls.filter(l => l.status?.startsWith('✅'));
+                const azureFail   = azureCalls.filter(l => l.status?.startsWith('❌'));
+                const webSpeech   = phonemeDebugLog.filter(l => l.method === 'web-speech');
+                const avgMs       = azureOk.length ? Math.round(azureOk.reduce((a,b)=>a+(b.ms||0),0)/azureOk.length) : 0;
+                return (
+                  <div style={{ padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.1)', fontFamily: 'monospace', fontSize: 10, color: '#94A3B8', marginTop: 4 }}>
+                    ☁️ Azure: {azureOk.length} ok / {azureFail.length} failed (avg {avgMs}ms)
+                    {' · '}📱 Web Speech: {webSpeech.length}
+                    {' · '}💾 Cached: {phonemeDebugLog.filter(l=>l.method==='azure-cached').length}
+                    {azureFail.length > 0 && (
+                      <div style={{ color: '#FCA5A5', marginTop: 4 }}>
+                        ❌ First error: {azureFail[azureFail.length-1]?.status}
+                      </div>
+                    )}
+                    <button onClick={() => setPhonemeDebugLog([])} style={{ float: 'right', background: 'none', border: '1px solid #334155', borderRadius: 4, color: '#64748B', cursor: 'pointer', fontSize: 9, padding: '1px 6px' }}>Clear</button>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
