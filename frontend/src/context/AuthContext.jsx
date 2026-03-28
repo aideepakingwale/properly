@@ -16,6 +16,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authAPI, progressAPI } from '../services/api';
+import { preloadPhonemes } from '../services/phonemeCache';
 
 const AuthContext = createContext(null);
 
