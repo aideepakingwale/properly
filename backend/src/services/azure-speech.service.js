@@ -269,47 +269,60 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   console.log('PRON CONFIG B64 (full):', pronConfigB64);
   console.log('====================================\n');
 
-  const response = await fetch(fullUrl, {
-    method: 'POST',
-    headers: {
-      'Ocp-Apim-Subscription-Key': AZURE_KEY,
-      'Content-Type':              contentType,
-      'Pronunciation-Assessment':  pronConfigB64,
-      'Accept':                    'application/json',
-    },
-    body: audioToSend,
-    signal: AbortSignal.timeout(30000),
-  });
+  // ── SEND TO AZURE — with automatic retry if PA is missing ──
+  // Azure's REST API intermittently routes to nodes that ignore the PA header.
+  // Retry once immediately on PA miss — different node, usually succeeds.
+  const HEADERS = {
+    'Ocp-Apim-Subscription-Key': AZURE_KEY,
+    'Content-Type':              contentType,
+    'Pronunciation-Assessment':  pronConfigB64,
+    'Accept':                    'application/json',
+  };
 
-  // ── FULL RESPONSE LOG ────────────────────────────────────────
-  const responseHeadersObj = {};
-  response.headers.forEach((val, key) => { responseHeadersObj[key] = val; });
-  console.log('\n========== AZURE RESPONSE ==========');
-  console.log('STATUS: ', response.status, response.statusText);
-  console.log('HEADERS:', JSON.stringify(responseHeadersObj, null, 2));
+  async function callAzurePA(attempt = 1) {
+    console.log(`[Azure] PA attempt ${attempt} — ${(audioToSend.length/1024).toFixed(1)}KB WAV`);
+    const res = await fetch(fullUrl, {
+      method: 'POST',
+      headers: HEADERS,
+      body: audioToSend,
+      signal: AbortSignal.timeout(30000),
+    });
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => response.statusText);
-    console.log('BODY (error):', errText);
-    console.log('=====================================\n');
-    throw new Error(`Azure STT ${response.status}: ${errText.slice(0, 200)}`);
+    const resHeaders = {};
+    res.headers.forEach((v, k) => { resHeaders[k] = v; });
+    console.log(`[Azure] Response ${res.status} — headers:`, JSON.stringify(resHeaders));
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.statusText);
+      console.error(`[Azure] HTTP ${res.status}:`, errText.slice(0, 200));
+      throw new Error(`Azure STT ${res.status}: ${errText.slice(0, 120)}`);
+    }
+
+    const json = await res.json();
+    console.log('[Azure] Body:', JSON.stringify(json, null, 2));
+
+    const haPA = !!json.NBest?.[0]?.PronunciationAssessment;
+    console.log(`[Azure] PA present: ${haPA} — attempt ${attempt}`);
+
+    // Retry once if PA is missing but recognition succeeded (intermittent node issue)
+    if (!haPA && json.RecognitionStatus === 'Success' && attempt < 3) {
+      console.warn(`[Azure] ⚠️ PA missing on attempt ${attempt} — retrying immediately`);
+      await new Promise(r => setTimeout(r, 150));  // tiny delay before retry
+      return callAzurePA(attempt + 1);
+    }
+
+    return { json, responseHeaders: resHeaders, attempts: attempt };
   }
 
-  const result = await response.json();
-  console.log('BODY (JSON):');
-  console.log(JSON.stringify(result, null, 2));
-  console.log('=====================================\n');
+  const { json: result, responseHeaders: responseHeadersObj, attempts } = await callAzurePA();
 
-  // Log recognition status for debugging
   const recognitionStatus = result.RecognitionStatus;
   const nBestPA = result.NBest?.[0]?.PronunciationAssessment;
-  const w0PA = result.NBest?.[0]?.Words?.[0]?.PronunciationAssessment;
-  console.log(`[Azure] RecognitionStatus: ${recognitionStatus} — NBest words: ${result.NBest?.[0]?.Words?.length ?? 0}`);
-  console.log(`[Azure] NBest[0].PronunciationAssessment present: ${!!nBestPA} — AccuracyScore: ${nBestPA?.AccuracyScore}`);
-  console.log(`[Azure] Words[0].PronunciationAssessment present: ${!!w0PA} — AccuracyScore: ${w0PA?.AccuracyScore}`);
+
   if (!nBestPA) {
-    console.error('[Azure] ❌ PronunciationAssessment MISSING from NBest — header likely not applied!');
-    console.error('[Azure] pronConfigB64 length:', pronConfigB64.length, 'hasNewline:', pronConfigB64.includes('\n'));
+    console.error(`[Azure] ❌ PA MISSING after ${attempts} attempt(s) — key/region may not support PA`);
+  } else {
+    console.log(`[Azure] ✅ PA present after ${attempts} attempt(s) — AccuracyScore: ${nBestPA.AccuracyScore}`);
   }
 
   if (recognitionStatus === 'NoMatch' || recognitionStatus === 'InitialSilenceTimeout') {
@@ -344,6 +357,7 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
     sanitised: sanitisedText,
     properNouns: Object.values(properNounMap).map(v => `${v.original} → "${v.phonetic}"`),
     recognitionStatus,
+    paAttempts:      attempts,
     nBestPAPresent:  !!result.NBest?.[0]?.PronunciationAssessment,
     nBestAccuracy:   result.NBest?.[0]?.PronunciationAssessment?.AccuracyScore,
     word0PAPresent:  !!result.NBest?.[0]?.Words?.[0]?.PronunciationAssessment,
