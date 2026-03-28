@@ -221,26 +221,26 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
   }
 
   // Step 4 — build Azure request
+  // IMPORTANT: Keep config minimal — extra fields like EnableProsodyAssessment
+  // can cause Azure to silently ignore the PA header on some regions/tiers.
+  // Field order matters: ReferenceText MUST be first per Azure REST API docs.
   const pronConfig = {
-    ReferenceText:            sanitisedText,
-    GradingSystem:            'HundredMark',
-    Granularity:              'Phoneme',
-    EnableMiscue:             true,
-    PhonemeAlphabet:          'IPA',
-    EnableProsodyAssessment:  true,  // en-US supports prosody scoring
+    ReferenceText:   sanitisedText,
+    GradingSystem:   'HundredMark',
+    Granularity:     'Phoneme',
+    EnableMiscue:    true,
+    PhonemeAlphabet: 'IPA',
   };
-  // CRITICAL: base64 must be a single line — some Node builds wrap at 76 chars
-  // which breaks the HTTP header. Replace all whitespace/newlines from base64.
+  // CRITICAL: base64 must be a single line with NO padding characters.
+  // Azure REST API documentation examples show base64 WITHOUT trailing '=' padding.
+  // Padding characters in HTTP headers can cause silent header rejection.
   const pronConfigB64 = Buffer.from(JSON.stringify(pronConfig))
     .toString('base64')
-    .replace(/[\r\n\s]/g, '');
+    .replace(/[\r\n\s=]/g, '');  // strip newlines AND padding
+  // Use the 'interactive' mode endpoint — 'conversation' mode sometimes ignores PA headers
+  // 'interactive' is designed for short utterances (< 15s) which is perfect for phonics
   const endpoint = `https://${AZURE_REGION}.stt.speech.microsoft.com` +
-                   `/speech/recognition/conversation/cognitiveservices/v1`;
-  // format=detailed is REQUIRED to get NBest array with PronunciationAssessment
-  // IMPORTANT: Pronunciation Assessment only supports specific locales.
-  // en-GB is NOT in the supported list — Azure silently returns plain STT with no scores.
-  // en-US IS supported and phonics phonemes (CVC, digraphs etc.) are the same.
-  // TTS stays en-GB so the child hears British English for reading.
+                   `/speech/recognition/interactive/cognitiveservices/v1`;
   const params   = new URLSearchParams({ language: 'en-US', format: 'detailed' });
 
   // CRITICAL: Azure pronunciation assessment REST API requires this EXACT Content-Type
@@ -254,6 +254,9 @@ export async function assessPronunciation(audioBuffer, referenceText, mimeType =
     'Pronunciation-Assessment':  pronConfigB64,
     'Accept':                    'application/json',
   };
+  // Log the full b64 so frontend debug panel can show it
+  console.log('[Azure] pronConfigB64 (no padding):', pronConfigB64);
+  console.log('[Azure] pronConfig:', JSON.stringify(pronConfig));
 
   // ── FULL REQUEST LOG ─────────────────────────────────────────
   console.log('\n========== AZURE REQUEST ==========');
