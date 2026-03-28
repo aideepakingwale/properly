@@ -19,33 +19,35 @@ import { r2Put, r2Url, r2Available } from './r2.service.js';
 // then fall back to a beautiful SVG illustration we generate ourselves.
 
 // ── POLLINATIONS CONFIGURATION ───────────────────────────────
-// model=turbo   — FREE, no API key, good quality, ~5s/image
-// model=flux    — requires POLLINATIONS_TOKEN (paid/partner tier)
-// Set POLLINATIONS_TOKEN in Render env to unlock flux quality images.
+// Pollinations.ai free tier: no API key needed, just hit the URL directly.
+// The bare prompt URL (no model param) uses their default free model.
+// model=flux requires POLLINATIONS_TOKEN (paid/partner tier).
 const POLL_TOKEN = (process.env.POLLINATIONS_TOKEN || '').trim();
-const POLL_MODEL = POLL_TOKEN ? 'flux' : 'turbo';  // auto-select based on token
 
 const POLL_ENDPOINTS = [
-  // Strategy 1: image.pollinations.ai with optional Bearer token
+  // Strategy 1: bare URL, no model param — uses free default, most compatible
   (prompt, seed) => ({
     url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-         `?width=800&height=600&seed=${seed}&model=${POLL_MODEL}&nologo=true&nofeed=true`,
+         `?width=800&height=600&seed=${seed}&nologo=true&nofeed=true`,
     headers: {
-      'Accept':   'image/jpeg,image/png,image/*',
-      'Referer':  'https://properly.app',
+      'Accept':     'image/jpeg,image/png,image/*,*/*',
+      'User-Agent': 'Mozilla/5.0 (compatible; ProperlyApp/1.0)',
       ...(POLL_TOKEN ? { 'Authorization': `Bearer ${POLL_TOKEN}` } : {}),
     },
   }),
-  // Strategy 2: turbo fallback (always free, no token needed)
+  // Strategy 2: shorter prompt (Pollinations can 400 on very long encoded URLs)
   (prompt, seed) => ({
-    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-         `?width=800&height=600&seed=${seed}&model=turbo&nologo=true`,
-    headers: { 'Accept': 'image/*', 'Referer': 'https://properly.app' },
+    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 100))}` +
+         `?width=512&height=384&seed=${seed}&nologo=true`,
+    headers: {
+      'Accept':     'image/*,*/*',
+      'User-Agent': 'Mozilla/5.0 (compatible; ProperlyApp/1.0)',
+    },
   }),
-  // Strategy 3: minimal URL — no model specified (server picks default)
+  // Strategy 3: absolute minimum — just prompt and seed
   (prompt, seed) => ({
-    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0,150))}?seed=${seed}`,
-    headers: { 'Accept': 'image/*' },
+    url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0, 80))}?seed=${seed}`,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProperlyApp/1.0)' },
   }),
 ];
 

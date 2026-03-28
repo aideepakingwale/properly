@@ -184,6 +184,8 @@ function FlipbookViewer({ book, onClose }) {
   const [pageIdx, setPageIdx]     = useState(-1);  // -1 = cover
   const [pollingKey, setPolling]  = useState(0);
   const [bookData, setBookData]   = useState(book);
+  const [genLog, setGenLog]       = useState([]);   // persists even after book is ready
+  const [showGenLog, setShowGenLog] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
   const [orderForm, setOrderForm] = useState({ name:'', address1:'', address2:'', city:'', postcode:'', country:'GB' });
   const [orderMsg, setOrderMsg]   = useState('');
@@ -192,13 +194,21 @@ function FlipbookViewer({ book, onClose }) {
   const pages = bookData.pages || [];
   const isReady = bookData.status === 'ready';
 
-  // Poll while generating
+  // Poll book status + fetch generation log. Log persists after book is ready.
   useEffect(() => {
-    if (isReady) return;
+    async function fetchLog() {
+      try {
+        const r = await bookAPI.getLog(bookData.id);
+        if (r.success && r.data?.logs?.length > 0) setGenLog(r.data.logs);
+      } catch {}
+    }
+    fetchLog(); // fetch immediately when viewer opens
+
+    if (isReady) return; // stop polling status once ready
     const t = setInterval(async () => {
       try {
         const r = await bookAPI.getBook(bookData.id);
-        if (r.success) setBookData(r.data);
+        if (r.success) { setBookData(r.data); fetchLog(); }
       } catch {}
     }, 3000);
     return () => clearInterval(t);
@@ -227,6 +237,13 @@ function FlipbookViewer({ book, onClose }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, width: '100%', maxWidth: 760, padding: '0 16px' }}>
         <button onClick={onClose} style={{ background: 'var(--overlay-10)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 14 }}>← Back</button>
         <div style={{ flex: 1, color: '#fff', fontWeight: 700, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bookData.title}</div>
+        {/* Generation log button — always available after creation */}
+        {genLog.length > 0 && (
+          <button onClick={() => setShowGenLog(v => !v)}
+            style={{ background: 'var(--overlay-10)', border: '1px solid var(--overlay-20)', color: '#93C5FD', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace' }}>
+            {showGenLog ? '▲' : '▼'} Gen log ({genLog.length} steps)
+          </button>
+        )}
         {isReady && bookData.pdfSignedUrl && (
           <a href={bookData.pdfSignedUrl} download target="_blank" rel="noreferrer"
             style={{ background: 'var(--color-success)', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
@@ -243,6 +260,28 @@ function FlipbookViewer({ book, onClose }) {
           <span style={{ background: 'var(--text-muted)', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 13 }}>🖨 Print Ordered</span>
         )}
       </div>
+
+      {/* Generation log drawer — shown when user expands it */}
+      {showGenLog && genLog.length > 0 && (
+        <div style={{ background: '#0A0718', padding: '10px 16px', maxHeight: 260, overflowY: 'auto', fontFamily: 'monospace', fontSize: 10, width: '100%', maxWidth: 760, margin: '0 auto', boxSizing: 'border-box' }}>
+          <div style={{ color: '#64748B', marginBottom: 6, fontSize: 9 }}>
+            GENERATION LOG — {genLog.length} steps
+            {genLog.some(s => s.status === 'warn') ? '  ⚠️ has warnings' : ''}
+            {genLog.some(s => s.status === 'error') ? '  ❌ has errors' : ''}
+          </div>
+          {genLog.map((step, i) => (
+            <div key={i} style={{ marginBottom: 3, color:
+              step.status === 'ok'    ? '#6EE7B7' :
+              step.status === 'error' ? '#FCA5A5' :
+              step.status === 'warn'  ? '#FCD34D' : '#93C5FD' }}>
+              {step.status === 'ok' ? '✅' : step.status === 'error' ? '❌' : step.status === 'warn' ? '⚠️' : '🔵'}
+              {' '}<strong>{step.step}</strong>
+              {step.detail ? <span style={{ color: '#475569' }}> — {step.detail}</span> : null}
+              {step.ts ? <span style={{ color: '#1E293B', marginLeft: 6 }}>{step.ts.slice(11,19)}</span> : null}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Not ready yet — with live generation log */}
       {!isReady && (
