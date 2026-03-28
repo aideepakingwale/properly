@@ -389,39 +389,61 @@ export async function generateBatch(opts) {
     recentTitles   = [],
     count          = 5,
     forceThemes    = null,
+    onProgress     = null,   // optional callback: (step) => void for SSE/debug
   } = opts;
+
+  const log = (step, data = {}) => {
+    const msg = { step, ts: new Date().toISOString(), ...data };
+    console.log(`[story-gen]`, JSON.stringify(msg));
+    onProgress?.(msg);
+  };
 
   const themes       = forceThemes || selectThemes(interests, recentTitles, count);
   const systemPrompt = buildSystemPrompt(child.phase);
   const userPrompt   = buildUserPrompt({ child, interests, struggledWords, recentTitles, themes, count: themes.length });
 
-  console.log(`[story-gen] Generating ${themes.length} stories for ${child.name} (Phase ${child.phase}): ${themes.join(', ')}`);
+  log('start', {
+    child: child.name, phase: child.phase, themes, count: themes.length,
+    geminiKey: !!process.env.GEMINI_API_KEY,
+    groqKey:   !!process.env.GROQ_API_KEY,
+    interests, struggledWords: struggledWords.slice(0,4),
+  });
 
   // 1. Gemini
+  log('trying_gemini');
   const geminiRaw = await callGemini(systemPrompt, userPrompt);
   if (geminiRaw) {
+    log('gemini_raw', { chars: geminiRaw.length, preview: geminiRaw.slice(0, 120) });
     const parsed = parseBatchJSON(geminiRaw);
     if (parsed) {
       parsed.forEach((s, i) => { if (!s.theme || !THEMES[s.theme]) s.theme = themes[i] || 'adventure'; });
-      console.log(`[story-gen] Gemini: ${parsed.length} stories, ${parsed[0]?.pages?.length || '?'} pages each`);
-      return { stories: parsed, provider: 'gemini', themes };
+      log('done', { provider: 'gemini', stories: parsed.length, pages: parsed[0]?.pages?.length });
+      return { stories: parsed, provider: 'gemini', themes, _debug: { provider: 'gemini', raw: geminiRaw.slice(0,500) } };
     }
+    log('gemini_parse_failed', { raw: geminiRaw.slice(0, 300) });
+  } else {
+    log('gemini_failed', { keySet: !!process.env.GEMINI_API_KEY });
   }
 
   // 2. Groq
+  log('trying_groq');
   const groqRaw = await callGroq(systemPrompt, userPrompt);
   if (groqRaw) {
+    log('groq_raw', { chars: groqRaw.length, preview: groqRaw.slice(0, 120) });
     const parsed = parseBatchJSON(groqRaw);
     if (parsed) {
       parsed.forEach((s, i) => { if (!s.theme || !THEMES[s.theme]) s.theme = themes[i] || 'adventure'; });
-      console.log(`[story-gen] Groq: ${parsed.length} stories, ${parsed[0]?.pages?.length || '?'} pages each`);
-      return { stories: parsed, provider: 'groq', themes };
+      log('done', { provider: 'groq', stories: parsed.length, pages: parsed[0]?.pages?.length });
+      return { stories: parsed, provider: 'groq', themes, _debug: { provider: 'groq', raw: groqRaw.slice(0,500) } };
     }
+    log('groq_parse_failed', { raw: groqRaw.slice(0, 300) });
+  } else {
+    log('groq_failed', { keySet: !!process.env.GROQ_API_KEY });
   }
 
   // 3. Fallback
-  console.log(`[story-gen] Using fallback for ${themes.length} stories`);
-  return { stories: buildFallback(child, themes), provider: 'fallback', themes };
+  log('using_fallback', { reason: 'both AI providers failed or returned unparseable JSON' });
+  return { stories: buildFallback(child, themes), provider: 'fallback', themes, _debug: { provider: 'fallback' } };
 }
 
 // Backwards compat single story

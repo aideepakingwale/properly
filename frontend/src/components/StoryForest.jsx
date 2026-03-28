@@ -13,9 +13,21 @@
  *   - Interests panel feeds child preferences into story generation prompts
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aiStoryAPI } from '../services/api';
+
+// Free AI image generation — Pollinations.ai (no API key needed, kid-safe)
+function getCoverImageUrl(story) {
+  if (!story) return null;
+  const prompt = encodeURIComponent(
+    `children's book cover, ${story.theme || 'adventure'} theme, ${story.emoji || '📖'} ` +
+    `cute colorful illustration, friendly characters, phonics reading book for age 4-7, ` +
+    `soft pastel colors, no text`
+  );
+  // width=400 height=300 — appropriate for a book cover thumbnail
+  return `https://image.pollinations.ai/prompt/${prompt}?width=400&height=300&seed=${story.id?.slice(-6) || '42'}&nologo=true&model=flux`;
+}
 import { AcornPill, Badge, Spinner } from './ui';
 
 const THEME_META = {
@@ -73,6 +85,91 @@ function ThemePicker({ selected, onSelect, interests = [] }) {
 }
 
 // ── AI STORY CARD ─────────────────────────────────────────────
+// ── COVER IMAGE ───────────────────────────────────────────────
+// Loads a Pollinations.ai illustration lazily — shows emoji placeholder while loading
+function CoverImage({ story, phaseColor, size = 72 }) {
+  const [imgState, setImgState] = React.useState('idle'); // idle | loading | loaded | error
+  const [visible, setVisible]   = React.useState(false);
+  const ref = React.useRef(null);
+
+  // Lazy-load: only generate image when card scrolls into view
+  React.useEffect(() => {
+    if (!ref.current) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.1 }
+    );
+    obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+
+  const imgUrl = visible ? getCoverImageUrl(story) : null;
+
+  return (
+    <div ref={ref} style={{
+      width: size, height: size, borderRadius: 18, flexShrink: 0, position: 'relative',
+      border: `1.5px solid ${phaseColor}30`, overflow: 'hidden',
+      background: `linear-gradient(135deg,${phaseColor}20,${phaseColor}10)`,
+    }}>
+      {/* Emoji placeholder — always shown under/before image */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size * 0.42,
+        opacity: imgState === 'loaded' ? 0 : 1,
+        transition: 'opacity 0.4s',
+      }}>
+        {story.emoji || '📖'}
+      </div>
+
+      {/* AI-generated cover image */}
+      {imgUrl && (
+        <img
+          src={imgUrl}
+          alt={story.title}
+          onLoadStart={() => setImgState('loading')}
+          onLoad={() => setImgState('loaded')}
+          onError={() => setImgState('error')}
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            objectFit: 'cover',
+            opacity: imgState === 'loaded' ? 1 : 0,
+            transition: 'opacity 0.5s ease',
+            borderRadius: 16,
+          }}
+        />
+      )}
+
+      {/* Loading shimmer */}
+      {imgState === 'loading' && (
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 16,
+          background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent)',
+          animation: 'shimmer 1.5s infinite',
+        }} />
+      )}
+
+      {/* Completed badge */}
+      {story.status === 'completed' && (
+        <div style={{
+          position: 'absolute', bottom: -5, right: -5,
+          background: 'var(--color-success)', borderRadius: '50%',
+          width: 22, height: 22, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 11, color: 'white',
+          border: '2.5px solid white', fontWeight: 900,
+        }}>✓</div>
+      )}
+      <style>{`
+        @keyframes shimmer {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
   const provider = PROVIDER_BADGES[story.aiProvider] || PROVIDER_BADGES.fallback;
   return (
@@ -86,11 +183,8 @@ function AiStoryCard({ story, onPlay, onDelete, phaseColor, phaseLabel }) {
         ✨ {provider.label}
       </div>
 
-      {/* Cover */}
-      <div style={{ width:64, height:64, borderRadius:18, background:story.status==='completed'?'var(--grad-card-active)':`linear-gradient(135deg,${phaseColor}20,${phaseColor}10)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, flexShrink:0, position:'relative', border:`1.5px solid ${phaseColor}30` }}>
-        {story.emoji}
-        {story.status==='completed' && <div style={{ position:'absolute', bottom:-5, right:-5, background:'var(--color-success)', borderRadius:'50%', width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'white', border:'2.5px solid white', fontWeight:900 }}>✓</div>}
-      </div>
+      {/* Cover — AI-generated image from Pollinations.ai (free, kid-safe) */}
+      <CoverImage story={story} phaseColor={phaseColor} size={72} />
 
       {/* Info */}
       <div style={{ flex:1, minWidth:0, paddingRight:24 }}>
@@ -223,6 +317,7 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
   const handleGenerate = async () => {
     if (dailyLeft <= 0) { setError('Daily batch limit reached (3 batches/day). Come back tomorrow!'); return; }
     setError('');
+    setGenDebug(null);
     setGenerating(true);
     setShowGenerator(false);
     try {
@@ -233,9 +328,14 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
       if (res.success) {
         setAiStories(prev => [...(res.data.stories || []), ...prev]);
         setDailyLeft(d => Math.max(0, d-1));
+        setGenDebug(res.data._debug || { provider: res.data.provider, count: res.data.count });
+      } else {
+        setGenDebug(res._debug || null);
+        setError('Generation returned no stories — see debug below');
       }
     } catch (e) {
       setError(e.message || 'Generation failed. Please try again.');
+      setGenDebug({ error: e.message });
     } finally { setGenerating(false); }
   };
 
@@ -304,6 +404,55 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
       {error && (
         <div style={{ background:'rgba(239,68,68,0.15)', border:'1.5px solid rgba(239,68,68,0.3)', borderRadius:14, padding:'10px 14px', marginBottom:12, fontSize:13, color:'var(--danger-light)', fontWeight:600 }}>
           ⚠️ {error}
+        </div>
+      )}
+
+      {/* ── GENERATION DEBUG PANEL ── */}
+      {genDebug && (
+        <div style={{ marginBottom:12, borderRadius:14, overflow:'hidden', border:'1px solid rgba(168,85,247,0.3)' }}>
+          <button onClick={() => setShowDebug(v => !v)}
+            style={{ width:'100%', padding:'8px 14px', background:'rgba(88,28,135,0.4)', border:'none', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', color:'#C4B5FD', fontFamily:'monospace', fontSize:10, fontWeight:700 }}>
+            <span>
+              {genDebug.error ? '❌' : genDebug.provider === 'gemini' ? '♊' : genDebug.provider === 'groq' ? '⚡' : '📚'}{' '}
+              Generation debug — provider: {genDebug.provider || 'unknown'}
+              {genDebug.geminiKey === false && ' · ⚠️ No GEMINI_API_KEY'}
+              {genDebug.groqKey   === false && ' · ⚠️ No GROQ_API_KEY'}
+            </span>
+            <span>{showDebug ? '▲' : '▼'} Details</span>
+          </button>
+          {showDebug && (
+            <div style={{ background:'#0F0A2E', padding:'10px 14px', fontFamily:'monospace', fontSize:10, color:'#93C5FD', maxHeight:280, overflowY:'auto' }}>
+              {/* Steps log */}
+              {genDebug.steps?.map((step, i) => (
+                <div key={i} style={{ marginBottom:3, color:
+                  step.step === 'done'            ? '#6EE7B7' :
+                  step.step?.includes('failed')   ? '#FCA5A5' :
+                  step.step?.includes('fallback') ? '#FCD34D' : '#93C5FD'
+                }}>
+                  [{step.ts?.slice(11,19)}] {step.step}
+                  {step.chars   && ` — ${step.chars} chars`}
+                  {step.stories && ` — ${step.stories} stories × ${step.pages} pages`}
+                  {step.reason  && ` — ${step.reason}`}
+                  {step.preview && <div style={{ color:'#64748B', marginLeft:16, wordBreak:'break-all' }}>{step.preview}</div>}
+                </div>
+              ))}
+              {/* Key check */}
+              <div style={{ marginTop:8, borderTop:'1px solid #1E293B', paddingTop:6 }}>
+                <span style={{ color: genDebug.geminiKey ? '#6EE7B7' : '#FCA5A5' }}>
+                  GEMINI_API_KEY: {genDebug.geminiKey ? '✅ set' : '❌ missing'}
+                </span>{'  '}
+                <span style={{ color: genDebug.groqKey ? '#6EE7B7' : '#FCA5A5' }}>
+                  GROQ_API_KEY: {genDebug.groqKey ? '✅ set' : '❌ missing'}
+                </span>
+              </div>
+              {genDebug.raw?.provider && (
+                <div style={{ marginTop:6, color:'#64748B' }}>Raw preview: {genDebug.raw.raw?.slice(0,200)}</div>
+              )}
+              {genDebug.error && (
+                <div style={{ color:'#FCA5A5', marginTop:6 }}>Error: {genDebug.error}</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

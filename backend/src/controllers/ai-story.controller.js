@@ -157,7 +157,8 @@ export const generateAiStoryBatch = async (req, res) => {
     VALUES (?,?,?,'generating')
   `).run(batchId, child.id, batchSize);
 
-  // Generate
+  // Generate — collect debug steps
+  const debugSteps = [];
   let result;
   try {
     result = await generateBatch({
@@ -173,11 +174,16 @@ export const generateAiStoryBatch = async (req, res) => {
       recentTitles,
       count: batchSize,
       forceThemes: forceThemes || null,
+      onProgress: (step) => debugSteps.push(step),
     });
   } catch (err) {
     db.prepare("UPDATE ai_story_batches SET status='failed' WHERE id=?").run(batchId);
     console.error('Batch generation error:', err);
-    return res.status(500).json({ success: false, message: 'Story generation failed. Please try again.' });
+    return res.status(500).json({
+      success: false,
+      message: 'Story generation failed. Please try again.',
+      _debug: { steps: debugSteps, error: err.message },
+    });
   }
 
   const { stories, provider, themes } = result;
@@ -274,6 +280,13 @@ export const generateAiStoryBatch = async (req, res) => {
       themes,
       provider,
       stories:  fullStories,
+      _debug: {
+        steps:    debugSteps,
+        provider,
+        geminiKey: !!process.env.GEMINI_API_KEY,
+        groqKey:   !!process.env.GROQ_API_KEY,
+        raw:       result._debug || null,
+      },
     },
   });
 };

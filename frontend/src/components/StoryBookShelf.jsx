@@ -16,7 +16,7 @@
  *   - Print order captures shipping address; fulfilment is manual/Gelato in future
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { bookAPI } from '../services/api';
 import ReportButton from './ReportButton';
 
@@ -71,6 +71,110 @@ function BookCard({ book, onOpen }) {
           {book.print_ordered ? ' · 🖨 Print ordered' : ''}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── GENERATION PROGRESS ───────────────────────────────────────
+// Live log of what's happening during async book generation.
+// Polls /books/:id every 3s for status updates + generation_log.
+function GenerationProgress({ book, onRetry }) {
+  const [logSteps, setLogSteps] = useState([]);
+  const [retrying, setRetrying] = useState(false);
+  const [showLog, setShowLog]   = useState(false);
+  const pollRef = useRef(null);
+
+  // Poll for log updates while not done/error
+  useEffect(() => {
+    if (book.status === 'ready' || (book.status === 'error' && logSteps.length > 0)) return;
+
+    async function poll() {
+      try {
+        const r = await bookAPI.getLog(book.id);
+        if (r.success) setLogSteps(r.data.logs || []);
+      } catch {}
+    }
+    poll();
+    pollRef.current = setInterval(poll, 2500);
+    return () => clearInterval(pollRef.current);
+  }, [book.id, book.status]);
+
+  const isError = book.status === 'error';
+  const icon    = isError ? '❌' : book.status === 'generating' ? '🎨' : '⏳';
+
+  const STATUS_LABELS = {
+    pending:    'Queued — generation will start shortly…',
+    generating: 'Creating your illustrated book…',
+    error:      book.error_msg || 'Generation failed. Tap retry to try again.',
+  };
+
+  const STEP_ICONS = { ok: '✅', warn: '⚠️', error: '❌', info: '🔵' };
+
+  return (
+    <div style={{ color: '#fff', textAlign: 'center', padding: '32px 24px', maxWidth: 560, margin: '0 auto' }}>
+      <div style={{ fontSize: 52, marginBottom: 12, animation: isError ? 'none' : 'bounce 1.5s ease infinite' }}>
+        {icon}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+        {STATUS_LABELS[book.status] || 'Working…'}
+      </div>
+
+      {!isError && (
+        <div style={{ fontSize: 13, color: 'var(--overlay-60)', marginBottom: 16 }}>
+          AI illustrations take 30–60 seconds. You can close this and come back later.
+        </div>
+      )}
+
+      {/* Step progress bar */}
+      {logSteps.length > 0 && (() => {
+        const total  = 10;  // cover + pages + pdf ≈ 10 steps
+        const done   = logSteps.filter(s => s.status === 'ok').length;
+        const pct    = Math.min(100, Math.round((done / total) * 100));
+        return (
+          <div style={{ width: '100%', height: 6, background: 'var(--overlay-15)', borderRadius: 3, marginBottom: 14, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: isError ? 'var(--color-danger)' : 'var(--color-success)', borderRadius: 3, transition: 'width 0.5s' }} />
+          </div>
+        );
+      })()}
+
+      {/* Last step hint */}
+      {logSteps.length > 0 && !showLog && (
+        <div style={{ fontSize: 12, color: 'var(--overlay-50)', marginBottom: 10, fontFamily: 'monospace' }}>
+          {STEP_ICONS[logSteps[logSteps.length-1]?.status] || '•'} {logSteps[logSteps.length-1]?.step}
+          {logSteps[logSteps.length-1]?.detail && ` — ${logSteps[logSteps.length-1].detail.slice(0,50)}`}
+        </div>
+      )}
+
+      {/* Expand full log */}
+      {logSteps.length > 0 && (
+        <button onClick={() => setShowLog(v => !v)}
+          style={{ background: 'var(--overlay-10)', border: '1px solid var(--overlay-20)', color: 'var(--overlay-70)', borderRadius: 8, padding: '5px 14px', fontSize: 11, cursor: 'pointer', marginBottom: showLog ? 0 : 12 }}>
+          {showLog ? '▲ Hide log' : '▼ Show generation log'}
+        </button>
+      )}
+
+      {showLog && (
+        <div style={{ background: '#0A0718', borderRadius: 10, padding: '10px 14px', marginTop: 8, marginBottom: 14, textAlign: 'left', maxHeight: 220, overflowY: 'auto', fontFamily: 'monospace', fontSize: 10 }}>
+          {logSteps.map((step, i) => (
+            <div key={i} style={{ marginBottom: 4, color: step.status === 'ok' ? '#6EE7B7' : step.status === 'error' ? '#FCA5A5' : step.status === 'warn' ? '#FCD34D' : '#93C5FD' }}>
+              {STEP_ICONS[step.status] || '•'} <strong>{step.step}</strong>
+              {step.detail && <span style={{ color: '#64748B' }}> — {step.detail.slice(0,80)}</span>}
+            </div>
+          ))}
+          {!isError && <div style={{ color: '#475569' }}>⏳ Still generating…</div>}
+        </div>
+      )}
+
+      {/* Retry button */}
+      {isError && (
+        <button onClick={async () => { setRetrying(true); await onRetry(); setRetrying(false); }}
+          disabled={retrying}
+          style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 28px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 8 }}>
+          {retrying ? '⏳ Retrying…' : '↺ Retry Generation'}
+        </button>
+      )}
+
+      <style>{`@keyframes bounce { 0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)} }`}</style>
     </div>
   );
 }
@@ -140,23 +244,14 @@ function FlipbookViewer({ book, onClose }) {
         )}
       </div>
 
-      {/* Not ready yet */}
+      {/* Not ready yet — with live generation log */}
       {!isReady && (
-        <div style={{ color: '#fff', textAlign: 'center', padding: 40 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>
-            {bookData.status === 'error' ? '❌' : '⏳'}
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>
-            {bookData.status === 'error'
-              ? '❌ ' + (bookData.error_msg || 'Generation failed — please try again')
-              : bookData.status === 'generating' ? 'Creating your beautiful book…' : 'Book queued for generation…'}
-          </div>
-          {bookData.status !== 'error' && (
-            <div style={{ fontSize: 14, color: 'var(--overlay-60)', marginTop: 8 }}>
-              Generating AI illustrations for each page. This takes about 30–60 seconds.
-            </div>
-          )}
-        </div>
+        <GenerationProgress book={bookData} onRetry={async () => {
+          try {
+            await bookAPI.retryBook(bookData.id);
+            setBookData(b => ({ ...b, status: 'pending', error_msg: null }));
+          } catch {}
+        }} />
       )}
 
       {/* Book viewer */}

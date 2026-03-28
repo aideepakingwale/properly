@@ -166,6 +166,7 @@ router.post('/books',                           authMiddleware, createBook);
 router.get('/books/:bookId',                    authMiddleware, getBook);
 router.delete('/books/:bookId',                 authMiddleware, deleteBook);
 router.get('/books/:bookId/debug',              authMiddleware, requireAdmin, getBookDebug);
+router.get('/books/:bookId/log',                authMiddleware, getBookLogs);  // parent-accessible generation log
 router.post('/books/:bookId/retry',             authMiddleware, retryBook);
 router.post('/books/:bookId/order-print',       authMiddleware, orderPrint);
 

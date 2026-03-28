@@ -159,6 +159,7 @@ export const bookAPI = {
   deleteBook: (bookId)             => api.delete(`/books/${bookId}`),
   orderPrint: (bookId, address)    => api.post(`/books/${bookId}/order-print`, address),
   retryBook:  (bookId)             => api.post(`/books/${bookId}/retry`),
+  getLog:     (bookId)             => api.get(`/books/${bookId}/log`),   // generation steps
 };
 
 export const aiStoryAPI = {
