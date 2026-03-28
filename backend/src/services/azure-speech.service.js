@@ -105,6 +105,49 @@ export function azureAvailable() {
   return Boolean(AZURE_KEY && !AZURE_KEY.includes('your-'));
 }
 
+// ── SERVER-SIDE PHONEME CACHE ─────────────────────────────────
+// Level 1: In-memory Map  — survives for the lifetime of the process (instant)
+// Level 2: Persistent JSON file in /tmp — survives server restarts on Render
+//          (R2 is for the DB; phonemes are tiny ~200KB total so /tmp is fine)
+//
+// Flow: synthesisePhoneme() → check memory → check /tmp file → call Azure → cache both
+
+const _phonemeMemCache = new Map();  // ipa → Buffer
+const PHONEME_CACHE_FILE = '/tmp/properly_phonemes.json';
+
+async function loadPhonemeFileCache() {
+  try {
+    const { readFileSync } = await import('fs');
+    const raw  = readFileSync(PHONEME_CACHE_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    let loaded = 0;
+    for (const [ipa, b64] of Object.entries(data.phonemes || {})) {
+      if (!_phonemeMemCache.has(ipa)) {
+        _phonemeMemCache.set(ipa, Buffer.from(b64, 'base64'));
+        loaded++;
+      }
+    }
+    if (loaded) console.log(`[PhonemeCache] Loaded ${loaded} phonemes from /tmp file cache`);
+  } catch {}  // file doesn't exist yet — silent
+}
+
+async function savePhonemeToFile(ipa, buf) {
+  try {
+    const { readFileSync, writeFileSync } = await import('fs');
+    let data = { generatedAt: new Date().toISOString(), phonemes: {} };
+    try { data = JSON.parse(readFileSync(PHONEME_CACHE_FILE, 'utf8')); } catch {}
+    data.phonemes[ipa] = buf.toString('base64');
+    data.updatedAt = new Date().toISOString();
+    writeFileSync(PHONEME_CACHE_FILE, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[PhonemeCache] Could not write file cache:', e.message);
+  }
+}
+
+// Load file cache on startup (non-blocking)
+loadPhonemeFileCache();
+
+
 // ── AUDIO CONVERSION: any browser format → WAV PCM 16 kHz ────
 export async function toWavPcm16k(inputBuffer, inputMime) {
   const { execFileSync }                            = await import('child_process');
@@ -611,14 +654,33 @@ function stringSimilarity(a, b) {
  * @param {string} grapheme    - Written letters e.g. "a", "ch", "th" (display text in SSML)
  * @param {number} rate        - Speech rate: 0.5 = very slow (best for kids)
  */
+function escapeXml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
 export async function synthesisePhoneme(ipaPhoneme, grapheme, rate = 0.55) {
   if (!azureAvailable()) throw new Error('Azure not configured');
 
-  // Strip surrounding / / from IPA if present
   const ipa = ipaPhoneme.replace(/^\/|\/$/g, '');
+  // Cache key includes rate so different speeds are cached separately
+  const cacheKey = `${ipa}:${rate}`;
 
-  // Build SSML with phoneme tag — Azure reads EXACTLY this IPA sound
-  // We wrap in a slow prosody so child can hear it clearly
+  // ── LEVEL 1: In-memory cache (instant) ───────────────────────
+  if (_phonemeMemCache.has(cacheKey)) {
+    return _phonemeMemCache.get(cacheKey);
+  }
+
+  // ── LEVEL 2: /tmp file cache (survives restarts, no Azure call) ──
+  // Try to load file cache if it hasn't been loaded yet
+  if (_phonemeMemCache.size === 0) await loadPhonemeFileCache();
+  if (_phonemeMemCache.has(cacheKey)) {
+    return _phonemeMemCache.get(cacheKey);
+  }
+
+  // ── LEVEL 3: Azure TTS API (only on cache miss) ───────────────
+  console.log(`[PhonemeCache] Cache miss — calling Azure for /${ipa}/ (rate=${rate})`);
+
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">
     <voice name="en-GB-SoniaNeural">
       <prosody rate="${rate}" pitch="+3%">
@@ -640,7 +702,13 @@ export async function synthesisePhoneme(ipaPhoneme, grapheme, rate = 0.55) {
     }
   );
   if (!r.ok) throw new Error(`Azure TTS phoneme ${r.status}: ${await r.text().catch(()=>'')}`);
-  return Buffer.from(await r.arrayBuffer());
+  const buf = Buffer.from(await r.arrayBuffer());
+
+  // Store in both caches
+  _phonemeMemCache.set(cacheKey, buf);
+  savePhonemeToFile(cacheKey, buf);  // async, non-blocking
+
+  return buf;
 }
 
 export async function synthesizeSpeech(text, voice = 'en-GB-SoniaNeural') {
@@ -664,10 +732,6 @@ export async function synthesizeSpeech(text, voice = 'en-GB-SoniaNeural') {
   return Buffer.from(await r.arrayBuffer());
 }
 
-function escapeXml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-          .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
-}
 
 export async function getAzureSasToken() {
   if (!azureAvailable()) return null;

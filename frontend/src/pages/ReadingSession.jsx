@@ -26,6 +26,7 @@ import { getWordColor } from '../utils/scoring';
 import { AcornPill, Modal, Confetti, ProgressBar, Button, Spinner } from '../components/ui';
 import PhonicsWord from '../components/PhonicsWord';
 import { analyseWord, getPhonemeHint } from '../utils/phonicsAnalyser';
+import { getPhonemeUrl, isCacheLoaded, getCacheStats } from '../services/phonemeCache';
 
 // Colour coding for Azure error types
 function getErrorBadge(errorType) {
@@ -195,18 +196,28 @@ export default function ReadingSession() {
   const addPhonemeLog = (entry) => setPhonemeDebugLog(prev => [entry, ...prev].slice(0, 30));
 
   const fetchPhonemeAudio = useCallback(async (ipa, grapheme) => {
-    const key = ipa;
-    if (phonemeAudioCache.current[key]) {
-      addPhonemeLog({ ipa, grapheme, method: 'azure-cached', status: '✅ cache hit', ms: 0 });
-      return phonemeAudioCache.current[key];
+    // 1. Check in-memory session cache (fastest — already a blob URL)
+    if (phonemeAudioCache.current[ipa]) {
+      addPhonemeLog({ ipa, grapheme, method: 'session-cache', status: '✅ instant', ms: 0 });
+      return phonemeAudioCache.current[ipa];
     }
+
+    // 2. Check localStorage preload cache (loaded at startup — instant base64 → blob URL)
+    const preloadUrl = getPhonemeUrl(ipa);
+    if (preloadUrl) {
+      phonemeAudioCache.current[ipa] = preloadUrl;  // also store in session cache
+      addPhonemeLog({ ipa, grapheme, method: 'preload-cache', status: '✅ localStorage hit', ms: 0 });
+      return preloadUrl;
+    }
+
+    // 3. Fallback: fetch individual phoneme from backend (only if preload didn't run)
     const t0 = Date.now();
+    const rawBase    = (typeof __API_URL__ !== 'undefined' && __API_URL__) ? __API_URL__ : '/api';
+    const withProto  = rawBase.startsWith('http') ? rawBase : (rawBase === '/api' ? '' : 'https://' + rawBase);
+    const apiBase    = withProto.replace(/\/$/, '').replace(/\/api$/, '') + '/api';
+    const url_called = `${apiBase}/ai/phoneme`;
     try {
       const token = localStorage.getItem('properly_token');
-      const rawBase = (typeof __API_URL__ !== 'undefined' && __API_URL__) ? __API_URL__ : '/api';
-      const base = rawBase.startsWith('http') ? rawBase.replace(/\/$/, '') : 'https://' + rawBase.replace(/\/$/, '');
-      const apiBase = base.endsWith('/api') ? base : base + '/api';
-      const url_called = `${apiBase}/ai/phoneme`;
       const res = await fetch(url_called, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -215,17 +226,16 @@ export default function ReadingSession() {
       const ms = Date.now() - t0;
       if (!res.ok) {
         const errText = await res.text().catch(() => res.statusText);
-        addPhonemeLog({ ipa, grapheme, method: 'azure-tts', status: `❌ HTTP ${res.status}: ${errText.slice(0,60)}`, ms, url: url_called });
-        throw new Error(`${res.status}: ${errText.slice(0,80)}`);
+        addPhonemeLog({ ipa, grapheme, method: 'azure-api', status: `❌ HTTP ${res.status}: ${errText.slice(0,60)}`, ms, endpoint: url_called });
+        throw new Error(`${res.status}`);
       }
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
-      phonemeAudioCache.current[key] = url;
-      addPhonemeLog({ ipa, grapheme, method: 'azure-tts', status: `✅ ${(blob.size/1024).toFixed(1)}KB MP3`, ms, url: url_called });
+      phonemeAudioCache.current[ipa] = url;
+      addPhonemeLog({ ipa, grapheme, method: 'azure-api', status: `✅ ${(blob.size/1024).toFixed(1)}KB`, ms, endpoint: url_called });
       return url;
     } catch (e) {
-      addPhonemeLog({ ipa, grapheme, method: 'azure-tts', status: `❌ ${e.message}`, ms: Date.now()-t0 });
-      console.warn('[PhonemeAudio] Azure failed for /' + ipa + '/ —', e.message);
+      addPhonemeLog({ ipa, grapheme, method: 'azure-api', status: `❌ ${e.message}`, ms: Date.now()-t0, endpoint: url_called });
       return null;
     }
   }, []);
@@ -1016,8 +1026,14 @@ export default function ReadingSession() {
             onClick={() => setShowPhonemeDebug(v => !v)}
             style={{ width: '100%', padding: '7px 14px', background: 'rgba(251,191,36,0.12)', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11 }}>
             <span>
-              🔤 Phoneme TTS Debug — {phonemeDebugLog.length} calls
-              {phonemeDebugLog.some(l => l.status?.startsWith('❌')) ? ' ❌ errors' : phonemeDebugLog.some(l => l.method === 'azure-tts' && l.status?.startsWith('✅')) ? ' ✅ Azure working' : ''}
+              🔤 Phoneme Debug — {phonemeDebugLog.length} calls
+              {(() => {
+                const stats = getCacheStats();
+                return <span style={{ fontWeight: 400, color: stats.inMemory >= 30 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                  {' '}· Cache: {stats.inMemory}/{stats.total} loaded
+                  {stats.generatedAt ? ` · built ${new Date(stats.generatedAt).toLocaleDateString()}` : ' · NOT preloaded'}
+                </span>;
+              })()}
             </span>
             <span>{showPhonemeDebug ? '▲' : '▼'}</span>
           </button>
@@ -1033,14 +1049,21 @@ export default function ReadingSession() {
                   No phoneme calls yet — tap "🔤 Hear the Phonics Sounds" to test
                 </div>
               ) : phonemeDebugLog.map((entry, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 60px 90px 1fr 50px', gap: 4, padding: '2px 12px', fontFamily: 'monospace', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.04)', color: entry.status?.startsWith('✅') ? '#6EE7B7' : entry.status?.startsWith('❌') ? '#FCA5A5' : '#93C5FD' }}>
-                  <span style={{ fontWeight: 700 }}>/{entry.ipa}/</span>
-                  <span style={{ color: '#FCD34D' }}>{entry.grapheme}</span>
-                  <span style={{ color: entry.method === 'azure-tts' ? '#A78BFA' : entry.method === 'azure-cached' ? '#34D399' : '#F97316' }}>
-                    {entry.method === 'azure-tts' ? '☁️ Azure' : entry.method === 'azure-cached' ? '💾 cached' : '📱 WebSpeech'}
-                  </span>
-                  <span style={{ wordBreak: 'break-all' }}>{entry.status}</span>
-                  <span style={{ color: '#64748B', textAlign: 'right' }}>{entry.ms > 0 ? `${entry.ms}ms` : '—'}</span>
+                <div key={i} style={{ padding: '3px 12px', fontFamily: 'monospace', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.04)', color: entry.status?.startsWith('✅') ? '#6EE7B7' : entry.status?.startsWith('❌') ? '#FCA5A5' : '#93C5FD' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '60px 60px 90px 1fr 50px', gap: 4 }}>
+                    <span style={{ fontWeight: 700 }}>/{entry.ipa}/</span>
+                    <span style={{ color: '#FCD34D' }}>{entry.grapheme}</span>
+                    <span style={{ color: entry.method === 'azure-tts' ? '#A78BFA' : entry.method === 'azure-cached' ? '#34D399' : '#F97316' }}>
+                      {entry.method === 'azure-tts' ? '☁️ Azure' : entry.method === 'azure-cached' ? '💾 cached' : '📱 WebSpeech'}
+                    </span>
+                    <span style={{ wordBreak: 'break-all' }}>{entry.status}</span>
+                    <span style={{ color: '#64748B', textAlign: 'right' }}>{entry.ms > 0 ? `${entry.ms}ms` : '—'}</span>
+                  </div>
+                  {entry.endpoint && (
+                    <div style={{ color: '#475569', fontSize: 9, marginTop: 1, wordBreak: 'break-all' }}>
+                      → {entry.endpoint}
+                    </div>
+                  )}
                 </div>
               ))}
               {/* Summary */}

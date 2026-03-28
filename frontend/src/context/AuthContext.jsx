@@ -52,6 +52,11 @@ export function AuthProvider({ children }) {
             setChild(activeChild);
             await loadProgress(activeChild.id);
           }
+          // Preload all phoneme sounds in background — non-blocking
+          // Stores in localStorage so subsequent sessions are instant
+          preloadPhonemes(t).then(r => {
+            console.log(`[PhonemeCache] Ready: ${r.loaded} phonemes ${r.fromCache ? '(from cache)' : '(from Azure)'}`);
+          }).catch(() => {});
         }
       } catch {
         // Token invalid or server down — clear in-memory state only
