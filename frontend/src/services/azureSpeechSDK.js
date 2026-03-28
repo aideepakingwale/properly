@@ -87,32 +87,31 @@ export async function assessWithSDK(audioBlob, referenceText, apiToken, onLog) {
   const { token, region } = await getToken(apiToken);
   log(`Token OK, region=${region}`);
 
-  // 3. Convert Blob → ArrayBuffer → AudioConfig
-  const arrayBuf = await audioBlob.arrayBuffer();
-  const uint8    = new Uint8Array(arrayBuf);
+  // 3. Convert Blob → WAV PCM 16kHz
+  // IMPORTANT: decodeAudioData() DETACHES the ArrayBuffer (spec behaviour).
+  // We must get a FRESH copy for pushStream.write() after decoding.
+  // Two separate arrayBuffer() calls give two independent copies.
+  const arrayBufForDecode = await audioBlob.arrayBuffer();
 
-  // Build a proper WAV buffer from the audio data
-  // The SDK needs raw PCM WAV. We'll convert via AudioContext if available.
   let wavBuffer;
   try {
-    const audioCtx  = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    const decoded   = await audioCtx.decodeAudioData(arrayBuf);
-    wavBuffer       = pcmToWav(decoded);
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const decoded  = await audioCtx.decodeAudioData(arrayBufForDecode);  // detaches arrayBufForDecode
+    wavBuffer      = pcmToWav(decoded);
     await audioCtx.close();
-    log(`Audio decoded: ${decoded.duration.toFixed(1)}s, ${decoded.numberOfChannels}ch → WAV PCM 16kHz`);
+    log(`Audio decoded: ${decoded.duration.toFixed(1)}s → WAV ${(wavBuffer.byteLength/1024).toFixed(1)}KB PCM 16kHz`);
   } catch (e) {
-    log(`AudioContext decode failed (${e.message}) — using raw blob`);
-    wavBuffer = arrayBuf;
+    log(`AudioContext decode failed (${e.message}) — using raw WebM`);
+    wavBuffer = await audioBlob.arrayBuffer();  // fresh copy since first was detached
   }
 
-  // 4. Create SDK objects
+  // 4. Create SDK objects — each call fully isolated (fresh config, stream, recognizer)
   const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region);
-  speechConfig.speechRecognitionLanguage = 'en-US';  // en-US required for PA
+  speechConfig.speechRecognitionLanguage = 'en-US';
 
-  const pushStream  = SDK.AudioInputStream.createPushStream(
+  const pushStream = SDK.AudioInputStream.createPushStream(
     SDK.AudioStreamFormat.getWaveFormatPCM(16000, 16, 1)
   );
-  // Push audio in 4KB chunks
   const chunk = 4096;
   const view  = new Uint8Array(wavBuffer);
   for (let i = 0; i < view.length; i += chunk) {

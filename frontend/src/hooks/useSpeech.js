@@ -22,17 +22,35 @@ export function useSpeech() {
     window.speechSynthesis?.addEventListener('voiceschanged',load);
     return ()=>window.speechSynthesis?.removeEventListener('voiceschanged',load);
   },[]);
-  const speak = useCallback((text,{rate=0.88,pitch=1.1,lang='en-GB'}={})=>{
-    const s=synth.current; if(!s) return; s.cancel();
-    const u=new SpeechSynthesisUtterance(text);
-    u.lang=lang; u.rate=rate; u.pitch=pitch;
-    const v=voices.current.find(v=>v.lang.startsWith('en-GB')&&v.name.toLowerCase().includes('female'))
-           ||voices.current.find(v=>v.lang.startsWith('en-GB'))
-           ||voices.current.find(v=>v.lang.startsWith('en'));
-    if(v) u.voice=v;
+  const speak = useCallback((text, {rate=0.88, pitch=1.1, lang='en-GB', onWordIdx} = {}) => {
+    const s = synth.current; if (!s) return; s.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang  = lang; u.rate = rate; u.pitch = pitch;
+    const v = voices.current.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
+           || voices.current.find(v => v.lang.startsWith('en-GB'))
+           || voices.current.find(v => v.lang.startsWith('en'));
+    if (v) u.voice = v;
+
+    // Sync word highlights to actual speech via onboundary event
+    if (onWordIdx) {
+      // Build word offset map once
+      const words   = text.split(' ');
+      const offsets = [];
+      let pos = 0;
+      for (const w of words) { offsets.push(pos); pos += w.length + 1; }
+
+      u.onboundary = (e) => {
+        if (e.name !== 'word') return;
+        // Find which word contains this char offset
+        let wi = offsets.findLastIndex(o => e.charIndex >= o);
+        if (wi < 0) wi = 0;
+        onWordIdx(wi);
+      };
+      u.onend = () => onWordIdx(-1);
+    }
     s.speak(u);
-  },[]);
-  const stop = useCallback(()=>synth.current?.cancel(),[]);
+  }, []);
+  const stop = useCallback(() => synth.current?.cancel(), []);
   return { speak, stop };
 }
 

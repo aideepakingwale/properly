@@ -122,6 +122,7 @@ export default function ReadingSession() {
   const recordingTimerRef = useRef(null);   // interval for countdown
   const autoStopTimerRef  = useRef(null);   // timeout for forced auto-stop
   const isRecordingRef    = useRef(false);   // mirrors isRecording without stale closure risk
+  const processingRef     = useRef(false);   // lock: prevents concurrent processAudio calls
   const allWordsCapturedRef = useRef(false); // true when browser has heard all ref words
   const [localConfidence, setLocalConfidence] = useState(0);
 
@@ -242,6 +243,7 @@ export default function ReadingSession() {
     setRevealedCount(0);
     transcriptRef.current  = null;
     isRecordingRef.current = false;
+    processingRef.current   = false;
     clearInterval(recordingTimerRef.current);
     clearTimeout(autoStopTimerRef.current);
     setRecordingSeconds(0);
@@ -355,25 +357,44 @@ export default function ReadingSession() {
     return { ipa: phoneme.replace(/^\/|\/$/g, ''), grapheme, speech: PHONEME_SPEECH[phoneme] || grapheme };
   }
 
-  const playPhoneme = useCallback(async (phoneme, grapheme) => {
+  const playPhoneme = useCallback(async (phoneme, grapheme, chunkKey = null) => {
     const ipaClean = phoneme.replace(/^\/|\/$/g, '');
 
-    // Always try the cache first — preload runs at login so localStorage is usually populated.
-    // Don't gate on providerInfo (it may still be loading when first phoneme plays).
+    // Fetch audio (may hit cache instantly)
     const url = await fetchPhonemeAudio(ipaClean, grapheme);
-    if (url) { await playAudioUrl(url); return; }
+    if (url) {
+      // Set highlight exactly when audio STARTS playing (not when fetch returns)
+      if (chunkKey) {
+        const origPlay = phonemeAudioRef.current;
+        const a = new Audio(url);
+        phonemeAudioRef.current = a;
+        await new Promise(resolve => {
+          a.onplay   = () => setSpeakingChunkKey(chunkKey);  // sync highlight to audio start
+          a.onended  = resolve;
+          a.onerror  = resolve;
+          a.play().catch(resolve);
+        });
+      } else {
+        await playAudioUrl(url);
+      }
+      return;
+    }
 
-    // Fallback: Web Speech phonetic syllable
+    // Fallback: Web Speech — set highlight on onstart
     const speech = PHONEME_SPEECH[phoneme] || grapheme;
     addPhonemeLog({ ipa: ipaClean, grapheme, method: 'web-speech', status: `▶ "${speech}"`, ms: 0 });
-    await sayWord(speech, 0.5, 1.1);
+    if (chunkKey) {
+      await sayWord(speech, 0.5, 1.1, () => setSpeakingChunkKey(chunkKey));
+    } else {
+      await sayWord(speech, 0.5, 1.1);
+    }
   }, [fetchPhonemeAudio]);
 
   // Promise-based speech — waits for onend before resolving
-  function sayWord(text, rate = 0.78, pitch = 1.08) {
+  function sayWord(text, rate = 0.78, pitch = 1.08, onStart) {
     return new Promise(resolve => {
       const synth = window.speechSynthesis;
-      if (!synth) { setTimeout(resolve, 400); return; }
+      if (!synth) { onStart?.(); setTimeout(resolve, 400); return; }
       const u = new SpeechSynthesisUtterance(text);
       u.lang  = 'en-GB';
       u.rate  = rate;
@@ -384,6 +405,7 @@ export default function ReadingSession() {
               || voices.find(v => v.lang.startsWith('en-US'))
               || voices[0];
       if (v) u.voice = v;
+      u.onstart = () => onStart?.();  // fires when audio actually starts playing
       u.onend   = resolve;
       u.onerror = resolve;
       synth.speak(u);
@@ -648,6 +670,9 @@ export default function ReadingSession() {
 
   const handleMic = async () => {
     if (isRecording) {
+      // Prevent double-invocation from race between auto-stop and manual stop
+      if (processingRef.current) return;
+      processingRef.current = true;
       // Clear all auto-stop timers — user pressed stop manually (or auto-stop fired)
       isRecordingRef.current = false;
       clearInterval(recordingTimerRef.current);
@@ -660,6 +685,7 @@ export default function ReadingSession() {
 
       if (!blob || blob.size < 300) {
         setFeedbackData({ tip: "I couldn't hear anything — tap 🎙️ and try again!", source: 'fallback', provider: 'rules' });
+        processingRef.current = false;
         return;
       }
 
@@ -688,6 +714,7 @@ export default function ReadingSession() {
         });
         setLastDebug({ stage: 'no-speech', blobKB: (blob.size/1024).toFixed(1), mime: blob.type, browserText: timedOut ? '(timed out)' : '(empty)', ref: pageRef.current?.text });
         transcriptRef.current = null;
+        processingRef.current = false;
         return;
       }
 
@@ -710,6 +737,7 @@ export default function ReadingSession() {
           provider: 'rules',
         });
         transcriptRef.current = null;
+        processingRef.current = false;
         return;
       }
 
@@ -720,6 +748,7 @@ export default function ReadingSession() {
 
       await processAudio(blob, browserText);
       transcriptRef.current = null;
+      processingRef.current = false;
       return;
     }
 
@@ -1105,11 +1134,10 @@ export default function ReadingSession() {
                 if (phonicsHearMode) {
                   speakPhonics();
                 } else {
-                  const pageWords = page.text.split(' ');
-                  setSpeakingWordIdx(0);
-                  pageWords.forEach((_, i) => setTimeout(() => setSpeakingWordIdx(i), i * 420));
-                  setTimeout(() => setSpeakingWordIdx(-1), pageWords.length * 420 + 500);
-                  speak(page.text);
+                  // Use onboundary for precise word sync — highlights fire when TTS actually speaks each word
+                  speak(page.text, {
+                    onWordIdx: (wi) => setSpeakingWordIdx(wi),
+                  });
                 }
               }}
               style={{
