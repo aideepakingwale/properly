@@ -382,13 +382,6 @@ export default function ReadingSession() {
       };
       setDebugInfo(debug);
       setLastDebug({ stage: 'done', ...debug });
-      else setDebugInfo({
-        source, azureAssessed, overallAccuracy, overallFluency,
-        wordScores: wordScores?.slice(0,3),
-        displayText,
-        blobSizeKB: (audioBlob?.size / 1024).toFixed(1),
-        note: 'No _debugInfo returned — Azure may not have been called',
-      });
 
       setRevealedCount(0);
       setWordScores(wordScores);
