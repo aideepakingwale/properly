@@ -216,7 +216,26 @@ export default function ReadingSession() {
   }, [story, child]);
 
   // Reset on page change
-  useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); setLocalTranscript(''); setLocalConfidence(0); transcriptRef.current = null; transcriptResolveRef.current = null; }, [pageIdx]);
+  useEffect(() => {
+    setWordScores([]);
+    setFeedbackData(null);
+    setAzureDetails(null);
+    setDebugInfo(null);
+    setLastDebug(null);           // clear stale debug from previous page
+    setShowDebug(false);          // collapse debug panel on page change
+    if (lastAudioUrl) { URL.revokeObjectURL(lastAudioUrl); setLastAudioUrl(null); }
+    setLastAudioMime(null);
+    setLastAudioKB(null);
+    setLocalTranscript('');
+    setLocalConfidence(0);
+    triesRef.current       = 0;
+    setSpeakingWordIdx(-1);
+    setRevealedCount(0);
+    transcriptRef.current  = null;
+    // Cancel any pending transcript promise from previous page
+    transcriptResolveRef.current?.({ text: '', confidence: 0, cancelled: true });
+    transcriptResolveRef.current = null;
+  }, [pageIdx]);
 
   const page    = story?.pages?.[pageIdx];
   const pageRef = useRef(null);
@@ -628,7 +647,29 @@ export default function ReadingSession() {
         return;
       }
 
-      // ── GATE PASSED: browser confirmed speech → send to Azure ────────────
+      // ── VALIDATE: ensure transcript is about the current page ────────────
+      // Guard against stale transcripts (previous page's onresult firing late).
+      // Check at least 1 content word (len > 2) overlaps between transcript and reference.
+      const currentRef  = (pageRef.current?.text || '').toLowerCase().replace(/[.,!?]/g, '');
+      const refWords    = new Set(currentRef.split(/\s+/).filter(w => w.length > 2));
+      const heardWords  = browserText.toLowerCase().replace(/[.,!?]/g, '').split(/\s+/).filter(w => w.length > 2);
+      const overlap     = heardWords.filter(w => refWords.has(w)).length;
+      const overlapPct  = refWords.size > 0 ? overlap / refWords.size : 0;
+
+      if (overlapPct === 0 && refWords.size > 2) {
+        // Transcript shares zero content words with current page — likely stale
+        console.warn('[Gate] Transcript appears stale — no overlap with current page. Discarding.');
+        setLocalTranscript('');
+        setFeedbackData({
+          tip: "Let me listen again — tap 🎙️ and read the sentence on screen.",
+          source: 'fallback',
+          provider: 'rules',
+        });
+        transcriptRef.current = null;
+        return;
+      }
+
+      // ── GATE PASSED: browser confirmed speech about current page → Azure ──
       setLocalTranscript(browserText);
       setLocalConfidence(browserConf);
       transcriptRef.current = browserText;

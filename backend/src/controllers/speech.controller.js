@@ -166,24 +166,38 @@ export const assessSpeech = async (req, res) => {
   }
 
   // ── 3. TEXT-COMPARISON FALLBACK ───────────────────────────────
-  // Used when Azure not configured OR when Azure fails.
-  // Requires browser Web Speech API transcript.
   if (transcript && transcript.trim()) {
-    const wordScores = scoreWords(transcript, referenceText);
-    const accuracy   = avg(wordScores.map(w => w.score));
-    return res.json({
-      success: true,
-      data: {
-        wordScores,
-        overallAccuracy:     accuracy,
-        overallFluency:      accuracy,
-        overallCompleteness: transcript ? 95 : 0,
-        overallProsody:      0,
-        displayText:         transcript,
-        source:              'text-comparison',
-        azureAssessed:       false,
-      },
-    });
+    // Validate transcript is about the current reference (Jaccard similarity)
+    const refTokens     = new Set(referenceText.toLowerCase().replace(/[.,!?;:'"]/g,'').split(/\s+/).filter(w=>w.length>2));
+    const spokenTokens  = transcript.toLowerCase().replace(/[.,!?;:'"]/g,'').split(/\s+/).filter(w=>w.length>2);
+    const overlapCount  = spokenTokens.filter(w=>refTokens.has(w)).length;
+    const jaccard       = refTokens.size > 0 ? overlapCount / refTokens.size : 0;
+    const staleTranscript = jaccard === 0 && refTokens.size > 2;
+
+    if (staleTranscript) {
+      console.warn(`[Speech] text-comparison: transcript appears stale (0% overlap). transcript="${transcript.slice(0,50)}" ref="${referenceText.slice(0,50)}"`);
+      // Fall through to no-assessment rather than give misleading 100% scores
+    } else {
+      const wordScores = scoreWords(transcript, referenceText);
+      const accuracy   = avg(wordScores.map(w => w.score));
+      // Cap accuracy if sentence similarity is low
+      const cappedAccuracy = jaccard < 0.25 ? Math.min(accuracy, 20) : accuracy;
+      return res.json({
+        success: true,
+        data: {
+          wordScores,
+          overallAccuracy:     cappedAccuracy,
+          overallFluency:      cappedAccuracy,
+          overallCompleteness: jaccard > 0.3 ? 95 : Math.round(jaccard * 100),
+          overallProsody:      0,
+          displayText:         transcript,
+          source:              'text-comparison',
+          azureAssessed:       false,
+          sentenceSimilarity:  Math.round(jaccard * 100),
+          wrongSentence:       jaccard < 0.25,
+        },
+      });
+    }
   }
 
   // ── 4. NO SCORING AVAILABLE ───────────────────────────────────
