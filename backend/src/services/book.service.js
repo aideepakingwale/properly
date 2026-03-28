@@ -187,12 +187,7 @@ function buildSvgPage(text, seed) {
   <text x="650" y="400" font-size="24" opacity="0.55" fill="${acc1}">💫</text>
 
   <!-- Decorative dots -->
-  ${[...Array(12)].map((_, i) => {
-    const cx = 80 + (i * 60);
-    const cy = 550 + (i % 3) * 12;
-    return `<circle cx="${cx}" cy="${cy}" r="5" fill="white" opacity="${0.3 + (i%3)*0.2}"/>`;
-  }).join('
-  ')}
+  ${[...Array(12)].map((_, i) => { const cx = 80+(i*60); const cy = 550+(i%3)*12; return '<circle cx="'+cx+'" cy="'+cy+'" r="5" fill="white" opacity="'+(0.3+(i%3)*0.2).toFixed(1)+'"/>'; }).join(' ')}
 
   <!-- Page text area -->
   <rect x="60" y="420" width="680" height="90" rx="18" fill="white" opacity="0.82"/>
