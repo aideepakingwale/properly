@@ -189,8 +189,9 @@ export default function ReadingSession() {
   // Falls back to Web Speech with carefully chosen English key words.
   // Each key word is the shortest common word that STARTS with that phoneme.
 
-  const phonemeAudioCache = useRef({});
-  const phonemeAudioRef   = useRef(null);
+  const phonemeAudioCache    = useRef({});
+  const phonemeAudioRef      = useRef(null);
+  const _reloadingPhonemes   = useRef(false);  // prevent multiple simultaneous preload calls
   const [phonemeDebugLog, setPhonemeDebugLog] = useState([]); // [{ipa, grapheme, method, status, ms}]
   const [showPhonemeDebug, setShowPhonemeDebug] = useState(false);
   const addPhonemeLog = (entry) => setPhonemeDebugLog(prev => [entry, ...prev].slice(0, 30));
@@ -210,34 +211,21 @@ export default function ReadingSession() {
       return preloadUrl;
     }
 
-    // 3. Fallback: fetch individual phoneme from backend (only if preload didn't run)
-    const t0 = Date.now();
-    const rawBase    = (typeof __API_URL__ !== 'undefined' && __API_URL__) ? __API_URL__ : '/api';
-    const withProto  = rawBase.startsWith('http') ? rawBase : (rawBase === '/api' ? '' : 'https://' + rawBase);
-    const apiBase    = withProto.replace(/\/$/, '').replace(/\/api$/, '') + '/api';
-    const url_called = `${apiBase}/ai/phoneme`;
-    try {
+    // 3. Cache miss — trigger a background re-preload (non-blocking) and return null
+    //    so WebSpeech fallback plays immediately.
+    //    The re-preload will populate localStorage for all future phonemes this session.
+    if (!_reloadingPhonemes.current) {
+      _reloadingPhonemes.current = true;
       const token = localStorage.getItem('properly_token');
-      const res = await fetch(url_called, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body:    JSON.stringify({ ipa, grapheme, rate: 0.55 }),
+      addPhonemeLog({ ipa, grapheme, method: 'preload-retry', status: '⏳ cache empty — re-fetching all phonemes…', ms: 0 });
+      import('../services/phonemeCache').then(({ preloadPhonemes }) => {
+        preloadPhonemes(token).then(r => {
+          addPhonemeLog({ ipa: '—', grapheme: '—', method: 'preload-retry', status: r.loaded > 0 ? `✅ ${r.loaded} phonemes loaded — future sounds will use Azure` : `❌ preload failed: ${r.error || 'unknown'}`, ms: 0 });
+          _reloadingPhonemes.current = false;
+        });
       });
-      const ms = Date.now() - t0;
-      if (!res.ok) {
-        const errText = await res.text().catch(() => res.statusText);
-        addPhonemeLog({ ipa, grapheme, method: 'azure-api', status: `❌ HTTP ${res.status}: ${errText.slice(0,60)}`, ms, endpoint: url_called });
-        throw new Error(`${res.status}`);
-      }
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      phonemeAudioCache.current[ipa] = url;
-      addPhonemeLog({ ipa, grapheme, method: 'azure-api', status: `✅ ${(blob.size/1024).toFixed(1)}KB`, ms, endpoint: url_called });
-      return url;
-    } catch (e) {
-      addPhonemeLog({ ipa, grapheme, method: 'azure-api', status: `❌ ${e.message}`, ms: Date.now()-t0, endpoint: url_called });
-      return null;
     }
+    return null;  // WebSpeech fallback will play while preload runs in background
   }, []);
 
   const playAudioUrl = (url) => new Promise(resolve => {
@@ -295,17 +283,16 @@ export default function ReadingSession() {
   const playPhoneme = useCallback(async (phoneme, grapheme) => {
     const ipaClean = phoneme.replace(/^\/|\/$/g, '');
 
-    // 1. Azure TTS with SSML <phoneme alphabet="ipa"> — EXACT sound (best quality)
-    if (providerInfo?.azure?.available) {
-      const url = await fetchPhonemeAudio(ipaClean, grapheme);
-      if (url) { await playAudioUrl(url); return; }
-    }
+    // Always try the cache first — preload runs at login so localStorage is usually populated.
+    // Don't gate on providerInfo (it may still be loading when first phoneme plays).
+    const url = await fetchPhonemeAudio(ipaClean, grapheme);
+    if (url) { await playAudioUrl(url); return; }
 
-    // 2. Web Speech fallback — phonetic syllable designed to isolate the target sound
+    // Fallback: Web Speech phonetic syllable
     const speech = PHONEME_SPEECH[phoneme] || grapheme;
     addPhonemeLog({ ipa: ipaClean, grapheme, method: 'web-speech', status: `▶ "${speech}"`, ms: 0 });
     await sayWord(speech, 0.5, 1.1);
-  }, [providerInfo, fetchPhonemeAudio]);
+  }, [fetchPhonemeAudio]);
 
   // Promise-based speech — waits for onend before resolving
   function sayWord(text, rate = 0.78, pitch = 1.08) {
@@ -1053,8 +1040,17 @@ export default function ReadingSession() {
                   <div style={{ display: 'grid', gridTemplateColumns: '60px 60px 90px 1fr 50px', gap: 4 }}>
                     <span style={{ fontWeight: 700 }}>/{entry.ipa}/</span>
                     <span style={{ color: '#FCD34D' }}>{entry.grapheme}</span>
-                    <span style={{ color: entry.method === 'azure-tts' ? '#A78BFA' : entry.method === 'azure-cached' ? '#34D399' : '#F97316' }}>
-                      {entry.method === 'azure-tts' ? '☁️ Azure' : entry.method === 'azure-cached' ? '💾 cached' : '📱 WebSpeech'}
+                    <span style={{ color:
+                        entry.method === 'azure-api'     ? '#A78BFA' :
+                        entry.method === 'session-cache' ? '#34D399'  :
+                        entry.method === 'preload-cache' ? '#34D399'  :
+                        entry.method === 'preload-retry' ? '#FCD34D'  :
+                        entry.method === 'web-speech'    ? '#F97316'  : '#94A3B8' }}>
+                      {entry.method === 'azure-api'     ? '☁️ Azure'     :
+                       entry.method === 'session-cache' ? '⚡ session'   :
+                       entry.method === 'preload-cache' ? '💾 preloaded' :
+                       entry.method === 'preload-retry' ? '🔄 re-fetch'  :
+                       entry.method === 'web-speech'    ? '📱 WebSpeech' : entry.method}
                     </span>
                     <span style={{ wordBreak: 'break-all' }}>{entry.status}</span>
                     <span style={{ color: '#64748B', textAlign: 'right' }}>{entry.ms > 0 ? `${entry.ms}ms` : '—'}</span>
@@ -1068,16 +1064,17 @@ export default function ReadingSession() {
               ))}
               {/* Summary */}
               {phonemeDebugLog.length > 0 && (() => {
-                const azureCalls  = phonemeDebugLog.filter(l => l.method === 'azure-tts');
+                const azureCalls  = phonemeDebugLog.filter(l => l.method === 'azure-api');
                 const azureOk     = azureCalls.filter(l => l.status?.startsWith('✅'));
                 const azureFail   = azureCalls.filter(l => l.status?.startsWith('❌'));
                 const webSpeech   = phonemeDebugLog.filter(l => l.method === 'web-speech');
+                const preloaded   = phonemeDebugLog.filter(l => l.method === 'preload-cache' || l.method === 'session-cache');
                 const avgMs       = azureOk.length ? Math.round(azureOk.reduce((a,b)=>a+(b.ms||0),0)/azureOk.length) : 0;
                 return (
                   <div style={{ padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.1)', fontFamily: 'monospace', fontSize: 10, color: '#94A3B8', marginTop: 4 }}>
-                    ☁️ Azure: {azureOk.length} ok / {azureFail.length} failed (avg {avgMs}ms)
-                    {' · '}📱 Web Speech: {webSpeech.length}
-                    {' · '}💾 Cached: {phonemeDebugLog.filter(l=>l.method==='azure-cached').length}
+                    ⚡/💾 Instant (preloaded/session): {preloaded.length}
+                    {' · '}☁️ Azure API: {azureOk.length} ok / {azureFail.length} failed{azureOk.length ? ` (avg ${avgMs}ms)` : ''}
+                    {' · '}📱 Web Speech fallback: {webSpeech.length}
                     {azureFail.length > 0 && (
                       <div style={{ color: '#FCA5A5', marginTop: 4 }}>
                         ❌ First error: {azureFail[azureFail.length-1]?.status}
