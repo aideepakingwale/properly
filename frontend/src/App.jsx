@@ -14,6 +14,31 @@
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Component } from 'react';
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  componentDidCatch(e, info) { console.error('[ErrorBoundary]', e, info); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 32, fontFamily: 'monospace', background: '#0F0A2E', color: '#FCA5A5', minHeight: '100vh' }}>
+          <div style={{ fontSize: 24, marginBottom: 16 }}>💥 Render Error</div>
+          <div style={{ color: '#FCD34D', marginBottom: 8 }}>{this.state.error.message}</div>
+          <pre style={{ color: '#93C5FD', fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {this.state.error.stack}
+          </pre>
+          <button onClick={() => this.setState({ error: null })}
+            style={{ marginTop: 16, padding: '8px 16px', background: '#7C3AED', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Landing        from './pages/Landing';
 import Auth           from './pages/Auth';
@@ -77,6 +102,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+    </ErrorBoundary>
     </AuthProvider>
   );
 }

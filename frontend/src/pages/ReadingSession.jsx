@@ -182,8 +182,8 @@ export default function ReadingSession() {
   useEffect(() => { setWordScores([]); setFeedbackData(null); setAzureDetails(null); setDebugInfo(null); triesRef.current = 0; setSpeakingWordIdx(-1); setRevealedCount(0); }, [pageIdx]);
 
   const page    = story?.pages?.[pageIdx];
-  const pageRef = useRef(page);
-  useEffect(() => { pageRef.current = page; }, [page]);  // always up to date
+  const pageRef = useRef(null);
+  pageRef.current = page;  // set synchronously every render — always current, no useEffect needed
 
   // ── PHONICS SOUND PLAYBACK ──────────────────────────────────
   // Reads each grapheme's phoneme sound in sequence, lighting up the chunk as it speaks.
