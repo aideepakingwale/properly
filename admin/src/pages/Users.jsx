@@ -38,10 +38,10 @@ export default function Users() {
   };
 
   return (
-    <div style={{ padding:28 }}>
+    <div className='page'>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
         <div>
-          <h1 style={{ fontSize:22, fontWeight:800 }}>Users</h1>
+          <h1>Users</h1>
           <div style={{ fontSize:12, color:'var(--muted)', marginTop:3 }}>{data.total} total registered accounts</div>
         </div>
       </div>
@@ -66,11 +66,11 @@ export default function Users() {
           </thead>
           <tbody>
             {loading
-              ? <tr><td colSpan={8} style={{ textAlign:'center', padding:32, color:'var(--muted)' }}>Loading…</td></tr>
+              ? <tr><td colSpan={8} style={{ textAlign:'center', padding:32, color:'var(--muted)' className='text-muted' }}>Loading…</td></tr>
               : data.users.map(u => (
               <tr key={u.id} style={{ cursor:'pointer' }} onClick={() => nav(`/users/${u.id}`)}>
                 <td>
-                  <span style={{ color: u.isAdmin ? 'var(--accent2)' : 'var(--text)', fontWeight: u.isAdmin ? 700 : 400 }}>
+                  <span style={{ color: u.isAdmin ? 'var(--amber)' : 'var(--text)', fontWeight: u.isAdmin ? 700 : 400 }}>
                     {u.email}
                   </span>
                 </td>

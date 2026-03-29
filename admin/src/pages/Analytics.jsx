@@ -21,7 +21,7 @@ export default function Analytics() {
     adminAPI.analytics().then(r => { if (r.success) setData(r.data); }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding:40, color:'var(--muted)' }}>Loading…</div>;
+  if (loading) return <div className='page'>Loading…</div>;
   if (!data)   return <div style={{ padding:40, color:'var(--danger)' }}>Failed to load</div>;
 
   const { sessionsByDay, phaseDistribution, topReaders, accuracyBuckets } = data;
@@ -30,21 +30,21 @@ export default function Analytics() {
   const buckets = [
     { label:'Excellent (90%+)', key:'excellent', color:'var(--accent)' },
     { label:'Good (70–89%)',    key:'good',      color:'var(--blue)' },
-    { label:'Fair (50–69%)',    key:'fair',      color:'var(--accent2)' },
+    { label:'Fair (50–69%)',    key:'fair',      color:'var(--amber)' },
     { label:'Needs work (<50%)',key:'needs_work',color:'var(--danger)' },
   ];
 
   return (
     <div style={{ padding:28 }}>
       <div style={{ marginBottom:24 }}>
-        <h1 style={{ fontSize:22, fontWeight:800 }}>Analytics</h1>
+        <h1>Analytics</h1>
         <div style={{ fontSize:12, color:'var(--muted)', marginTop:3 }}>Reading performance — last 30 days</div>
       </div>
 
       {/* Sessions over time */}
-      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:20, marginBottom:20 }}>
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:20, marginBottom:20 }}>
         <div style={{ display:'flex', justifyContent:'space-between', marginBottom:16 }}>
-          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase' }}>Daily Sessions</div>
+          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase' }}>Daily Sessions</div>
         </div>
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={sessionsByDay} margin={{ top:4, right:0, left:-20, bottom:0 }}>
@@ -68,8 +68,8 @@ export default function Analytics() {
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16, marginBottom:20 }}>
         {/* Accuracy distribution */}
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:20 }}>
-          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:16 }}>Accuracy Distribution</div>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:20 }}>
+          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', marginBottom:16 }}>Accuracy Distribution</div>
           {buckets.map(b => {
             const pct = totalBucket>0 ? Math.round((accuracyBuckets[b.key]||0)/totalBucket*100) : 0;
             return (
@@ -87,8 +87,8 @@ export default function Analytics() {
         </div>
 
         {/* Phase distribution */}
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:20 }}>
-          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:16 }}>Children by Phase</div>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:20 }}>
+          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', marginBottom:16 }}>Children by Phase</div>
           <ResponsiveContainer width="100%" height={130}>
             <BarChart data={phaseDistribution} margin={{ top:0, right:0, left:-20, bottom:0 }}>
               <XAxis dataKey="phase" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={p=>`P${p}`} />
@@ -100,14 +100,14 @@ export default function Analytics() {
         </div>
 
         {/* Acorns awarded */}
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:20 }}>
-          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:16 }}>Acorns Awarded / Day</div>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:20 }}>
+          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', marginBottom:16 }}>Acorns Awarded / Day</div>
           <ResponsiveContainer width="100%" height={130}>
             <BarChart data={sessionsByDay} margin={{ top:0, right:0, left:-20, bottom:0 }}>
               <XAxis dataKey="day" tick={{ fontSize:9, fill:'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={d=>d.slice(5)} interval={6} />
               <YAxis tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={{ background:'var(--surface)', border:'1px solid var(--border2)', borderRadius:4, fontSize:11 }} />
-              <Bar dataKey="acorns_awarded" fill="var(--accent2)" radius={[3,3,0,0]} />
+              <Bar dataKey="acorns_awarded" fill="var(--amber)" radius={[3,3,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -115,7 +115,7 @@ export default function Analytics() {
 
       {/* Top readers */}
       <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8 }}>
-        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase' }}>
+        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase' }}>
           Top Readers (by total acorns)
         </div>
         <table>
@@ -127,7 +127,7 @@ export default function Analytics() {
                 <td style={{ fontWeight:700 }}>{r.name}</td>
                 <td style={{ color:'var(--muted)', fontSize:11 }}>{r.email}</td>
                 <td><span className="badge badge-blue">P{r.phase}</span></td>
-                <td style={{ color:'var(--accent2)', fontWeight:700 }}>🌰 {(r.total_acorns||0).toLocaleString()}</td>
+                <td style={{ color:'var(--amber)', fontWeight:700 }}>🌰 {(r.total_acorns||0).toLocaleString()}</td>
                 <td style={{ color:'var(--muted)' }}>{(r.words_read||0).toLocaleString()}</td>
                 <td style={{ color:'var(--muted)' }}>{r.sessions}</td>
               </tr>

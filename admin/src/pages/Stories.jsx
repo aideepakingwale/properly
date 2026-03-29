@@ -27,17 +27,17 @@ export default function Stories() {
     }).finally(() => setLoading(false));
   }, []);
 
-  const phaseColor = { 2:'var(--blue)',3:'var(--accent)',4:'var(--accent2)',5:'var(--purple)',6:'var(--danger)' };
+  const phaseColor = { 2:'var(--blue)',3:'var(--accent)',4:'var(--amber)',5:'var(--purple)',6:'var(--danger)' };
 
   return (
-    <div style={{ padding:28 }}>
+    <div className='page'>
       <div style={{ marginBottom:20 }}>
-        <h1 style={{ fontSize:22, fontWeight:800 }}>Stories</h1>
+        <h1>Stories</h1>
         <div style={{ fontSize:12, color:'var(--muted)', marginTop:3 }}>Curriculum library & AI generation stats</div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:2, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:4, width:'fit-content', marginBottom:20 }}>
+      <div style={{ display:'flex', gap:2, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:4, width:'fit-content', marginBottom:20 }}>
         {[['curriculum','📚 Curriculum'],['ai','✨ AI Stories']].map(([k,l]) => (
           <button key={k} onClick={()=>setTab(k)} className="btn btn-sm"
             style={{ background:tab===k?'var(--accent)':'transparent', color:tab===k?'#000':'var(--muted)', border:'none' }}>
@@ -67,12 +67,12 @@ export default function Stories() {
                       P{s.phase} · {PHASE_LABEL[s.phase]}
                     </span>
                   </td>
-                  <td style={{ color:'var(--accent2)' }}>🌰 {s.acorns}</td>
+                  <td style={{ color:'var(--amber)' }}>🌰 {s.acorns}</td>
                   <td style={{ color:'var(--muted)' }}>{s.page_count}</td>
                   <td style={{ fontWeight: s.reads>0?600:400, color: s.reads>0?'var(--text)':'var(--muted)' }}>{s.reads}</td>
                   <td>
                     {s.avgAccuracy
-                      ? <span style={{ color: s.avgAccuracy>=80?'var(--accent)':s.avgAccuracy>=60?'var(--accent2)':'var(--danger)', fontWeight:700 }}>{s.avgAccuracy}%</span>
+                      ? <span style={{ color: s.avgAccuracy>=80?'var(--accent)':s.avgAccuracy>=60?'var(--amber)':'var(--danger)', fontWeight:700 }}>{s.avgAccuracy}%</span>
                       : <span style={{ color:'var(--muted)' }}>–</span>
                     }
                   </td>
@@ -85,7 +85,7 @@ export default function Stories() {
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           {/* By theme */}
           <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8 }}>
-            <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase' }}>By Theme</div>
+            <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase' }}>By Theme</div>
             <table>
               <thead><tr><th>Theme</th><th>Generated</th><th>Completed</th><th>Completion %</th><th>Avg Accuracy</th></tr></thead>
               <tbody>
@@ -102,7 +102,7 @@ export default function Stories() {
                         <span style={{ color:'var(--muted)', fontSize:11 }}>{t.total>0?Math.round(t.completed/t.total*100):0}%</span>
                       </div>
                     </td>
-                    <td style={{ color: t.avg_acc>=80?'var(--accent)':t.avg_acc>=60?'var(--accent2)':'var(--danger)' }}>
+                    <td style={{ color: t.avg_acc>=80?'var(--accent)':t.avg_acc>=60?'var(--amber)':'var(--danger)' }}>
                       {t.avg_acc ? `${t.avg_acc}%` : '–'}
                     </td>
                   </tr>
@@ -112,8 +112,8 @@ export default function Stories() {
           </div>
 
           {/* By AI provider */}
-          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:20 }}>
-            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:14 }}>By AI Provider</div>
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:20 }}>
+            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', marginBottom:14 }}>By AI Provider</div>
             <div style={{ display:'flex', gap:16 }}>
               {aiStats.byProvider.map(p => (
                 <div key={p.ai_provider} style={{ background:'var(--bg)', border:'1px solid var(--border2)', borderRadius:8, padding:'14px 20px', minWidth:120 }}>

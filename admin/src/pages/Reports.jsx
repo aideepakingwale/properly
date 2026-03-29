@@ -70,7 +70,7 @@ export default function Reports() {
   return (
     <div style={{ padding: 28, maxWidth: 900 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800 }}>🚩 Content Reports</h1>
+        <h1>🚩 Content Reports</h1>
         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
           Review user-flagged AI stories and books. Award credits for valid reports.
         </div>

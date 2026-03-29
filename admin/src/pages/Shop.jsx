@@ -33,7 +33,7 @@ function ItemForm({ initial, onSave, onCancel, isNew }) {
 
   return (
     <div style={{ background:'var(--bg)', border:'1px solid var(--accent)', borderRadius:8, padding:20, marginBottom:16 }}>
-      <div style={{ fontFamily:'var(--font-ui)', fontWeight:700, marginBottom:14, color:'var(--accent)' }}>
+      <div style={{ fontFamily:'var(--font-body)', fontWeight:700, marginBottom:14, color:'var(--accent)' }}>
         {isNew ? '+ New Item' : 'Edit Item'}
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
@@ -85,13 +85,13 @@ export default function Shop() {
     await adminAPI.deleteItem(id); load();
   };
 
-  const catColor = { avatar:'var(--blue)', background:'var(--purple)', badge:'var(--accent)', reward:'var(--accent2)', physical:'var(--danger)' };
+  const catColor = { avatar:'var(--blue)', background:'var(--purple)', badge:'var(--accent)', reward:'var(--amber)', physical:'var(--danger)' };
 
   return (
-    <div style={{ padding:28 }}>
+    <div className='page'>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
         <div>
-          <h1 style={{ fontSize:22, fontWeight:800 }}>Gift Shop</h1>
+          <h1>Gift Shop</h1>
           <div style={{ fontSize:12, color:'var(--muted)', marginTop:3 }}>{items.length} items · children spend acorns here</div>
         </div>
         <button className="btn btn-accent" onClick={()=>{setShowNew(true);setEditing(null);}}>+ New Item</button>
@@ -121,7 +121,7 @@ export default function Shop() {
                       </div>
                     </td>
                     <td><span className="badge" style={{ background:`${catColor[item.category]}20`, color:catColor[item.category]||'var(--muted)', border:`1px solid ${catColor[item.category]}40` }}>{item.category}</span></td>
-                    <td><span style={{ color:'var(--accent2)', fontWeight:700 }}>🌰 {item.cost}</span></td>
+                    <td><span style={{ color:'var(--amber)', fontWeight:700 }}>🌰 {item.cost}</span></td>
                     <td style={{ color:'var(--muted)' }}>{item.ownerCount}</td>
                     <td style={{ color:'var(--muted)' }}>{item.sort_order}</td>
                     <td>

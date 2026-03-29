@@ -33,7 +33,7 @@ function TestResult({ result }) {
       {result.note  && <div style={{ color:'var(--text)' }}>{result.note}</div>}
       {result.reply && <div style={{ color:'var(--muted)', fontStyle:'italic' }}>Reply: "{result.reply}"</div>}
       {result.error && <div style={{ color:'var(--danger)' }}>{result.error}</div>}
-      {result.mode  && <div style={{ color:'var(--accent2)', fontWeight:700 }}>{result.mode}</div>}
+      {result.mode  && <div style={{ color:'var(--amber)', fontWeight:700 }}>{result.mode}</div>}
       {result.results && Object.entries(result.results).map(([k, v]) => (
         <div key={k} style={{ display:'flex', gap:8, alignItems:'center', marginTop:2 }}>
           <span style={{ color: v.ok ? 'var(--accent)' : 'var(--danger)', fontSize:12 }}>{v.ok ? "\u2713" : "\u2717"}</span>
@@ -74,7 +74,7 @@ function ServiceRow({ label, value, configured, note, onTest, testKey, testing, 
 
 function SectionTitle({ icon, children }) {
   return (
-    <div style={{ fontFamily:'var(--font-ui)', fontWeight:700, fontSize:14, color:'var(--accent)', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+    <div style={{ fontFamily:'var(--font-body)', fontWeight:700, fontSize:14, color:'var(--accent)', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
       <span>{icon}</span> {children}
     </div>
   );
@@ -185,13 +185,13 @@ export default function Config() {
     finally { setBacking(false); }
   };
 
-  if (loading) return <div style={{ padding:40, color:'var(--muted)' }}>Loading...</div>;
+  if (loading) return <div className='page'>Loading...</div>;
   if (!cfg)    return <div style={{ padding:40, color:'var(--danger)' }}>Failed to load config</div>;
 
   return (
     <div style={{ padding:28, maxWidth:860 }}>
       <div style={{ marginBottom:24 }}>
-        <h1 style={{ fontSize:22, fontWeight:800 }}>Configuration</h1>
+        <h1>Configuration</h1>
         <div style={{ fontSize:12, color:'var(--muted)', marginTop:3 }}>
           Live config status. Click Test to verify each key is working correctly.
         </div>
@@ -209,7 +209,7 @@ export default function Config() {
               <div style={{ fontSize:11, color:'var(--muted)', lineHeight:1.7 }}>
                 When ON: Azure raw API request and response shown in a collapsible panel during reading sessions.<br/>
                 Includes audio size, reference text, pronunciation config, and full JSON response.<br/>
-                <strong style={{ color:'var(--accent2)' }}>Turn OFF in production — for development only.</strong>
+                <strong style={{ color:'var(--amber)' }}>Turn OFF in production — for development only.</strong>
               </div>
             </div>
             <div style={{ flexShrink:0, marginLeft:24, textAlign:'center' }}>
@@ -217,7 +217,7 @@ export default function Config() {
                 onClick={() => toggleDebugMode(!debugMode)}
                 disabled={debugSaving}
                 style={{ padding:'10px 24px', borderRadius:6, border:'none', fontFamily:'var(--font-mono)', fontWeight:700, fontSize:13, cursor:'pointer',
-                  background: debugMode ? 'var(--accent2)' : 'var(--border2)',
+                  background: debugMode ? 'var(--amber)' : 'var(--border2)',
                   color: debugMode ? '#000' : 'var(--muted)',
                   minWidth:100,
                 }}>
@@ -266,7 +266,7 @@ export default function Config() {
                       {debugData.vars && Object.entries(debugData.vars).map(([k, v]) => (
                         <div key={k} style={{ display:'flex', gap:8, alignItems:'center', marginBottom:5 }}>
                           <span style={{ color: v.present ? 'var(--accent)' : 'var(--danger)', fontSize:12 }}>{v.present ? '\u2713' : '\u2717'}</span>
-                          <code style={{ color:'var(--accent2)', minWidth:140 }}>{k}</code>
+                          <code style={{ color:'var(--amber)', minWidth:140 }}>{k}</code>
                           {v.present
                             ? <span style={{ color:'var(--muted)' }}>{v.length} chars — {v.preview}{v.hasWhitespace ? ' \u26a0 has whitespace!' : ''}</span>
                             : <span style={{ color:'var(--danger)' }}>NOT SET</span>
@@ -286,7 +286,7 @@ export default function Config() {
       {/* AI */}
       <section style={{ marginBottom:24 }}>
         <SectionTitle icon="\u25C6">AI Services</SectionTitle>
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:'0 20px' }}>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:'0 20px' }}>
           <ServiceRow label="Google Gemini Flash" configured={!!cfg.gemini.key}
             note="Primary AI story generator — free 1,500 req/day · aistudio.google.com"
             testKey="gemini" onTest={runTest} testing={testing} results={results} />
@@ -330,7 +330,7 @@ export default function Config() {
       {/* Payments & Email */}
       <section style={{ marginBottom:24 }}>
         <SectionTitle icon="\u25C6">Payments & Email</SectionTitle>
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:'0 20px' }}>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:'0 20px' }}>
           <ServiceRow label="Stripe" configured={!!cfg.stripe.configured}
             note="Subscription billing — Sprout 3.99/mo, Forest 6.99/mo · dashboard.stripe.com"
             testKey="stripe" onTest={runTest} testing={testing} results={results} />
@@ -346,7 +346,7 @@ export default function Config() {
       {/* Auth */}
       <section style={{ marginBottom:24 }}>
         <SectionTitle icon="\u25C6">Authentication</SectionTitle>
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:'0 20px' }}>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:'0 20px' }}>
           <PlainRow label="JWT Expiry" value={cfg.jwtExpiry} status="ok" note="30d — keeps users logged in across deploys" />
           <PlainRow label="Admin Emails" value={cfg.adminEmails?.join(', ')||null}
             status={cfg.adminEmails?.length?'ok':'warn'} note="ADMIN_EMAILS env var — auto-promoted to admin on login" />

@@ -1,76 +1,78 @@
-/**
- * @file        Login.jsx
- * @description Admin login page — email/password form with contextual error messages for unverified/non-admin accounts
- * @module      Admin Pages
- *
- * @project     Properly — AI Phonics Tutor
- * @authors     Deepak Ingwale, Mahima Verma
- * @copyright   2026 Properly. All rights reserved.
- * @license     Proprietary
- */
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail]   = useState('');
-  const [pass, setPass]     = useState('');
-  const [err, setErr]       = useState('');
+  const [pass,  setPass]    = useState('');
+  const [err,   setErr]     = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const nav = useNavigate();
 
-  const handle = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErr(''); setLoading(true);
-    try {
-      await login(email, pass);
-      nav('/dashboard');
-    } catch (e) {
-      // Surface specific error messages
-      const msg = e.message || 'Login failed';
-      if (msg.includes('verify your email')) {
-        setErr('Email not verified. Add this email to ADMIN_EMAILS in Render env vars so it bypasses verification, then redeploy.');
-      } else if (msg.includes('admin access')) {
-        setErr('Account exists but has no admin access. Add email to ADMIN_EMAILS in Render env vars and log into the main app once.');
-      } else {
-        setErr(msg);
-      }
-    } finally { setLoading(false); }
+    const res = await login(email, pass);
+    setLoading(false);
+    if (res.success) nav('/dashboard');
+    else setErr(res.message || 'Invalid credentials');
   };
 
   return (
-    <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
-      <div style={{ width:360 }}>
-        {/* Header */}
-        <div style={{ marginBottom:32, textAlign:'center' }}>
-          <div style={{ fontFamily:'var(--font-ui)', fontSize:28, fontWeight:800, color:'var(--accent)', marginBottom:4 }}>
-            🦉 PROPERLY
-          </div>
-          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'3px' }}>ADMIN CONSOLE</div>
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(135deg, #F4F6FB 0%, #EEF0FF 100%)',
+      padding: 20,
+    }}>
+      <div style={{ width: '100%', maxWidth: 400 }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'linear-gradient(135deg, #5B68F6, #8B5CF6)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 28, marginBottom: 14, boxShadow: '0 8px 24px rgba(91,104,246,0.3)',
+          }}>🦉</div>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#111827', marginBottom: 4 }}>Properly Admin</h1>
+          <p style={{ fontSize: '0.875rem', color: '#6B7280' }}>Sign in to your admin console</p>
         </div>
 
-        <form onSubmit={handle} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:28 }}>
-          <div style={{ marginBottom:16 }}>
-            <label style={{ display:'block', fontSize:10, color:'var(--muted)', letterSpacing:'1px', marginBottom:6 }}>EMAIL</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="admin@properly.app" required />
-          </div>
-          <div style={{ marginBottom:20 }}>
-            <label style={{ display:'block', fontSize:10, color:'var(--muted)', letterSpacing:'1px', marginBottom:6 }}>PASSWORD</label>
-            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" required />
-          </div>
-          {err && <div style={{ color:'var(--danger)', fontSize:12, marginBottom:14, padding:'8px 10px', background:'rgba(255,68,68,0.08)', borderRadius:'var(--radius)' }}>{err}</div>}
-          <button type="submit" className="btn btn-accent" style={{ width:'100%', justifyContent:'center', padding:'10px' }} disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in →'}
-          </button>
-        </form>
+        {/* Card */}
+        <div className="card" style={{ padding: '28px 32px' }}>
+          {err && <div className="alert alert-error" style={{ marginBottom: 18 }}>⚠️ {err}</div>}
 
-        <div style={{ marginTop:16, fontSize:11, color:'var(--muted)', textAlign:'center', lineHeight:1.7 }}>
-          Requires admin privileges.<br/>
-          Set <code style={{ color:'var(--accent)' }}>ADMIN_EMAILS</code> in Render env vars<br/>
-          or run: <code style={{ color:'var(--accent2)' }}>UPDATE users SET is_admin=1 WHERE email='you@x.com'</code>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="input-group">
+              <label>Email address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="admin@properly.app"
+                required
+                autoFocus
+              />
+            </div>
+            <div className="input-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={pass}
+                onChange={e => setPass(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: 4, width: '100%' }}>
+              {loading ? '⏳ Signing in…' : 'Sign In →'}
+            </button>
+          </form>
         </div>
+
+        <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#9CA3AF', marginTop: 20 }}>
+          Properly Ltd · Admin Console v2.0
+        </p>
       </div>
     </div>
   );

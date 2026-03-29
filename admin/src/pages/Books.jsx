@@ -98,7 +98,7 @@ export default function BooksAdmin() {
 
   return (
     <div style={{ padding: 28, maxWidth: 1000 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>📚 Story Books</h1>
+      <h1>📚 Story Books</h1>
       <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 24 }}>
         Manage AI-generated storybooks, book credits and print orders.
       </div>
@@ -186,7 +186,7 @@ export default function BooksAdmin() {
                                       padding: '4px 8px', borderRadius: 5,
                                       background: entry.status === 'error' ? 'rgba(239,68,68,0.08)' : entry.status === 'warn' ? 'rgba(245,158,11,0.06)' : 'rgba(16,185,129,0.05)'
                                     }}>
-                                      <span style={{ color: 'var(--accent2)', fontWeight: 600 }}>{entry.step}</span>
+                                      <span style={{ color: 'var(--amber)', fontWeight: 600 }}>{entry.step}</span>
                                       <span>{entry.status === 'ok' ? '✅' : entry.status === 'warn' ? '⚠️' : '❌'}</span>
                                       <span style={{ color: entry.status === 'error' ? 'var(--danger)' : 'var(--text)', wordBreak: 'break-all' }}>{entry.detail}</span>
                                       <span style={{ color: 'var(--muted)', fontSize: 10, textAlign: 'right' }}>{new Date(entry.ts).toLocaleTimeString()}</span>

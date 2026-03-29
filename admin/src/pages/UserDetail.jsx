@@ -74,7 +74,7 @@ export default function UserDetail() {
     nav('/users');
   };
 
-  if (loading) return <div style={{ padding:40, color:'var(--muted)' }}>Loading…</div>;
+  if (loading) return <div className='page'>Loading…</div>;
   if (!data)   return <div style={{ padding:40, color:'var(--danger)' }}>User not found</div>;
 
   const { user, subscription, children, recentSessions } = data;
@@ -89,7 +89,7 @@ export default function UserDetail() {
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24 }}>
         <div>
-          <h1 style={{ fontSize:20, fontWeight:800, color: user.isAdmin ? 'var(--accent2)' : 'var(--text)' }}>
+          <h1 style={{ fontSize:20, fontWeight:800, color: user.isAdmin ? 'var(--amber)' : 'var(--text)' }}>
             {user.email} {user.isAdmin && <span className="badge badge-amber" style={{ marginLeft:8 }}>Admin</span>}
           </h1>
           <div style={{ fontSize:11, color:'var(--muted)', marginTop:4 }}>
@@ -104,8 +104,8 @@ export default function UserDetail() {
         {/* Left: edit panel */}
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           {/* Plan */}
-          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:18 }}>
-            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:12 }}>Subscription Plan</div>
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:18 }}>
+            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', marginBottom:12 }}>Subscription Plan</div>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:14 }}>
               {PLANS.map(p => (
                 <label key={p} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', padding:'8px 10px', borderRadius:'var(--radius)', background: plan===p ? 'rgba(0,229,160,0.08)' : 'transparent', border: `1px solid ${plan===p?'rgba(0,229,160,0.3)':'var(--border2)'}` }}>
@@ -123,10 +123,10 @@ export default function UserDetail() {
           </div>
 
           {/* Admin toggle */}
-          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:18 }}>
-            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:12 }}>Permissions</div>
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:18 }}>
+            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', marginBottom:12 }}>Permissions</div>
             <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
-              <input type="checkbox" checked={isAdmin} onChange={e=>setIsAdmin(e.target.checked)} style={{ width:'auto', accentColor:'var(--accent2)' }} />
+              <input type="checkbox" checked={isAdmin} onChange={e=>setIsAdmin(e.target.checked)} style={{ width:'auto', accentColor:'var(--amber)' }} />
               <span style={{ fontSize:12 }}>Admin access</span>
             </label>
             <div style={{ fontSize:11, color:'var(--muted)', marginTop:6 }}>Grants full admin panel access</div>
@@ -138,8 +138,8 @@ export default function UserDetail() {
           {msg && <div style={{ fontSize:12, color: msg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)', textAlign:'center' }}>{msg}</div>}
 
           {/* ── Book Credits ── */}
-          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:18 }}>
-            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:12 }}>Book Credits</div>
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:18 }}>
+            <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', marginBottom:12 }}>Book Credits</div>
 
             {/* Current balance */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
@@ -189,7 +189,7 @@ export default function UserDetail() {
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           {/* Children */}
           <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8 }}>
-            <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase' }}>
+            <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase' }}>
               Children ({children.length})
             </div>
             <table>
@@ -200,10 +200,10 @@ export default function UserDetail() {
                     <td style={{ fontWeight:600 }}>{c.name}</td>
                     <td><span className="badge badge-blue">P{c.phase}</span></td>
                     <td style={{ color:'var(--muted)' }}>{c.age ?? '–'}</td>
-                    <td style={{ color:'var(--accent2)' }}>🌰 {c.acorns}</td>
+                    <td style={{ color:'var(--amber)' }}>🌰 {c.acorns}</td>
                     <td style={{ color:'var(--muted)' }}>{c.sessions}</td>
                     <td style={{ color:'var(--purple)' }}>{c.aiCompleted}</td>
-                    <td style={{ color: c.avgAccuracy >= 80 ? 'var(--accent)' : c.avgAccuracy >= 60 ? 'var(--accent2)' : 'var(--danger)' }}>
+                    <td style={{ color: c.avgAccuracy >= 80 ? 'var(--accent)' : c.avgAccuracy >= 60 ? 'var(--amber)' : 'var(--danger)' }}>
                       {c.avgAccuracy ?? '–'}{c.avgAccuracy ? '%' : ''}
                     </td>
                   </tr>
@@ -215,7 +215,7 @@ export default function UserDetail() {
 
           {/* Recent sessions */}
           <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8 }}>
-            <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase' }}>
+            <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase' }}>
               Recent Sessions
             </div>
             <table>
@@ -226,10 +226,10 @@ export default function UserDetail() {
                     <td>{s.child_name}</td>
                     <td style={{ color:'var(--muted)', fontSize:11 }}>{s.story_title}</td>
                     <td><span className={`badge ${s.story_type==='ai'?'badge-purple':'badge-blue'}`}>{s.story_type}</span></td>
-                    <td style={{ color: s.accuracy>=80?'var(--accent)':s.accuracy>=60?'var(--accent2)':'var(--danger)', fontWeight:700 }}>
+                    <td style={{ color: s.accuracy>=80?'var(--accent)':s.accuracy>=60?'var(--amber)':'var(--danger)', fontWeight:700 }}>
                       {Math.round(s.accuracy??0)}%
                     </td>
-                    <td style={{ color:'var(--accent2)' }}>+{s.acorns_earned}</td>
+                    <td style={{ color:'var(--amber)' }}>+{s.acorns_earned}</td>
                     <td style={{ color:'var(--muted)', fontSize:11 }}>{new Date(s.completed_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</td>
                   </tr>
                 ))}

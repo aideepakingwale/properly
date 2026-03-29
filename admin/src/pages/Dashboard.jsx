@@ -13,12 +13,15 @@ import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
-function Stat({ label, value, sub, color = 'var(--accent)' }) {
+function Stat({ label, value, sub, color = 'var(--primary)', icon }) {
   return (
-    <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:'16px 20px' }}>
-      <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:6 }}>{label}</div>
-      <div style={{ fontSize:28, fontWeight:700, fontFamily:'var(--font-ui)', color }}>{value ?? '–'}</div>
-      {sub && <div style={{ fontSize:11, color:'var(--muted)', marginTop:4 }}>{sub}</div>}
+    <div className="stat-card">
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:12 }}>
+        <div className="stat-label">{label}</div>
+        {icon && <span style={{ fontSize:20 }}>{icon}</span>}
+      </div>
+      <div className="stat-value" style={{ color }}>{value ?? '–'}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
     </div>
   );
 }
@@ -33,31 +36,31 @@ export default function Dashboard() {
     adminAPI.dashboard().then(r => { if (r.success) setData(r.data); }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding:40, color:'var(--muted)' }}>Loading dashboard…</div>;
-  if (!data)   return <div style={{ padding:40, color:'var(--danger)' }}>Failed to load</div>;
+  if (loading) return <div className='empty-state'><div className='empty-icon'>⏳</div><p>Loading dashboard…</p></div>;
+  if (!data)   return <div className='alert alert-error' style={{margin:28}}>Failed to load dashboard data.</div>;
 
   const { stats, planBreakdown, weeklySignups, recentUsers, recentSessions } = data;
 
   return (
-    <div style={{ padding:28 }}>
+    <div className='page'>
       <div style={{ marginBottom:24 }}>
         <h1 style={{ fontSize:22, fontWeight:800, color:'var(--text)' }}>Dashboard</h1>
         <div style={{ fontSize:12, color:'var(--muted)', marginTop:3 }}>System overview — Properly v2.0</div>
       </div>
 
       {/* Stats grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
-        <Stat label="Total Users"    value={stats.totalUsers}    sub={`${stats.verifiedUsers} verified`} />
-        <Stat label="Children"       value={stats.totalChildren} sub="across all accounts" color="var(--blue)" />
-        <Stat label="Sessions"       value={stats.totalSessions} sub={`avg ${stats.avgAccuracy ?? '–'}% accuracy`} color="var(--accent2)" />
-        <Stat label="AI Stories"     value={stats.totalAiStories} sub={`${stats.aiCompleted} completed`} color="var(--purple)" />
+      <div className='grid-4' style={{ marginBottom:24 }}>
+        <Stat label="Total Users"    value={stats.totalUsers}    sub={`${stats.verifiedUsers} verified`} icon='👤' />
+        <Stat label="Children"       value={stats.totalChildren} sub="across all accounts" color='var(--blue)' icon='👧' />
+        <Stat label="Sessions"       value={stats.totalSessions} sub={`avg \${stats.avgAccuracy ?? '–'}% accuracy`} color='var(--amber)' icon='🎙️' />
+        <Stat label="AI Stories"     value={stats.totalAiStories} sub={`\${stats.aiCompleted} completed`} color='var(--purple)' icon='✨' />
       </div>
 
       {/* Charts row */}
-      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:16, marginBottom:24 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:16, marginBottom:24, flexWrap:'wrap' }}>
         {/* Signups chart */}
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:20 }}>
-          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:16 }}>Signups — Last 7 days</div>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:20, boxShadow:'var(--shadow-sm)' }}>
+          <div style={{ fontSize:'0.7rem', color:'var(--muted)', fontWeight:700, letterSpacing:'0.6px', textTransform:'uppercase', marginBottom:16 }}>Signups — Last 7 days</div>
           <ResponsiveContainer width="100%" height={120}>
             <BarChart data={weeklySignups} margin={{ top:0, right:0, left:-20, bottom:0 }}>
               <XAxis dataKey="day" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} tickFormatter={d=>d.slice(5)} />
@@ -69,8 +72,8 @@ export default function Dashboard() {
         </div>
 
         {/* Plan breakdown */}
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:20 }}>
-          <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginBottom:16 }}>Plan Distribution</div>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:20, boxShadow:'var(--shadow-sm)' }}>
+          <div style={{ fontSize:'0.7rem', color:'var(--muted)', fontWeight:700, letterSpacing:'0.6px', textTransform:'uppercase', marginBottom:16 }}>Plan Distribution</div>
           {planBreakdown.map(p => (
             <div key={p.plan} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
