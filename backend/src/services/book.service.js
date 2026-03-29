@@ -415,63 +415,265 @@ function phoneticiseWord(word) {
   return chunks;
 }
 
-// Draw a phonics word as tiles in the PDF (PDFKit version)
+// ── COMPREHENSIVE PHONEME PRONUNCIATION MAP ──────────────────
+// Covers every grapheme a child encounters in Phases 2-6.
+// Format: grapheme → [pronunciation label, example word hint]
+const PHONEME_GUIDE = {
+  // ── Consonants ─────────────────────────────────────────────
+  's': ['s', 'sun'],   'a': ['a', 'cat'],   't': ['t', 'tap'],
+  'p': ['p', 'pin'],   'i': ['i', 'sit'],   'n': ['n', 'net'],
+  'm': ['m', 'map'],   'd': ['d', 'dog'],   'g': ['g', 'got'],
+  'o': ['o', 'hot'],   'c': ['k', 'cat'],   'k': ['k', 'kit'],
+  'e': ['e', 'bed'],   'u': ['u', 'cup'],   'r': ['r', 'red'],
+  'h': ['h', 'hat'],   'b': ['b', 'big'],   'f': ['f', 'fan'],
+  'l': ['l', 'lip'],   'j': ['j', 'jam'],   'v': ['v', 'van'],
+  'w': ['w', 'wet'],   'x': ['ks', 'fox'],  'y': ['y', 'yes'],
+  'z': ['z', 'zip'],   'q': ['kw', 'quiz'],
+  // ── Phase 2 doubles ────────────────────────────────────────
+  'ff': ['f', 'off'],  'll': ['l', 'ball'], 'ss': ['s', 'hiss'],
+  'zz': ['z', 'buzz'], 'ck': ['k', 'duck'],
+  // ── Phase 3 digraphs ───────────────────────────────────────
+  'ch': ['ch', 'chip'], 'sh': ['sh', 'ship'], 'th': ['th', 'the'],
+  'ng': ['ng', 'ring'], 'wh': ['w', 'when'],  'ph': ['f', 'phone'],
+  // ── Phase 3 vowel digraphs ─────────────────────────────────
+  'ai': ['ay', 'rain'], 'ee': ['ee', 'feet'], 'igh': ['ie', 'night'],
+  'oa': ['oh', 'boat'], 'oo': ['oo', 'moon'], 'ar': ['ar', 'car'],
+  'or': ['or', 'fork'], 'ur': ['er', 'turn'], 'ow': ['ow', 'cow'],
+  'oi': ['oy', 'coin'], 'ear': ['eer', 'hear'],'air': ['air', 'fair'],
+  'ure': ['yoor', 'pure'],'er': ['er', 'her'], 'ea': ['ee', 'eat'],
+  'ou': ['ow', 'out'],
+  // ── Phase 4 blends ─────────────────────────────────────────
+  'bl': ['bl', 'blue'], 'br': ['br', 'bring'], 'cl': ['kl', 'clap'],
+  'cr': ['kr', 'crab'], 'dr': ['dr', 'drop'],  'fl': ['fl', 'flag'],
+  'fr': ['fr', 'frog'], 'gl': ['gl', 'glad'],  'gr': ['gr', 'grab'],
+  'pl': ['pl', 'play'], 'pr': ['pr', 'pram'],  'sl': ['sl', 'slip'],
+  'sm': ['sm', 'smile'],'sn': ['sn', 'snap'],  'sp': ['sp', 'spin'],
+  'st': ['st', 'step'], 'sw': ['sw', 'swim'],  'tr': ['tr', 'trip'],
+  'tw': ['tw', 'twin'], 'sk': ['sk', 'skip'],  'scr':['skr','scrap'],
+  'str':['str','strap'],'spr':['spr','spring'],
+  // ── Phase 5 alternatives ───────────────────────────────────
+  'ay': ['ay', 'play'], 'ey': ['ay', 'they'],  'ie': ['ie', 'pie'],
+  'ue': ['yoo', 'blue'],'ew': ['yoo', 'new'],  'oe': ['oh', 'toe'],
+  'au': ['aw', 'haul'], 'aw': ['aw', 'saw'],   'aigh':['ay','straight'],
+  'eigh':['ay','eight'],'ey2':['ee','key'],
+  // ── Phase 6 morphemes (shown without slashes) ──────────────
+  'tion': ['shun','nation'],'sion':['zhun','vision'],'ture':['cher','nature'],
+  'ous': ['us','famous'], 'ful':['ful','hopeful'], 'less':['les','careless'],
+  'ness':['nes','sadness'],'ment':['ment','moment'],'ly':['lee','quickly'],
+};
+
+// Get the pronunciation label for a grapheme
+function getPhonemeLabel(grapheme) {
+  const g = grapheme.toLowerCase();
+  const entry = PHONEME_GUIDE[g];
+  if (!entry) return g;        // fallback: show the letter itself
+  return entry[0];             // return the pronunciation string
+}
+
+// Get example word for tooltip/sub-label
+function getExampleWord(grapheme) {
+  const entry = PHONEME_GUIDE[grapheme.toLowerCase()];
+  return entry ? entry[1] : '';
+}
+
+// Draw a phonics word as tiles in the PDF — pronunciation below every grapheme
+// ── LETTER-LEVEL IPA MAP ──────────────────────────────────────
+// Maps every letter/digraph to its IPA phoneme symbol for the footer strip.
+// Uses UK English (British RP) phonemes.
+const LETTER_IPA = {
+  // ── Consonants ──────────────────────────────────────────────────
+  'b':'/b/','c':'/k/','d':'/d/','f':'/f/','g':'/ɡ/','h':'/h/',
+  'j':'/dʒ/','k':'/k/','l':'/l/','m':'/m/','n':'/n/','p':'/p/',
+  'q':'/k/','r':'/r/','s':'/s/','t':'/t/','v':'/v/','w':'/w/',
+  'x':'/ks/','y':'/j/','z':'/z/',
+  // ── Short vowels ────────────────────────────────────────────────
+  'a':'/æ/','e':'/ɛ/','i':'/ɪ/','o':'/ɒ/','u':'/ʌ/',
+  // ── Digraphs (Phase 3) ──────────────────────────────────────────
+  'ch':'/tʃ/','sh':'/ʃ/','th':'/ð/','ng':'/ŋ/','wh':'/w/','ph':'/f/',
+  'ck':'/k/','ff':'/f/','ll':'/l/','ss':'/s/','zz':'/z/',
+  // ── Vowel digraphs ──────────────────────────────────────────────
+  'ai':'/eɪ/','ay':'/eɪ/','ee':'/iː/','ea':'/iː/','igh':'/aɪ/','ie':'/aɪ/',
+  'oa':'/əʊ/','ow':'/əʊ/','oe':'/əʊ/','oo':'/uː/','ue':'/juː/','ew':'/juː/',
+  'ar':'/ɑː/','or':'/ɔː/','ur':'/ɜː/','er':'/ɜː/','ir':'/ɜː/',
+  'oi':'/ɔɪ/','oy':'/ɔɪ/','ou':'/aʊ/','au':'/ɔː/','aw':'/ɔː/',
+  'ear':'/ɪə/','air':'/ɛː/','ure':'/jʊə/','ew':'/juː/',
+  // ── Blends — show component phonemes ────────────────────────────
+  'bl':'/bl/','br':'/br/','cl':'/kl/','cr':'/kr/','dr':'/dr/',
+  'fl':'/fl/','fr':'/fr/','gl':'/ɡl/','gr':'/ɡr/','pl':'/pl/',
+  'pr':'/pr/','sl':'/sl/','sm':'/sm/','sn':'/sn/','sp':'/sp/',
+  'st':'/st/','sw':'/sw/','tr':'/tr/','tw':'/tw/','sk':'/sk/',
+  'scr':'/skr/','str':'/str/','spr':'/spr/',
+  // ── Morphemes ────────────────────────────────────────────────────
+  'tion':'/ʃən/','sion':'/ʒən/','ture':'/tʃə/','ous':'/əs/',
+  'ful':'/fʊl/','less':'/lɪs/','ness':'/nɪs/','ment':'/mənt/','ly':'/li/',
+};
+
+// Build letter-level IPA string for a whole sentence
+// e.g. "the fat" → "/t//h//ɛ//f//æ//t/"
+function buildIpaStrip(text) {
+  const phonemes = [];
+  const words = (text||'').toLowerCase().replace(/[^a-z ]/g, '').trim().split(/s+/);
+
+  for (const word of words) {
+    if (!word) continue;
+    let i = 0;
+    while (i < word.length) {
+      // Try longest match first (3-letter digraph, then 2, then 1)
+      let matched = false;
+      for (const len of [3, 2, 1]) {
+        const sub = word.slice(i, i + len);
+        if (LETTER_IPA[sub]) {
+          phonemes.push(LETTER_IPA[sub]);
+          i += len;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) { phonemes.push('/' + word[i] + '/'); i++; }
+    }
+    phonemes.push(' ');  // word break
+  }
+  return phonemes.filter(p => p !== ' ' || phonemes[phonemes.indexOf(p)-1] !== ' ').join('');
+}
+
+// Draw the IPA phoneme strip as a footer row
+// Each phoneme is a small pill: /t/ /h/ /ɛ/ /f/ /æ/ /t/ ...
+function drawIpaStrip(doc, text, x, y, maxWidth) {
+  const ipaFull = buildIpaStrip(text);
+  // Split into individual /x/ tokens
+  const tokens  = ipaFull.match(//[^/]+//g) || [];
+  if (tokens.length === 0) return y;
+
+  const pillH  = 18;
+  const padX   = 4;
+  const padY   = 2;
+  const gap    = 2;
+  const fs     = 7.5;
+  const wordSep = 6; // extra gap at word boundaries
+
+  // Draw strip label
+  doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#94A3B8')
+     .text('IPA phonemes:', x, y, { lineBreak:false });
+  y += 10;
+
+  const words     = (text||'').toLowerCase().replace(/[^a-z ]/g,'').trim().split(/s+/);
+  const wordTokens = words.map(w => {
+    const toks = [];
+    let i = 0;
+    while (i < w.length) {
+      let matched = false;
+      for (const len of [3, 2, 1]) {
+        const sub = w.slice(i, i + len);
+        if (LETTER_IPA[sub]) { toks.push(LETTER_IPA[sub]); i += len; matched = true; break; }
+      }
+      if (!matched) { toks.push('/' + w[i] + '/'); i++; }
+    }
+    return toks;
+  });
+
+  let cx   = x;
+  const COLOURS = ['#7C3AED','#0891B2','#059669','#D97706','#DB2777','#DC2626'];
+
+  wordTokens.forEach((wordToks, wi) => {
+    wordToks.forEach((tok, ti) => {
+      const tw = doc.widthOfString(tok, { font:'Helvetica', fontSize:fs }) + padX * 2;
+      const col = COLOURS[(wi * 7 + ti) % COLOURS.length];
+
+      // Wrap line if needed
+      if (cx + tw > x + maxWidth) {
+        cx  = x;
+        y  += pillH + 4;
+      }
+
+      // Pill background
+      doc.roundedRect(cx, y, tw, pillH, 3).fill(col + '15');
+      doc.roundedRect(cx, y, tw, pillH, 3).stroke(col + '60').lineWidth(0.8);
+
+      // Phoneme text
+      doc.font('Helvetica-Bold').fontSize(fs).fillColor(col)
+         .text(tok, cx, y + (pillH - fs) / 2, { width:tw, align:'center', lineBreak:false });
+
+      cx += tw + gap;
+    });
+    cx += wordSep;  // extra gap between words
+  });
+
+  return y + pillH + 6;
+}
+
 function drawPhonicsTiles(doc, text, x, y, maxWidth, tileH) {
-  const words  = (text||'').split(' ');
-  const tilePad = 6, gap = 4, wordGap = 10;
-  let cx = x, lineY = y, lineH = tileH + 22; // tile + phoneme label row
+  const words     = (text||'').trim().split(/\s+/);
+  const tilePad   = 7;
+  const gap       = 5;
+  const wordGap   = 14;
+  const pronSize  = 8;    // font size for pronunciation label
+  const exSize    = 7;    // font size for example word
+  // Row height = tile + pronunciation label + example word + spacing
+  const lineH = tileH + pronSize + exSize + 10;
 
-  words.forEach((word, wi) => {
-    const chunks    = phoneticiseWord(word);
-    const wordWidth = chunks.reduce((sum, c) => {
-      const fontSize = Math.max(20, Math.min(32, 28 - Math.max(0, c.g.length-2)*4));
-      return sum + doc.widthOfString(c.g, { font:'Helvetica-Bold', fontSize }) + tilePad*2 + gap;
-    }, wordGap);
+  let cx = x, lineY = y;
 
-    // Wrap to next line if needed
-    if (cx + wordWidth > x + maxWidth && cx > x) { cx = x; lineY += lineH + 6; }
+  words.forEach(word => {
+    if (!word) return;
+    const punct  = word.match(/([.,!?!]+)$/)?.[1] || '';
+    const bare   = word.replace(/[.,!?!]+$/, '');
+    const chunks = phoneticiseWord(bare);
 
-    chunks.forEach((chunk, ci) => {
-      const fs     = Math.max(20, Math.min(30, 28 - Math.max(0, chunk.g.length-2)*4));
-      const tw     = Math.max(30, doc.widthOfString(chunk.g.toUpperCase(), { font:'Helvetica-Bold', fontSize: fs }) + tilePad*2);
-      const colors = PHASE_COLORS[chunk.type] || PHASE_COLORS.cons;
+    // Measure total word width to decide line-wrap
+    const wordW = chunks.reduce((sum, c) => {
+      const fs = Math.max(18, Math.min(28, 26 - Math.max(0, c.g.length - 2) * 4));
+      return sum + Math.max(32, doc.widthOfString(c.g, { font:'Helvetica-Bold', fontSize:fs }) + tilePad * 2) + gap;
+    }, wordGap) + (punct ? 16 : 0);
 
-      // Tile background
-      doc.roundedRect(cx, lineY, tw, tileH, 7)
-         .fillAndStroke(colors.fill, colors.stroke);
-      doc.strokeOpacity(0.7).lineWidth(2).stroke();
-      doc.fillOpacity(1);
+    if (cx + wordW > x + maxWidth && cx > x) {
+      cx = x;
+      lineY += lineH + 8;
+    }
 
-      // Grapheme letter(s)
+    chunks.forEach(chunk => {
+      const fs      = Math.max(18, Math.min(28, 26 - Math.max(0, chunk.g.length - 2) * 4));
+      const label   = chunk.g.toUpperCase();
+      const tw      = Math.max(32, doc.widthOfString(label, { font:'Helvetica-Bold', fontSize:fs }) + tilePad * 2);
+      const colors  = PHASE_COLORS[chunk.type] || PHASE_COLORS.cons;
+
+      // ── Tile background (rounded rect with colour by type) ──
+      doc.roundedRect(cx, lineY, tw, tileH, 7).fill(colors.fill);
+      doc.roundedRect(cx, lineY, tw, tileH, 7).stroke(colors.stroke).lineWidth(1.8);
+
+      // ── Grapheme letter(s) — big and bold ──────────────────
       doc.font('Helvetica-Bold').fontSize(fs).fillColor(colors.text)
-         .text(chunk.g.toUpperCase(), cx, lineY + (tileH - fs) / 2, { width: tw, align:'center' });
+         .text(label, cx, lineY + (tileH - fs) / 2, { width:tw, align:'center', lineBreak:false });
 
-      // Phoneme guide under tile (small)
-      // Use simple phoneme hints for common patterns
-      const phonemeHint = {
-        'ch':'/tʃ/', 'sh':'/ʃ/', 'th':'/ð/', 'ng':'/ŋ/',
-        'ai':'/eɪ/', 'ee':'/iː/', 'oo':'/uː/', 'oa':'/oʊ/',
-        'ar':'/ɑːr/', 'or':'/ɔːr/', 'er':'/ər/', 'ow':'/aʊ/',
-      }[chunk.g] || '';
+      // ── Pronunciation label — always shown ──────────────────
+      // e.g. "ch" → "ch", "ai" → "ay", "oo" → "oo", "a" → "a"
+      const pronLabel  = getPhonemeLabel(chunk.g);
+      const exWord     = getExampleWord(chunk.g);
 
-      if (phonemeHint) {
-        doc.font('Helvetica').fontSize(7).fillColor('#6B7280')
-           .text(phonemeHint, cx, lineY + tileH + 2, { width: tw, align:'center' });
+      // Pronunciation box below the tile
+      const pronY = lineY + tileH + 2;
+      doc.roundedRect(cx, pronY, tw, pronSize + 4, 3).fill(colors.stroke + '25');
+      doc.font('Helvetica-Bold').fontSize(pronSize).fillColor(colors.stroke)
+         .text(pronLabel, cx, pronY + 2, { width:tw, align:'center', lineBreak:false });
+
+      // Example word (tiny, grey) — helps parent/teacher say it right
+      if (exWord) {
+        doc.font('Helvetica').fontSize(exSize).fillColor('#9CA3AF')
+           .text(exWord, cx, pronY + pronSize + 4, { width:tw, align:'center', lineBreak:false });
       }
 
       cx += tw + gap;
     });
 
     // Punctuation
-    const punct = word.match(/([.,!?]+)$/)?.[1] || '';
     if (punct) {
-      doc.font('Helvetica-Bold').fontSize(24).fillColor('#9CA3AF')
-         .text(punct, cx - gap, lineY + (tileH-24)/2);
+      doc.font('Helvetica-Bold').fontSize(22).fillColor('#9CA3AF')
+         .text(punct, cx - gap + 2, lineY + (tileH - 22) / 2, { lineBreak:false });
+      cx += 12;
     }
     cx += wordGap;
   });
 
-  return lineY + lineH; // return final Y position
+  return lineY + lineH + 4;
 }
 
 async function buildPdf(PDFDocument, story, childName, pageImages, bookUrl) {
@@ -569,7 +771,18 @@ async function buildPdf(PDFDocument, story, childName, pageImages, bookUrl) {
 
       // Draw phonics tiles for each word
       const tileH = 44;
-      const finalY = drawPhonicsTiles(doc, page.text||'', 52, tileAreaY + 14, W-104, tileH);
+      const afterTilesY = drawPhonicsTiles(doc, page.text||'', 52, tileAreaY + 14, W-104, tileH);
+
+      // ── IPA PHONEME STRIP ──────────────────────────────────────
+      // Shows the full sentence as continuous IPA notation:
+      // /t//h//ɛ//f//æ//t//k//æ//t//s//æ//t//ɒ//n//t//h//ɛ//m//æ//t/
+      const ipaStripY = afterTilesY + 6;
+      if (ipaStripY + 32 < H - 28) {
+        // Divider line
+        doc.moveTo(52, ipaStripY).lineTo(W-52, ipaStripY)
+           .stroke('#E0E7FF').lineWidth(0.7);
+        drawIpaStrip(doc, page.text||'', 52, ipaStripY + 6, W-104);
+      }
     });
 
     // ── BACK COVER with QR code ─────────────────────────────────
