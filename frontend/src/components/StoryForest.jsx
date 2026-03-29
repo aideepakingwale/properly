@@ -272,6 +272,8 @@ export default function StoryForest({ child, progress, phaseColor, phaseLabel, o
   const [dailyLeft, setDailyLeft]       = useState(5);
   const [error, setError]               = useState('');
   const [providerInfo, setProviderInfo] = useState(null);
+  const [genDebug, setGenDebug]         = useState(null);
+  const [showDebug, setShowDebug]       = useState(false);
 
   const loadData = useCallback(async () => {
     if (!child?.id) return;
