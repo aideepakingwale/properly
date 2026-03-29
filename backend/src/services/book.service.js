@@ -512,7 +512,7 @@ const LETTER_IPA = {
 // e.g. "the fat" → "/t//h//ɛ//f//æ//t/"
 function buildIpaStrip(text) {
   const phonemes = [];
-  const words = (text||'').toLowerCase().replace(/[^a-z ]/g, '').trim().split(/s+/);
+  const words = (text||'').toLowerCase().replace(/[^a-z ]/g, '').trim().split(/\s+/);
 
   for (const word of words) {
     if (!word) continue;
@@ -541,7 +541,7 @@ function buildIpaStrip(text) {
 function drawIpaStrip(doc, text, x, y, maxWidth) {
   const ipaFull = buildIpaStrip(text);
   // Split into individual /x/ tokens
-  const tokens  = ipaFull.match(//[^/]+//g) || [];
+  const tokens  = ipaFull.match(/\/[^/]+\//g) || [];
   if (tokens.length === 0) return y;
 
   const pillH  = 18;
@@ -556,7 +556,7 @@ function drawIpaStrip(doc, text, x, y, maxWidth) {
      .text('IPA phonemes:', x, y, { lineBreak:false });
   y += 10;
 
-  const words     = (text||'').toLowerCase().replace(/[^a-z ]/g,'').trim().split(/s+/);
+  const words     = (text||'').toLowerCase().replace(/[^a-z ]/g,'').trim().split(/\s+/);
   const wordTokens = words.map(w => {
     const toks = [];
     let i = 0;
