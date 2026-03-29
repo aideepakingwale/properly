@@ -186,10 +186,16 @@ function FlipbookViewer({ book, onClose }) {
   const [bookData, setBookData]   = useState(book);
   const [genLog, setGenLog]       = useState([]);   // persists even after book is ready
   const [showGenLog, setShowGenLog] = useState(false);
-  const [showOrder, setShowOrder] = useState(false);
-  const [orderForm, setOrderForm] = useState({ name:'', address1:'', address2:'', city:'', postcode:'', country:'GB' });
-  const [orderMsg, setOrderMsg]   = useState('');
-  const [ordering, setOrdering]   = useState(false);
+  const [showOrder, setShowOrder]     = useState(false);
+  const [orderForm, setOrderForm]     = useState({ name:'', address1:'', address2:'', city:'', postcode:'', country:'GB' });
+  const [orderMsg, setOrderMsg]       = useState('');
+  const [ordering, setOrdering]       = useState(false);
+  const [showReport, setShowReport]   = useState(false);
+  const [reportMsg, setReportMsg]     = useState('');
+  const [reportNote, setReportNote]   = useState('');
+  const [reporting, setReporting]     = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting]       = useState(false);
 
   const pages = bookData.pages || [];
   const isReady = bookData.status === 'ready';
@@ -217,6 +223,41 @@ function FlipbookViewer({ book, onClose }) {
   const totalPages = pages.length;
   const currentPage = pageIdx === -1 ? null : pages[pageIdx];
   const imgSrc = currentPage?.imageSignedUrl || currentPage?.image_url;
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await bookAPI.deleteBook(bookData.id);
+      onClose('deleted', bookData.id);
+    } catch (e) {
+      alert('Delete failed: ' + (e.message || 'unknown error'));
+    } finally { setDeleting(false); }
+  };
+
+  const submitReport = async () => {
+    setReporting(true);
+    try {
+      // Attach the full generation log to the report for admin diagnosis
+      const logText = genLog.map(s =>
+        `[${s.ts?.slice(11,19)||''}] ${s.status === 'ok' ? '✅' : s.status === 'error' ? '❌' : '⚠️'} ${s.step}: ${s.detail||''}`
+      ).join('\n');
+      const detail  = (reportNote ? reportNote + '\n\n' : '') + 'GENERATION LOG:\n' + logText;
+      await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('properly_token') || '') },
+        body: JSON.stringify({
+          contentType:  'story_book',
+          contentId:    bookData.id,
+          contentTitle: bookData.title || 'My Book',
+          reason:       'generation_error',
+          detail,
+        }),
+      });
+      setReportMsg('✅ Report sent! Admin will investigate and may issue a credit.');
+    } catch (e) {
+      setReportMsg('❌ Failed to send report. Please try again.');
+    } finally { setReporting(false); }
+  };
 
   const submitOrder = async () => {
     setOrdering(true);
@@ -259,6 +300,18 @@ function FlipbookViewer({ book, onClose }) {
         {bookData.print_ordered && (
           <span style={{ background: 'var(--text-muted)', color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 13 }}>🖨 Print Ordered</span>
         )}
+        {/* Report issue button */}
+        <button onClick={() => { setShowReport(true); setReportMsg(''); }}
+          title="Report a problem with this book"
+          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5', borderRadius: 8, padding: '8px 10px', fontSize: 12, cursor: 'pointer' }}>
+          🚩 Report
+        </button>
+        {/* Delete book button */}
+        <button onClick={() => setShowDeleteConfirm(true)}
+          title="Delete this book"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#FCA5A5', borderRadius: 8, padding: '8px 10px', fontSize: 14, cursor: 'pointer' }}>
+          🗑
+        </button>
       </div>
 
       {/* Generation log drawer — shown when user expands it */}
@@ -359,6 +412,71 @@ function FlipbookViewer({ book, onClose }) {
               <button key={dotIdx} onClick={() => setPageIdx(p)}
                 style={{ width: pageIdx === p ? 20 : 8, height: 8, borderRadius: 4, border: 'none', background: pageIdx === p ? 'var(--color-success)' : 'var(--overlay-30)', cursor: 'pointer', transition: 'all 0.2s', padding: 0 }} />
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── REPORT ISSUE MODAL ── */}
+      {showReport && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'var(--surface)', borderRadius:16, padding:28, width:'100%', maxWidth:480, margin:16 }}>
+            <div style={{ fontSize:18, fontWeight:800, color:'var(--text)', marginBottom:4 }}>🚩 Report Book Issue</div>
+            <div style={{ fontSize:12, color:'var(--muted)', marginBottom:14 }}>
+              The generation log will be automatically attached. Admin will investigate and may issue a replacement credit.
+            </div>
+            {reportMsg ? (
+              <div style={{ padding:14, borderRadius:10, background: reportMsg.startsWith('✅') ? 'var(--bg-success-light)' : 'rgba(239,68,68,0.1)', color: reportMsg.startsWith('✅') ? 'var(--text-success-dark)' : 'var(--color-danger)', fontWeight:600, marginBottom:16 }}>
+                {reportMsg}
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={reportNote}
+                  onChange={e => setReportNote(e.target.value)}
+                  placeholder="Describe the issue (e.g. wrong images, SVG placeholders, missing pages)…"
+                  rows={4}
+                  style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:13, resize:'vertical', boxSizing:'border-box', fontFamily:'var(--font-body)' }}
+                />
+                <div style={{ fontSize:10, color:'var(--text-muted)', marginTop:6, marginBottom:14, fontFamily:'monospace' }}>
+                  📎 Generation log ({genLog.length} steps) will be attached automatically
+                </div>
+              </>
+            )}
+            <div style={{ display:'flex', gap:10, marginTop:8 }}>
+              <button onClick={() => { setShowReport(false); setReportNote(''); setReportMsg(''); }}
+                style={{ flex:1, padding:'10px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text)', cursor:'pointer', fontWeight:600 }}>
+                {reportMsg ? 'Close' : 'Cancel'}
+              </button>
+              {!reportMsg && (
+                <button onClick={submitReport} disabled={reporting}
+                  style={{ flex:2, padding:'10px', borderRadius:8, border:'none', background:'var(--color-danger)', color:'#fff', cursor:'pointer', fontWeight:700, opacity: reporting ? 0.7 : 1 }}>
+                  {reporting ? 'Sending…' : '🚩 Send Report'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE CONFIRM MODAL ── */}
+      {showDeleteConfirm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'var(--surface)', borderRadius:16, padding:28, width:'100%', maxWidth:400, margin:16, textAlign:'center' }}>
+            <div style={{ fontSize:48, marginBottom:8 }}>🗑️</div>
+            <div style={{ fontSize:18, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Delete this book?</div>
+            <div style={{ fontSize:13, color:'var(--muted)', marginBottom:20 }}>
+              This will permanently delete <strong>{bookData.title}</strong> and remove all images from storage. Your book credit will <em>not</em> be refunded.
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setShowDeleteConfirm(false)}
+                style={{ flex:1, padding:'12px', borderRadius:8, border:'1px solid var(--border)', background:'transparent', color:'var(--text)', cursor:'pointer', fontWeight:600 }}>
+                Cancel
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                style={{ flex:1, padding:'12px', borderRadius:8, border:'none', background:'var(--color-danger)', color:'#fff', cursor:'pointer', fontWeight:700, opacity: deleting ? 0.7 : 1 }}>
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -471,7 +589,17 @@ export default function StoryBookShelf({ child }) {
   return (
     <div>
       {/* Viewer overlay */}
-      {viewing && <FlipbookViewer book={viewing} onClose={() => setViewing(null)} />}
+      {viewing && (
+        <FlipbookViewer
+          book={viewing}
+          onClose={(action, bookId) => {
+            setViewing(null);
+            if (action === 'deleted' && bookId) {
+              setBooks(prev => prev.filter(b => b.id !== bookId));
+            }
+          }}
+        />
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>

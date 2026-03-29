@@ -37,10 +37,12 @@ const POLL_TOKEN = (process.env.POLLINATIONS_TOKEN   || '').trim();
 
 // HuggingFace models — free tier, ~10-30s per image
 // Primary: flux-schnell (fast, good quality), fallback: sd-xl-turbo
+// Models confirmed working on router.huggingface.co/hf-inference/models/
+// FLUX.1-schnell is fast free tier; SD v2.1 is reliable fallback
 const HF_MODELS = [
-  'black-forest-labs/FLUX.1-schnell',
-  'stabilityai/sdxl-turbo',
-  'runwayml/stable-diffusion-v1-5',
+  'black-forest-labs/FLUX.1-schnell',          // fast, excellent quality
+  'stabilityai/stable-diffusion-2-1',           // reliable SD v2.1
+  'stabilityai/stable-diffusion-xl-base-1.0',  // SDXL base
 ];
 
 // Unsplash themed search terms for children's book topics
@@ -75,8 +77,17 @@ function safeSeed(bookId, offset) {
 }
 
 function buildImagePrompt(text, childName) {
-  const clean = (text || '').replace(/['"]/g, '').trim().slice(0, 180);
-  return `cute kawaii watercolour children book illustration, bright pastel colours, friendly characters, no text, ${clean}, child character named ${childName}`;
+  const clean = (text || '').replace(/['"]/g, '').replace(/[^a-zA-Z0-9 .,]/g, '').trim().slice(0, 120);
+  // IMPORTANT: be very explicit about illustration style — NOT a photo
+  return [
+    'digital cartoon illustration, children picture book style,',
+    'thick outlines, flat bold colours, friendly cute characters,',
+    'soft warm lighting, storybook art, 2D animated style,',
+    'NO PHOTO NO REALISTIC NO TEXT NO WORDS,',
+    clean + ',',
+    'cute child character named ' + childName + ',',
+    'kawaii pastel palette, professional children book art',
+  ].join(' ');
 }
 
 // ── FETCH IMAGE — MULTI-PROVIDER CASCADE ─────────────────────
@@ -91,7 +102,8 @@ async function fetchImageWithFallback(prompt, seed, label, logger) {
     for (const model of HF_MODELS) {
       try {
         L(`hf_${model.split('/')[1]}`, 'ok', `Trying ${model}`);
-        const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+        // New HuggingFace Inference API (api-inference.huggingface.co deprecated as of 2025)
+        const res = await fetch(`https://router.huggingface.co/hf-inference/models/${model}`, {
           method:  'POST',
           headers: { 'Authorization': `Bearer ${HF_TOKEN}`, 'Content-Type': 'application/json' },
           body:    JSON.stringify({ inputs: prompt.slice(0, 500) }),
@@ -132,7 +144,7 @@ async function fetchImageWithFallback(prompt, seed, label, logger) {
       },
       {
         url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt.slice(0,200))}` +
-             `?width=800&height=600&seed=${seed}&nologo=true&token=${POLL_TOKEN}`,
+             `?width=800&height=600&seed=${seed}&nologo=true&key=${POLL_TOKEN}`,
         headers: { 'User-Agent': 'Mozilla/5.0' },
         label: 'query-token',
       },
@@ -183,104 +195,300 @@ async function fetchImageWithFallback(prompt, seed, label, logger) {
 
   // ── Provider 4: SVG fallback (always works, local generation) ──
   L('svg_fallback', 'warn', 'All image providers failed — using SVG illustration');
-  const svgBuf = buildSvgPage(prompt, seed);
+  const svgBuf = buildSvgPage(prompt, seed, detectTheme(prompt));
   return { buf: svgBuf, source: 'svg_fallback' };
 }
 
-// ── SVG PAGE ILLUSTRATION FALLBACK ───────────────────────────
-// Generates a beautiful, colourful SVG page for children's books.
-// Used when Pollinations.ai is unavailable. Includes randomised shapes,
-// theme-appropriate colours, and decorative elements.
-function buildSvgPage(text, seed) {
-  const n   = typeof seed === 'number' ? seed : 42;
-  const rng = (lo, hi) => lo + ((n * 1103515245 + 12345) & 0x7fffffff) % (hi - lo + 1);
+// ── SVG PAGE ILLUSTRATION FALLBACK ─────────────────────────
+// Theme-aware cartoon SVG illustrations — far better than generic shapes.
+// Each theme has its own scene, palette, and character silhouettes.
+const THEME_SCENES = {
+  space:    { sky:'#0B0C2A', mid:'#1A1B4B', ground:'#2D1B69', stars:true,  char:'rocket',  accent:'#F59E0B', acc2:'#7C3AED' },
+  adventure:{ sky:'#87CEEB', mid:'#228B22', ground:'#8B6914', stars:false, char:'explorer', accent:'#F97316', acc2:'#10B981' },
+  animals:  { sky:'#FDE68A', mid:'#86EFAC', ground:'#6EE7B7', stars:false, char:'cat',      accent:'#F472B6', acc2:'#FBBF24' },
+  forest:   { sky:'#D1FAE5', mid:'#16A34A', ground:'#92400E', stars:false, char:'owl',      accent:'#F59E0B', acc2:'#7C3AED' },
+  ocean:    { sky:'#BAE6FD', mid:'#0EA5E9', ground:'#1E3A5F', stars:false, char:'fish',     accent:'#34D399', acc2:'#F59E0B' },
+  dragons:  { sky:'#1C1917', mid:'#7C2D12', ground:'#292524', stars:true,  char:'dragon',   accent:'#F97316', acc2:'#EF4444' },
+  magic:    { sky:'#4C1D95', mid:'#7C3AED', ground:'#2E1065', stars:true,  char:'wizard',   accent:'#F59E0B', acc2:'#EC4899' },
+  farm:     { sky:'#FEF3C7', mid:'#84CC16', ground:'#A16207', stars:false, char:'cow',      accent:'#EF4444', acc2:'#F97316' },
+  default:  { sky:'#E0F2FE', mid:'#7C3AED', ground:'#4C1D95', stars:false, char:'star',     accent:'#FBBF24', acc2:'#EC4899' },
+};
 
-  const PALETTES = [
-    ['#FFD166','#EF476F','#06D6A0','#118AB2','#073B4C'],  // vibrant
-    ['#F9C74F','#F8961E','#F3722C','#90BE6D','#43AA8B'],  // warm sunset
-    ['#9B5DE5','#F15BB5','#FEE440','#00BBF9','#00F5D4'],  // pastel candy
-    ['#264653','#2A9D8F','#E9C46A','#F4A261','#E76F51'],  // earth tones
-  ];
-  const palette = PALETTES[Math.abs(n) % PALETTES.length];
-  const bg      = palette[0];
-  const acc1    = palette[1];
-  const acc2    = palette[2];
-  const acc3    = palette[3];
+// Detect story theme from prompt text
+function detectTheme(text) {
+  const t = (text||'').toLowerCase();
+  if (/space|star|planet|rocket|moon|alien/.test(t))  return 'space';
+  if (/dragon|fire|castle|knight/.test(t))            return 'dragons';
+  if (/magic|wizard|wand|spell|enchant/.test(t))      return 'magic';
+  if (/ocean|sea|fish|wave|underwater/.test(t))       return 'ocean';
+  if (/forest|tree|wood|mushroom|owl/.test(t))        return 'forest';
+  if (/farm|cow|horse|barn|chicken/.test(t))          return 'farm';
+  if (/animal|cat|dog|lion|tiger|bear/.test(t))       return 'animals';
+  if (/adventure|quest|journey|explore/.test(t))      return 'adventure';
+  return 'default';
+}
 
-  // Extract a short excerpt for display (no more than 6 words)
-  const snippet = (text || '')
-    .replace(/[^a-zA-Z0-9 ]/g, '')
-    .trim()
-    .split(' ')
-    .slice(0, 6)
-    .join(' ');
+// Character SVG snippets — cartoon silhouettes
+function charSvg(char, cx, cy, color, size) {
+  const s = size || 1;
+  switch(char) {
+    case 'rocket': return `
+      <ellipse cx="${cx}" cy="${cy+20*s}" rx="${22*s}" ry="${50*s}" fill="${color}"/>
+      <polygon points="${cx},${cy-40*s} ${cx-20*s},${cy+20*s} ${cx+20*s},${cy+20*s}" fill="#EF4444"/>
+      <polygon points="${cx-22*s},${cy+30*s} ${cx-38*s},${cy+55*s} ${cx-10*s},${cy+40*s}" fill="#F97316"/>
+      <polygon points="${cx+22*s},${cy+30*s} ${cx+38*s},${cy+55*s} ${cx+10*s},${cy+40*s}" fill="#F97316"/>
+      <circle  cx="${cx}" cy="${cy}" r="${13*s}" fill="#BAE6FD" opacity="0.9"/>
+      <circle  cx="${cx}" cy="${cy+15*s}" r="${7*s}" fill="#FBBF24"/>
+      <ellipse cx="${cx}" cy="${cy+60*s}" rx="${32*s}" ry="${8*s}" fill="#F97316" opacity="0.6"/>`;
+    case 'cat': return `
+      <ellipse cx="${cx}" cy="${cy+10*s}" rx="${30*s}" ry="${35*s}" fill="${color}"/>
+      <circle  cx="${cx}" cy="${cy-18*s}" r="${22*s}" fill="${color}"/>
+      <polygon points="${cx-16*s},${cy-36*s} ${cx-24*s},${cy-54*s} ${cx-8*s},${cy-36*s}" fill="${color}"/>
+      <polygon points="${cx+16*s},${cy-36*s} ${cx+24*s},${cy-54*s} ${cx+8*s},${cy-36*s}" fill="${color}"/>
+      <circle  cx="${cx-8*s}" cy="${cy-20*s}" r="${4*s}" fill="#1F2937"/>
+      <circle  cx="${cx+8*s}" cy="${cy-20*s}" r="${4*s}" fill="#1F2937"/>
+      <ellipse cx="${cx}" cy="${cy-12*s}" rx="${5*s}" ry="${3*s}" fill="#F9A8D4"/>
+      <path d="M ${cx-4*s} ${cy-8*s} Q ${cx} ${cy-2*s} ${cx+4*s} ${cy-8*s}" stroke="#1F2937" stroke-width="${1.5*s}" fill="none"/>`;
+    case 'star': return `
+      <polygon points="${cx},${cy-50*s} ${cx+12*s},${cy-18*s} ${cx+47*s},${cy-15*s} ${cx+20*s},${cy+10*s} ${cx+29*s},${cy+45*s} ${cx},${cy+25*s} ${cx-29*s},${cy+45*s} ${cx-20*s},${cy+10*s} ${cx-47*s},${cy-15*s} ${cx-12*s},${cy-18*s}" fill="${color}" opacity="0.95"/>
+      <circle cx="${cx}" cy="${cy}" r="${14*s}" fill="white" opacity="0.8"/>`;
+    case 'owl': return `
+      <ellipse cx="${cx}" cy="${cy+15*s}" rx="${28*s}" ry="${38*s}" fill="${color}"/>
+      <circle  cx="${cx}" cy="${cy-5*s}" r="${24*s}" fill="${color}"/>
+      <circle  cx="${cx-9*s}" cy="${cy-8*s}" r="${11*s}" fill="white"/>
+      <circle  cx="${cx+9*s}" cy="${cy-8*s}" r="${11*s}" fill="white"/>
+      <circle  cx="${cx-9*s}" cy="${cy-8*s}" r="${6*s}" fill="#1F2937"/>
+      <circle  cx="${cx+9*s}" cy="${cy-8*s}" r="${6*s}" fill="#1F2937"/>
+      <polygon points="${cx-3*s},${cy-2*s} ${cx+3*s},${cy-2*s} ${cx},${cy+4*s}" fill="#F97316"/>
+      <polygon points="${cx-26*s},${cy-30*s} ${cx-18*s},${cy-48*s} ${cx-10*s},${cy-30*s}" fill="${color}"/>
+      <polygon points="${cx+26*s},${cy-30*s} ${cx+18*s},${cy-48*s} ${cx+10*s},${cy-30*s}" fill="${color}"/>`;
+    case 'dragon': return `
+      <ellipse cx="${cx}" cy="${cy+20*s}" rx="${40*s}" ry="${30*s}" fill="${color}"/>
+      <circle  cx="${cx-10*s}" cy="${cy-10*s}" r="${24*s}" fill="${color}"/>
+      <polygon points="${cx-18*s},${cy-30*s} ${cx-26*s},${cy-52*s} ${cx-6*s},${cy-30*s}" fill="#EF4444"/>
+      <polygon points="${cx+2*s},${cy-30*s} ${cx+10*s},${cy-52*s} ${cx+20*s},${cy-30*s}" fill="#EF4444"/>
+      <circle  cx="${cx-18*s}" cy="${cy-12*s}" r="${5*s}" fill="#FBBF24"/>
+      <circle  cx="${cx}" cy="${cy-12*s}" r="${5*s}" fill="#FBBF24"/>
+      <polygon points="${cx+40*s},${cy+10*s} ${cx+75*s},${cy-15*s} ${cx+50*s},${cy+25*s}" fill="${color}"/>
+      <path d="M ${cx-5*s} ${cy-5*s} Q ${cx+5*s} ${cy+5*s} ${cx+18*s} ${cy}" stroke="#EF4444" stroke-width="${2*s}" fill="none"/>`;
+    default: return `
+      <circle  cx="${cx}" cy="${cy-28*s}" r="${22*s}" fill="${color}"/>
+      <rect    x="${cx-18*s}" y="${cy-6*s}" width="${36*s}" height="${48*s}" rx="${8*s}" fill="${color}"/>
+      <rect    x="${cx-30*s}" y="${cy-2*s}" width="${14*s}" height="${35*s}" rx="${7*s}" fill="${color}"/>
+      <rect    x="${cx+16*s}" y="${cy-2*s}" width="${14*s}" height="${35*s}" rx="${7*s}" fill="${color}"/>
+      <rect    x="${cx-18*s}" y="${cy+40*s}" width="${14*s}" height="${36*s}" rx="${7*s}" fill="${color}"/>
+      <rect    x="${cx+4*s}"  y="${cy+40*s}" width="${14*s}" height="${36*s}" rx="${7*s}" fill="${color}"/>`;
+  }
+}
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+function buildSvgPage(text, seed, theme) {
+  const n   = typeof seed === 'number' ? Math.abs(seed) : 42;
+  const sc  = THEME_SCENES[theme] || THEME_SCENES[detectTheme(text)] || THEME_SCENES.default;
+  const acc = sc.accent, acc2 = sc.acc2;
+
+  // Stars for space/magic/dragons themes
+  const starsSvg = sc.stars ? [...Array(22)].map((_, i) => {
+    const sx = 20 + ((n * (i+1) * 73) % 760);
+    const sy = 10 + ((n * (i+1) * 37) % 320);
+    const sr = 1 + (i % 3);
+    const op = 0.4 + (i % 5) * 0.12;
+    return `<circle cx="${sx}" cy="${sy}" r="${sr}" fill="white" opacity="${op.toFixed(2)}"/>`;
+  }).join('') : '';
+
+  // Trees for forest/adventure
+  const treesSvg = ['forest','adventure','farm'].includes(theme) ? `
+    <polygon points="80,350 110,250 140,350" fill="#16A34A" opacity="0.7"/>
+    <rect x="103" y="350" width="14" height="40" fill="#92400E" opacity="0.7"/>
+    <polygon points="660,340 700,220 740,340" fill="#15803D" opacity="0.6"/>
+    <rect x="693" y="340" width="14" height="50" fill="#92400E" opacity="0.6"/>
+  ` : '';
+
+  // Waves for ocean theme
+  const wavesSvg = theme === 'ocean' ? `
+    <path d="M 0 460 Q 100 420 200 460 Q 300 500 400 460 Q 500 420 600 460 Q 700 500 800 460 L 800 600 L 0 600 Z" fill="#0EA5E9" opacity="0.6"/>
+    <path d="M 0 490 Q 120 455 240 490 Q 360 525 480 490 Q 600 455 720 490 L 800 490 L 800 600 L 0 600 Z" fill="#0284C7" opacity="0.7"/>
+    <circle cx="150" cy="430" r="25" fill="#F59E0B" opacity="0.6"/>
+    <circle cx="650" cy="440" r="18" fill="#F59E0B" opacity="0.5"/>
+  ` : '';
+
+  // Ground
+  const groundY = 420;
+  // Character position
+  const charX = 220 + (n % 80), charY = 360;
+  const charColor = acc;
+
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
-      <stop offset="0%" stop-color="${palette[4] || '#fff'}" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="${bg}"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${sc.sky}"/>
+      <stop offset="100%" stop-color="${sc.mid}"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="${acc2}" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="${sc.sky}" stop-opacity="0"/>
     </radialGradient>
-    <filter id="soft">
-      <feGaussianBlur stdDeviation="3"/>
-    </filter>
   </defs>
 
-  <!-- Background -->
-  <rect width="800" height="600" fill="url(#bg)"/>
-  <rect width="800" height="600" fill="${bg}" opacity="0.6"/>
+  <!-- Sky gradient -->
+  <rect width="800" height="600" fill="url(#sky)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
 
-  <!-- Decorative blobs -->
-  <ellipse cx="${150 + rng(0,50)}" cy="${80 + rng(0,40)}"  rx="${80+rng(0,40)}" ry="${60+rng(0,30)}" fill="${acc1}" opacity="0.35" filter="url(#soft)"/>
-  <ellipse cx="${620 + rng(0,60)}" cy="${120 + rng(0,50)}" rx="${90+rng(0,50)}" ry="${70+rng(0,30)}" fill="${acc2}" opacity="0.3"  filter="url(#soft)"/>
-  <ellipse cx="${400}"             cy="${520}"               rx="${200}"          ry="${80}"           fill="${acc3}" opacity="0.25" filter="url(#soft)"/>
+  ${starsSvg}
+  ${treesSvg}
+  ${wavesSvg}
 
-  <!-- Central illustration area -->
-  <circle cx="400" cy="280" r="160" fill="white" opacity="0.18"/>
-  <circle cx="400" cy="280" r="140" fill="${acc1}" opacity="0.22"/>
+  <!-- Clouds (not for space/dragons) -->
+  ${!sc.stars ? `
+  <ellipse cx="160" cy="90"  rx="70" ry="28" fill="white" opacity="0.55"/>
+  <ellipse cx="120" cy="85"  rx="45" ry="22" fill="white" opacity="0.55"/>
+  <ellipse cx="200" cy="85"  rx="45" ry="22" fill="white" opacity="0.55"/>
+  <ellipse cx="580" cy="110" rx="60" ry="25" fill="white" opacity="0.45"/>
+  <ellipse cx="540" cy="106" rx="38" ry="20" fill="white" opacity="0.45"/>
+  <ellipse cx="618" cy="106" rx="38" ry="20" fill="white" opacity="0.45"/>
+  ` : ''}
 
-  <!-- Character silhouette — simplified child figure -->
-  <ellipse cx="400" cy="220" rx="38" ry="42" fill="white" opacity="0.85"/>
-  <rect x="364" y="258" width="72" height="80" rx="18" fill="white" opacity="0.85"/>
-  <rect x="342" y="266" width="28" height="55" rx="12" fill="white" opacity="0.75"/>
-  <rect x="430" y="266" width="28" height="55" rx="12" fill="white" opacity="0.75"/>
-  <rect x="372" y="334" width="26" height="52" rx="12" fill="white" opacity="0.75"/>
-  <rect x="402" y="334" width="26" height="52" rx="12" fill="white" opacity="0.75"/>
+  <!-- Ground / floor -->
+  <rect x="0" y="${groundY}" width="800" height="${600-groundY}" fill="${sc.ground}" opacity="0.75" rx="0"/>
+  <ellipse cx="400" cy="${groundY}" rx="400" ry="24" fill="${sc.ground}" opacity="0.5"/>
 
-  <!-- Stars and sparkles -->
-  <text x="180" y="160" font-size="28" opacity="0.7" fill="${acc2}">⭐</text>
-  <text x="580" y="180" font-size="22" opacity="0.6" fill="${acc3}">✨</text>
-  <text x="120" y="420" font-size="20" opacity="0.5" fill="white">🌟</text>
-  <text x="650" y="400" font-size="24" opacity="0.55" fill="${acc1}">💫</text>
+  <!-- Main character -->
+  ${charSvg(sc.char, charX, charY, charColor, 1.1)}
 
-  <!-- Decorative dots -->
-  ${[...Array(12)].map((_, i) => { const cx = 80+(i*60); const cy = 550+(i%3)*12; return '<circle cx="'+cx+'" cy="'+cy+'" r="5" fill="white" opacity="'+(0.3+(i%3)*0.2).toFixed(1)+'"/>'; }).join(' ')}
+  <!-- Decorative sparkles -->
+  <circle cx="${350+(n%120)}" cy="${180+(n%80)}" r="5" fill="${acc}" opacity="0.8"/>
+  <circle cx="${500+(n%100)}" cy="${220+(n%60)}" r="4" fill="${acc2}" opacity="0.7"/>
+  <circle cx="${150+(n%60)}"  cy="${300+(n%50)}" r="3" fill="white"  opacity="0.6"/>
 
-  <!-- Page text area -->
-  <rect x="60" y="420" width="680" height="90" rx="18" fill="white" opacity="0.82"/>
-  <text x="400" y="448" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#374151" font-style="italic" opacity="0.6">Illustrated Story Page</text>
-  <text x="400" y="472" text-anchor="middle" font-family="Georgia, serif" font-size="17" fill="#1F2937" font-weight="bold">${snippet}</text>
-
-  <!-- Frame border -->
-  <rect x="12" y="12" width="776" height="576" rx="28" fill="none" stroke="white" stroke-width="3" stroke-dasharray="8 5" opacity="0.4"/>
-</svg>`;
-
-  return Buffer.from(svg, 'utf8');
+  <!-- Story text on illustrated panel -->
+  <rect x="50" y="468" width="700" height="112" rx="18" fill="white" opacity="0.92"/>
+  <rect x="50" y="468" width="700" height="112" rx="18" fill="none" stroke="${acc}" stroke-width="2" opacity="0.5"/>
+</svg>`, 'utf8');
 }
 
 // ── PDF GENERATION ────────────────────────────────────────────
-async function generatePdf(story, childName, pageImages, logger) {
+async function generatePdf(story, childName, pageImages, logger, bookUrl) {
   try {
     const { default: PDFDocument } = await import('pdfkit');
     logger.log('pdf_engine', 'ok', 'PDFKit available');
-    return await buildPdf(PDFDocument, story, childName, pageImages);
+    return await buildPdf(PDFDocument, story, childName, pageImages, bookUrl);
   } catch (e) {
     logger.log('pdf_engine', 'warn', `PDFKit not available (${e.message}) — using HTML fallback`);
     return buildHtml(story, childName, pageImages);
   }
 }
 
-async function buildPdf(PDFDocument, story, childName, pageImages) {
+// ── PHONICS WORD ANALYSER (server-side for PDF) ──────────────
+// Simplified version of the frontend phonicsAnalyser.
+// Splits words into grapheme chunks with phase-appropriate colours.
+const DIGRAPHS     = ['ch','sh','th','wh','ph','ng','ai','ea','ee','oa','oo','ou','ow','oi','oy','ar','or','er','ir','ur','au','aw','ew','ue'];
+const SPLIT_DIGR   = [['a','e'],['i','e'],['o','e'],['u','e'],['e','e']];
+const PHASE_COLORS = {
+  vowel:   { fill:'#FEF3C7', stroke:'#F59E0B', text:'#92400E' },
+  digraph: { fill:'#E0F2FE', stroke:'#0EA5E9', text:'#0C4A6E' },
+  split:   { fill:'#FCE7F3', stroke:'#EC4899', text:'#831843' },
+  cons:    { fill:'#F5F3FF', stroke:'#7C3AED', text:'#4C1D95' },
+};
+const VOWELS = new Set(['a','e','i','o','u']);
+
+function phoneticiseWord(word) {
+  const clean = word.replace(/[^a-z]/gi,'').toLowerCase();
+  const chunks = [];
+  let i = 0;
+  while (i < clean.length) {
+    // Try digraph
+    const di = DIGRAPHS.find(d => clean.slice(i, i+d.length) === d);
+    if (di) { chunks.push({ g: di, type:'digraph' }); i += di.length; continue; }
+    // Single letter
+    const ch = clean[i];
+    const type = VOWELS.has(ch) ? 'vowel' : 'cons';
+    chunks.push({ g: ch, type }); i++;
+  }
+  // Detect split digraphs (e.g. cake = c + a_e + k)
+  for (let j = 0; j < chunks.length-2; j++) {
+    const v = chunks[j].g, mid = chunks.slice(j+1, chunks.length-1), fin = chunks[chunks.length-1].g;
+    if (SPLIT_DIGR.some(([a,e]) => v===a && fin===e) && mid.length >= 1 && mid.every(m => !VOWELS.has(m.g))) {
+      chunks[j].type       = 'split';
+      chunks[chunks.length-1].type = 'split';
+      chunks[j].splitPair  = true;
+    }
+  }
+  return chunks;
+}
+
+// Draw a phonics word as tiles in the PDF (PDFKit version)
+function drawPhonicsTiles(doc, text, x, y, maxWidth, tileH) {
+  const words  = (text||'').split(' ');
+  const tilePad = 6, gap = 4, wordGap = 10;
+  let cx = x, lineY = y, lineH = tileH + 22; // tile + phoneme label row
+
+  words.forEach((word, wi) => {
+    const chunks    = phoneticiseWord(word);
+    const wordWidth = chunks.reduce((sum, c) => {
+      const fontSize = Math.max(20, Math.min(32, 28 - Math.max(0, c.g.length-2)*4));
+      return sum + doc.widthOfString(c.g, { font:'Helvetica-Bold', fontSize }) + tilePad*2 + gap;
+    }, wordGap);
+
+    // Wrap to next line if needed
+    if (cx + wordWidth > x + maxWidth && cx > x) { cx = x; lineY += lineH + 6; }
+
+    chunks.forEach((chunk, ci) => {
+      const fs     = Math.max(20, Math.min(30, 28 - Math.max(0, chunk.g.length-2)*4));
+      const tw     = Math.max(30, doc.widthOfString(chunk.g.toUpperCase(), { font:'Helvetica-Bold', fontSize: fs }) + tilePad*2);
+      const colors = PHASE_COLORS[chunk.type] || PHASE_COLORS.cons;
+
+      // Tile background
+      doc.roundedRect(cx, lineY, tw, tileH, 7)
+         .fillAndStroke(colors.fill, colors.stroke);
+      doc.strokeOpacity(0.7).lineWidth(2).stroke();
+      doc.fillOpacity(1);
+
+      // Grapheme letter(s)
+      doc.font('Helvetica-Bold').fontSize(fs).fillColor(colors.text)
+         .text(chunk.g.toUpperCase(), cx, lineY + (tileH - fs) / 2, { width: tw, align:'center' });
+
+      // Phoneme guide under tile (small)
+      // Use simple phoneme hints for common patterns
+      const phonemeHint = {
+        'ch':'/tʃ/', 'sh':'/ʃ/', 'th':'/ð/', 'ng':'/ŋ/',
+        'ai':'/eɪ/', 'ee':'/iː/', 'oo':'/uː/', 'oa':'/oʊ/',
+        'ar':'/ɑːr/', 'or':'/ɔːr/', 'er':'/ər/', 'ow':'/aʊ/',
+      }[chunk.g] || '';
+
+      if (phonemeHint) {
+        doc.font('Helvetica').fontSize(7).fillColor('#6B7280')
+           .text(phonemeHint, cx, lineY + tileH + 2, { width: tw, align:'center' });
+      }
+
+      cx += tw + gap;
+    });
+
+    // Punctuation
+    const punct = word.match(/([.,!?]+)$/)?.[1] || '';
+    if (punct) {
+      doc.font('Helvetica-Bold').fontSize(24).fillColor('#9CA3AF')
+         .text(punct, cx - gap, lineY + (tileH-24)/2);
+    }
+    cx += wordGap;
+  });
+
+  return lineY + lineH; // return final Y position
+}
+
+async function buildPdf(PDFDocument, story, childName, pageImages, bookUrl) {
+  // Try to load qrcode — optional, won't fail if not installed
+  let qrBuf = null;
+  if (bookUrl) {
+    try {
+      const QRCode = (await import('qrcode')).default;
+      qrBuf = await QRCode.toBuffer(bookUrl, {
+        type:  'png',
+        width: 200,
+        margin: 2,
+        color: { dark: '#1E1B4B', light: '#FFFFFF' },
+      });
+    } catch (e) { console.warn('[Book] QR code generation failed:', e.message); }
+  }
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: false });
     const chunks = [];
@@ -290,46 +498,110 @@ async function buildPdf(PDFDocument, story, childName, pageImages) {
 
     const W = 595.28, H = 841.89;
     const pages = story.pages || [];
-    const bgs   = ['#F5F3FF','#FFF9F0','#F0F4FF','#FFF0F9','#FFFBEB','#F0FDF4'];
+    const bgs   = ['#FFFBF5','#F5F9FF','#FFF5FB','#F5FFF8','#FFFEF5','#F8F5FF'];
 
-    // Cover
+    // ── COVER ─────────────────────────────────────────────────
     doc.addPage();
     doc.rect(0,0,W,H).fill('#1E1B4B');
-    if (pageImages[0]) { try { doc.image(pageImages[0], 60, 60, { width: W-120, height: 340, fit:[W-120,340], align:'center' }); } catch {} }
-    doc.fontSize(34).font('Helvetica-Bold').fillColor('#FBBF24')
-       .text(story.title || `${childName}'s Story`, 40, 430, { width:W-80, align:'center' });
-    doc.fontSize(15).font('Helvetica').fillColor('rgba(255,255,255,0.7)')
-       .text(`A personalised phonics story for ${childName}`, 40, 478, { width:W-80, align:'center' });
-    doc.rect(0, H-64, W, 64).fill('#7C3AED');
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#fff')
-       .text('Properly — AI Phonics Tutor', 0, H-42, { width:W, align:'center' });
+    // Gradient overlay
+    doc.rect(0,0,W,H/2).fill('#0F0C2E');
 
-    // Story pages
+    if (pageImages[0]) {
+      try {
+        const isMimeData = Buffer.isBuffer(pageImages[0]) && pageImages[0].slice(0,5).toString().includes('svg');
+        doc.image(pageImages[0], 50, 40, { width: W-100, height: 380, fit:[W-100,380], align:'center', valign:'center' });
+      } catch {}
+    }
+
+    // Title band
+    doc.rect(0, 440, W, 120).fill('#7C3AED');
+    doc.fontSize(32).font('Helvetica-Bold').fillColor('#FBBF24')
+       .text(story.title || `${childName}'s Story`, 40, 458, { width:W-80, align:'center' });
+    doc.fontSize(14).font('Helvetica').fillColor('rgba(255,255,255,0.8)')
+       .text(`A personalised phonics story for ${childName}`, 40, 498, { width:W-80, align:'center' });
+
+    // Decorative dots
+    [50,100,150,200,250,300,350,400,450,500,550].forEach((dx,i) => {
+      doc.circle(dx, H-22, 5).fill(i%2===0?'#7C3AED':'#FBBF24').fillOpacity(0.6);
+    });
+    doc.rect(0, H-44, W, 44).fill('#0F0C2E');
+    doc.fontSize(11).font('Helvetica').fillColor('rgba(255,255,255,0.4)')
+       .text('Properly — AI Phonics Tutor  |  properly-web.onrender.com', 0, H-28, { width:W, align:'center' });
+
+    // ── STORY PAGES ────────────────────────────────────────────
     pages.forEach((page, idx) => {
       doc.addPage();
-      doc.rect(0,0,W,H).fill(bgs[idx % bgs.length]);
-      doc.circle(W-40,40,18).fill('#7C3AED');
-      doc.fontSize(13).font('Helvetica-Bold').fillColor('#fff').text(String(idx+1), W-55, 33, { width:36, align:'center' });
+      const bg = bgs[idx % bgs.length];
+      doc.rect(0,0,W,H).fill(bg);
+
+      // Decorative corner blobs
+      doc.circle(-20, -20, 80).fill('#7C3AED').fillOpacity(0.07);
+      doc.circle(W+20, H+20, 80).fill('#7C3AED').fillOpacity(0.07);
+      doc.fillOpacity(1);
+
+      // Page number badge
+      doc.circle(W-38, 38, 22).fill('#7C3AED');
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#fff')
+         .text(String(idx+1), W-58, 30, { width:44, align:'center' });
+
+      // Illustration
       const imgBuf = pageImages[idx+1];
-      if (imgBuf) { try { doc.image(imgBuf, 40, 28, { width:W-80, height:400, fit:[W-80,400], align:'center', valign:'center' }); } catch {} }
-      else { doc.roundedRect(40,28,W-80,400,10).fill('#EDE9FE'); doc.fontSize(48).text('✨', 0, 200, { width:W, align:'center' }); }
-      const ty = 450;
-      doc.roundedRect(40, ty, W-80, H-ty-36, 10).fill('#fff');
-      doc.roundedRect(40, ty, W-80, H-ty-36, 10).stroke('#DDD6FE').lineWidth(1.5);
-      doc.fontSize(20).font('Helvetica-Bold').fillColor('#1E1B4B')
-         .text(page.text||'', 58, ty+16, { width:W-116, align:'center', lineGap:5 });
+      const imgH   = 390, imgY = 18;
+      if (imgBuf) {
+        try {
+          doc.save();
+          doc.roundedRect(36, imgY, W-72, imgH, 16).clip();
+          doc.image(imgBuf, 36, imgY, { width: W-72, height: imgH, fit:[W-72,imgH], align:'center', valign:'center' });
+          doc.restore();
+          // Image border
+          doc.roundedRect(36, imgY, W-72, imgH, 16).stroke('#DDD6FE').lineWidth(2);
+        } catch {}
+      } else {
+        doc.roundedRect(36, imgY, W-72, imgH, 16).fill('#EDE9FE');
+        doc.fontSize(56).text('📖', 0, 160, { width:W, align:'center' });
+      }
+
+      // ── PHONICS TILES TEXT AREA ──────────────────────────────
+      const tileAreaY = imgY + imgH + 14;
+      const tileAreaH = H - tileAreaY - 28;
+      doc.roundedRect(36, tileAreaY, W-72, tileAreaH, 14).fill('#fff');
+      doc.roundedRect(36, tileAreaY, W-72, tileAreaH, 14).stroke('#DDD6FE').lineWidth(1.5);
+
+      // Draw phonics tiles for each word
+      const tileH = 44;
+      const finalY = drawPhonicsTiles(doc, page.text||'', 52, tileAreaY + 14, W-104, tileH);
     });
 
-    // Back cover
+    // ── BACK COVER with QR code ─────────────────────────────────
     doc.addPage();
-    doc.rect(0,0,W,H).fill('#7C3AED');
-    doc.fontSize(72).text('🌟', 0, H*0.28, { width:W, align:'center' });
-    doc.fontSize(28).font('Helvetica-Bold').fillColor('#fff')
-       .text(`Well done, ${childName}!`, 0, H*0.52, { width:W, align:'center' });
+    doc.rect(0,0,W,H).fill('#1E1B4B');
+    doc.rect(0,0,W,60).fill('#7C3AED');
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#fff')
+       .text('Properly — AI Phonics Tutor', 0, 20, { width:W, align:'center' });
+
+    // Star emoji area
+    doc.fontSize(70).text('🌟', 0, H*0.12, { width:W, align:'center' });
+    doc.fontSize(30).font('Helvetica-Bold').fillColor('#FBBF24')
+       .text(`Well done, ${childName}!`, 0, H*0.31, { width:W, align:'center' });
     doc.fontSize(16).font('Helvetica').fillColor('rgba(255,255,255,0.75)')
-       .text('You are a brilliant reader! 📚', 0, H*0.52+50, { width:W, align:'center' });
-    doc.fontSize(12).fillColor('rgba(255,255,255,0.4)')
-       .text('Created with Properly — AI Phonics Tutor', 0, H-72, { width:W, align:'center' });
+       .text('You are a brilliant reader! Keep it up.', 0, H*0.31+46, { width:W, align:'center' });
+
+    // QR Code
+    if (qrBuf) {
+      const qrSize = 160;
+      const qrX = (W - qrSize) / 2;
+      const qrY = H * 0.5;
+      // White background for QR
+      doc.roundedRect(qrX - 12, qrY - 12, qrSize + 24, qrSize + 70, 16).fill('#fff');
+      try { doc.image(qrBuf, qrX, qrY, { width: qrSize }); } catch {}
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#1E1B4B')
+         .text('Scan to read this story in the app!', qrX - 12, qrY + qrSize + 8, { width: qrSize + 24, align:'center' });
+      doc.fontSize(9).font('Helvetica').fillColor('#6B7280')
+         .text(bookUrl || 'properly-web.onrender.com', qrX - 12, qrY + qrSize + 28, { width: qrSize + 24, align:'center' });
+    }
+
+    doc.fontSize(11).font('Helvetica').fillColor('rgba(255,255,255,0.35)')
+       .text(`Created with Properly · Phonics Adventure for ${childName}`, 0, H-36, { width:W, align:'center' });
 
     doc.end();
   });
@@ -478,9 +750,11 @@ export async function generateBook(bookId) {
 
     // Document
     logger.log('doc_start', 'ok', 'Building PDF/HTML document');
+    const storyTheme = story.theme || 'adventure';
+    const bookUrl    = `${(process.env.FRONTEND_URL || 'https://properly-web.onrender.com').replace(/\/+$/,'')}/read/${story.id}?ai=1`;
     let docBuf = null, docExt = 'pdf', docMime = 'application/pdf';
     try {
-      docBuf = await generatePdf(story, childName, imgBufs, logger);
+      docBuf = await generatePdf(story, childName, imgBufs, logger, bookUrl);
       if (docBuf?.slice(0,15).toString().includes('<!DOCTYPE')) {
         docExt = 'html'; docMime = 'text/html';
         logger.log('doc_type', 'warn', 'HTML fallback used (PDFKit not installed on server)');

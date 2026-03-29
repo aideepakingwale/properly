@@ -30,7 +30,7 @@ export const getBookLogs = (req, res) => {
 
 import getDb             from '../db/database.js';
 import { generateBook } from '../services/book.service.js';
-import { r2Url, r2Available } from '../services/r2.service.js';
+import { r2Url, r2Available, r2Delete } from '../services/r2.service.js';
 
 // ── CREDIT HELPERS ────────────────────────────────────────────
 function getCredits(db, userId) {
@@ -196,10 +196,47 @@ export const retryBook = (req, res) => {
 };
 
 // ── DELETE BOOK ───────────────────────────────────────────────
-export const deleteBook = (req, res) => {
-  const db = getDb();
-  db.prepare('DELETE FROM story_books WHERE id=?').run(req.params.bookId);
-  res.json({ success: true });
+export const deleteBook = async (req, res) => {
+  const db     = getDb();
+  const userId = req.user.userId;
+  const bookId = req.params.bookId;
+
+  // Verify this book belongs to a child of this user
+  const book = db.prepare(`
+    SELECT sb.* FROM story_books sb
+    JOIN children c ON c.id = sb.child_id
+    WHERE sb.id = ? AND c.user_id = ?
+  `).get(bookId, userId);
+  if (!book) return res.status(404).json({ success: false, message: 'Book not found' });
+
+  // Collect all R2 keys to delete
+  const pages   = db.prepare('SELECT image_r2_key FROM story_book_pages WHERE book_id=?').all(bookId);
+  const r2Keys  = [
+    book.cover_r2_key,
+    book.pdf_r2_key,
+    ...pages.map(p => p.image_r2_key),
+  ].filter(k => k && k.length < 200 && !k.startsWith('data:') && !k.startsWith('http'));
+
+  // Delete DB records first (fast path)
+  db.prepare('DELETE FROM story_book_pages WHERE book_id=?').run(bookId);
+  db.prepare('DELETE FROM story_books WHERE id=?').run(bookId);
+
+  // Async R2 cleanup — don't block the HTTP response
+  if (r2Keys.length > 0 && r2Available()) {
+    setImmediate(async () => {
+      for (const key of r2Keys) {
+        try {
+          await r2Delete(key);
+          console.log(`[Book:delete] R2 cleaned: ${key}`);
+        } catch (e) {
+          console.warn(`[Book:delete] R2 delete failed for ${key}: ${e.message}`);
+        }
+      }
+      console.log(`[Book:delete] Cleaned ${r2Keys.length} R2 object(s) for book ${bookId}`);
+    });
+  }
+
+  res.json({ success: true, data: { deleted: bookId, r2KeysQueued: r2Keys.length } });
 };
 
 // ── ORDER PRINT ───────────────────────────────────────────────
