@@ -48,6 +48,8 @@ export default function App() {
             <Route path="stories" element={<Stories />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="config" element={<Config />} />
+            <Route path="books"    element={<BooksAdmin />} />
+            <Route path="reports"  element={<Reports />} />
           </Route>
         </Routes>
       </BrowserRouter>
