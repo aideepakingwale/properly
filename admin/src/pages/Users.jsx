@@ -66,7 +66,7 @@ export default function Users() {
           </thead>
           <tbody>
             {loading
-              ? <tr><td colSpan={8} style={{ textAlign:'center', padding:32, color:'var(--muted)' className='text-muted' }}>Loading…</td></tr>
+              ? <tr><td colSpan={8} style={{ textAlign:'center', padding:32, color:'var(--muted)' }}>Loading…</td></tr>
               : data.users.map(u => (
               <tr key={u.id} style={{ cursor:'pointer' }} onClick={() => nav(`/users/${u.id}`)}>
                 <td>
