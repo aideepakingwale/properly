@@ -26,6 +26,7 @@ import { getWordColor } from '../utils/scoring';
 import { AcornPill, Modal, Confetti, ProgressBar, Button, Spinner } from '../components/ui';
 import PhonicsWord from '../components/PhonicsWord';
 import { analyseWord, getPhonemeHint } from '../utils/phonicsAnalyser';
+import PhonicsLearn from '../components/PhonicsLearn';
 import { getPhonemeUrl, isCacheLoaded, getCacheStats } from '../services/phonemeCache';
 import { assessWithSDK } from '../services/azureSpeechSDK';
 
@@ -84,6 +85,7 @@ export default function ReadingSession() {
   const [story, setStory]        = useState(null);
   const [pageIdx, setPageIdx]    = useState(0);
   const [showNextButton, setShowNextButton] = useState(false);  // shown after good score
+  const [showLearnModal, setShowLearnModal] = useState(false); // phonics guide modal
   const [wordScores, setWordScores] = useState([]);
   const [feedbackData, setFeedbackData] = useState(null); // { tip, source, provider }
   const [loadingFb, setLoadingFb]= useState(false);
@@ -1160,6 +1162,11 @@ export default function ReadingSession() {
                 style={{ borderRadius: 50, padding: '4px 14px', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11, background: !phonicsHearMode ? 'var(--grad-primary)' : 'transparent', color: !phonicsHearMode ? 'white' : (dark ? 'var(--overlay-50)' : 'var(--text-muted)'), transition: 'all 0.2s' }}>
                 🔊 Full Sentence
               </button>
+        <button onClick={() => setShowLearnModal(true)}
+          title="Open Phonics Guide"
+          style={{ background:'var(--primary-10)', border:'1px solid var(--primary-25)', borderRadius:50, padding:'4px 12px', fontSize:11, fontWeight:700, color:'var(--color-primary)', cursor:'pointer', fontFamily:'var(--font-body)' }}>
+          🔤 Phonics Guide
+        </button>
               <button
                 onClick={() => setPhonicsHearMode(true)}
                 style={{ borderRadius: 50, padding: '4px 14px', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11, background: phonicsHearMode ? 'var(--grad-primary)' : 'transparent', color: phonicsHearMode ? 'white' : (dark ? 'var(--overlay-50)' : 'var(--text-muted)'), transition: 'all 0.2s' }}>

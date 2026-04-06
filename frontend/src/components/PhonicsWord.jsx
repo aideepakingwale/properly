@@ -76,9 +76,23 @@ export default function PhonicsWord({
       flexDirection:  'column',
       alignItems:     'center',
       gap:            4,
-      transition:     'transform 0.18s ease',
-      transform:      isSpeaking ? 'scale(1.15) translateY(-4px)' : 'scale(1)',
+      transition:     'transform 0.18s ease, filter 0.18s ease',
+      transform:      isSpeaking ? 'scale(1.18) translateY(-5px)' : 'scale(1)',
+      filter:         isSpeaking ? 'drop-shadow(0 4px 12px rgba(14,165,233,0.5))' : 'none',
+      position:       'relative',
     }}>
+      {/* Speaking highlight halo — bright blue glow behind the whole word */}
+      {isSpeaking && (
+        <span style={{
+          position:     'absolute',
+          inset:        '-6px -8px',
+          borderRadius: 12,
+          background:   'var(--bg-info-light)',
+          border:       '2px solid var(--color-info)',
+          zIndex:       0,
+          animation:    'speakPulse 0.6s ease-in-out infinite alternate',
+        }} />
+      )}
       {/* Score badge (post-assessment) */}
       {isRevealed && score !== null && (
         <span style={{
@@ -161,7 +175,7 @@ export default function PhonicsWord({
                 color:          isChunkSpeaking(ci)
                   ? '#fff'
                   : isSpeaking
-                  ? 'var(--color-info)'
+                  ? '#0369A1'  /* deep info blue — readable over light bg */
                   : isRevealed && chunkColor
                     ? chunkColor.text
                     : dark ? 'rgba(255,255,255,0.9)' : 'var(--text)',
@@ -183,6 +197,8 @@ export default function PhonicsWord({
                 padding:        isChunkSpeaking(ci) || (isRevealed && chunkColor) || isSpeaking ? '1px 5px' : '1px 1px',
                 transition:     'all 0.15s ease',
                 opacity:        chunk.isSilent ? 0.35 : 1,
+                position:       'relative',
+                zIndex:         1,
                 boxShadow:      isChunkSpeaking(ci) ? '0 0 14px rgba(251,191,36,0.6)' : 'none',
                 transform:      isChunkSpeaking(ci) ? 'scale(1.25) translateY(-2px)' : 'scale(1)',
                 animation:      isWorst && !isChunkSpeaking(ci) ? 'pulse-chunk 1s ease-in-out 3' : 'none',
@@ -298,6 +314,10 @@ export default function PhonicsWord({
         @keyframes pulse-chunk {
           0%, 100% { transform: scale(1); }
           50%       { transform: scale(1.2); filter: brightness(1.2); }
+        }
+        @keyframes speakPulse {
+          from { opacity: 0.55; transform: scale(0.97); }
+          to   { opacity: 0.9;  transform: scale(1.01); }
         }
       `}</style>
     </span>

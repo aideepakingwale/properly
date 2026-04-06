@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { storyAPI, aiStoryAPI } from '../services/api';
 import { AcornPill, ProgressBar, StarBg, Badge, Spinner, Toast } from '../components/ui';
 import StoryForest from '../components/StoryForest';
+import PhonicsLearn from '../components/PhonicsLearn';
 import { PlansSection } from '../components/PlanCard';
 import ParentGate from '../components/layout/ParentGate';
 import { useToast } from '../hooks/useToast';
@@ -35,7 +36,7 @@ export default function Home() {
   const { child, progress, refreshProgress } = useAuth();
   const [stories, setStories]   = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [tab, setTab]           = useState('curriculum');  // 'curriculum' | 'ai'
+  const [tab, setTab]           = useState('learn');  // 'learn' | 'curriculum' | 'ai' | 'plans'
   const [showGate, setShowGate] = useState(false);
   const { toast, showToast, hideToast } = useToast();
   const nav = useNavigate();
@@ -130,6 +131,7 @@ export default function Home() {
         {/* Tab switcher */}
         <div style={{ display:'flex', background:'var(--overlay-8)', borderRadius:14, padding:4, marginBottom:18, gap:4 }}>
           {[
+            { k:'learn',      l:'🔤 Phonics Guide', d:'Learn the basics first' },
             { k:'curriculum', l:'📚 Curriculum',  d:'Structured phonics path' },
             { k:'ai',         l:'✨ My Stories',   d:'AI-personalised just for you' },
             { k:'plans',      l:'⭐ Plans',         d:'Upgrade for more features' },
@@ -141,6 +143,13 @@ export default function Home() {
             </button>
           ))}
         </div>
+
+        {/* ── LEARN TAB ── */}
+        {tab === 'learn' && (
+          <div style={{ paddingBottom: 24 }}>
+            <PhonicsLearn childPhase={child?.phase || 2} />
+          </div>
+        )}
 
         {/* ── CURRICULUM TAB ── */}
         {tab === 'curriculum' && (
