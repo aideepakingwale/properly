@@ -4,6 +4,7 @@
  */
 import { useState, useRef } from 'react';
 import { useSpeech } from '../hooks/useSpeech';
+import { usePhonemePlayer } from '../hooks/usePhonemePlayer';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { speechAPI } from '../services/api';
 
@@ -159,13 +160,17 @@ const PHASES = [
 
 // ── PRACTICE BUTTON ───────────────────────────────────────────────────────
 function PracticeButton({ targetWord, targetText, color }) {
-  const { speak } = useSpeech();
   const { startRecording, stopRecording } = useAudioRecorder();
   const [phase, setPhase] = useState('idle');
   const [result, setResult] = useState(null);
   const timerRef = useRef(null);
 
-  const hear = () => speak(targetText || targetWord, { rate:0.75 });
+  const { playGrapheme, playWordByPhonemes, playWord } = usePhonemePlayer();
+  // Remove inner useSpeech since we use usePhonemePlayer instead
+  const hearFn = async () => {
+    // Play word naturally, giving child the full sound to imitate
+    playWord(targetWord);
+  };
 
   const practise = async () => {
     if (phase === 'listening') {
@@ -201,7 +206,7 @@ function PracticeButton({ targetWord, targetText, color }) {
 
   return (
     <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-      <button onClick={hear}
+      <button onClick={hearFn}
         style={{ padding:'5px 12px', borderRadius:50, border:`1.5px solid ${color}40`,
           background:`${color}10`, color, cursor:'pointer', fontSize:12, fontWeight:700 }}>
         🔊 Hear it
@@ -232,11 +237,13 @@ function PracticeButton({ targetWord, targetText, color }) {
 
 // ── SOUND TILE ────────────────────────────────────────────────────────────
 function SoundTile({ g, spoken, ipa, color }) {
-  const { speak } = useSpeech();
+  const { playGrapheme } = usePhonemePlayer();
   const [active, setActive] = useState(false);
-  const click = () => {
-    setActive(true); speak(spoken, { rate:0.68 });
-    setTimeout(() => setActive(false), 850);
+  const click = async () => {
+    setActive(true);
+    // Play the real cached Azure phoneme sound — not the letter name
+    await playGrapheme(g, spoken);
+    setTimeout(() => setActive(false), 200);
   };
   return (
     <button onClick={click} title={`Hear: ${spoken}`}
@@ -254,10 +261,10 @@ function SoundTile({ g, spoken, ipa, color }) {
 
 // ── WORD TILE ─────────────────────────────────────────────────────────────
 function WordTile({ word, pattern, letters, label, color }) {
-  const { speak } = useSpeech();
+  const { playWord } = usePhonemePlayer();
   const [active, setActive] = useState(false);
   const PC = { C:'#7C3AED', V:'#EF4444', CC:'#7C3AED' };
-  const click = () => { setActive(true); speak(word, {rate:0.75}); setTimeout(()=>setActive(false),900); };
+  const click = () => { setActive(true); playWord(word); setTimeout(()=>setActive(false),900); };
   return (
     <button onClick={click} title={`Hear: ${word}`}
       style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5,
@@ -285,10 +292,10 @@ function WordTile({ word, pattern, letters, label, color }) {
 }
 
 function TrickyTile({ word }) {
-  const { speak } = useSpeech();
+  const { playWord } = usePhonemePlayer();
   const [active, setActive] = useState(false);
   return (
-    <button onClick={() => { setActive(true); speak(word,{rate:0.8}); setTimeout(()=>setActive(false),700); }}
+    <button onClick={() => { setActive(true); playWord(word); setTimeout(()=>setActive(false),700); }}
       style={{ padding:'5px 12px', borderRadius:8, cursor:'pointer',
         border:`1.5px solid ${active?'#EF4444':'#FECACA'}`,
         background:active?'#FEF2F2':'#FFF5F5', color:active?'#991B1B':'#DC2626',
@@ -301,15 +308,19 @@ function TrickyTile({ word }) {
 
 // ── ALPHABET EXPLORER ──────────────────────────────────────────────────────
 function AlphabetExplorer() {
+  const { playGrapheme, playWord } = usePhonemePlayer();
   const { speak } = useSpeech();
   const { startRecording, stopRecording } = useAudioRecorder();
   const [activeL, setActiveL] = useState(null);
   const [states, setStates]   = useState({});
   const timerRef = useRef(null);
 
-  const hear = (item) => {
+  const hear = async (item) => {
     setActiveL(item.l);
-    speak(`${item.l} says ${item.ipa} as in ${item.eg}`, { rate:0.7 });
+    // Play isolated phoneme sound from Azure cache, then say the example word
+    await playGrapheme(item.l, item.eg);
+    await new Promise(r => setTimeout(r, 250));
+    playWord(item.eg);
     setTimeout(() => setActiveL(null), 1200);
   };
 
@@ -323,7 +334,7 @@ function AlphabetExplorer() {
       return;
     }
     setStates(p=>({...p,[item.l]:'listening'}));
-    speak(item.eg, { rate:0.7 });
+    playWord(item.eg);
     setTimeout(async () => {
       const ok = await startRecording();
       if (!ok) { setStates(p=>({...p,[item.l]:'idle'})); return; }
