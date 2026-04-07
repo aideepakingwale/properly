@@ -5,6 +5,7 @@
  */
 import React, { useState, useRef } from 'react';
 import { usePhonemePlayer, triggerPhonicsPreload } from '../hooks/usePhonemePlayer';
+import { segmentWord, PHONEME_MAP } from '../utils/phonicsEngine';
 import { isCacheLoaded } from '../services/phonemeCache';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useAzureTTS } from '../hooks/useAzureTTS';
@@ -143,7 +144,7 @@ function TermPhonicsBreakdown({ term, accentColor }) {
     for (let i = 0; i < breakdown.length; i++) {
       setActiveTile(i);
       await playGrapheme(breakdown[i].key, breakdown[i].g);
-      await new Promise(r => setTimeout(r, 320));
+      await new Promise(r => setTimeout(r, 180));
     }
     setActiveTile(-1);
     await new Promise(r => setTimeout(r, 450));

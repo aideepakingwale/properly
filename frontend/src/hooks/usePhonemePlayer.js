@@ -1,77 +1,48 @@
 /**
  * @file        usePhonemePlayer.js
- * @description Plays real isolated phoneme sounds for any grapheme.
+ * @description Plays real Azure SSML phoneme sounds for any grapheme.
+ *              Imports all grapheme→IPA data from phonicsEngine.js (single source of truth).
  *
- * Sound resolution:
- *  1. localStorage preload cache (44 phonemes fetched at login)
- *  2. In-memory session cache (blob URLs built from #1)
- *  3. POST /api/ai/phoneme on-demand (Azure SSML — for cache misses)
- *  4. Web Speech with a context phrase as last resort
- *
- * isCacheReady() → true once all 44 phonemes are available.
- * triggerPreload(token) → call this when Phonics Guide opens to ensure cache is warm.
+ * Resolution order for each sound:
+ *   1. Module-level blob URL cache (instant — survives re-renders)
+ *   2. localStorage preload cache (44 phonemes loaded at login)
+ *   3. POST /api/ai/phoneme — on-demand Azure SSML synthesis
+ *   4. Web Speech API with a context phrase (never speaks bare letter names)
  */
 
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
+import { PHONEME_MAP, getIpa, getBlendComponents } from '../utils/phonicsEngine';
 import { getPhonemeUrl, isCacheLoaded, preloadPhonemes } from '../services/phonemeCache';
 import { useSpeech } from './useSpeech';
 
-// ── GRAPHEME → IPA MAP ────────────────────────────────────────────────────────
-export const GRAPHEME_TO_IPA = {
-  // Consonants
-  'p':'p','b':'b','t':'t','d':'d','k':'k','c':'k','g':'g','f':'f',
-  'v':'v','s':'s','z':'z','h':'h','m':'m','n':'n','l':'l','r':'r',
-  'w':'w','y':'j','j':'dʒ','x':'ks','q':'kw','qu':'kw',
-  // Short vowels
-  'a':'æ','e':'ɛ','i':'ɪ','o':'ɒ','u':'ʌ',
-  // Consonant digraphs (single sounds — must be cached as IPA)
-  'sh':'ʃ','ch':'tʃ','th':'ð','ng':'ŋ','wh':'w','ph':'f',
-  // Doubled consonants
-  'ck':'k','ff':'f','ll':'l','ss':'s','zz':'z',
-  // Vowel digraphs
-  'ai':'eɪ','ay':'eɪ','ee':'iː','ea':'iː','igh':'aɪ','ie':'aɪ',
-  'oa':'əʊ','ow':'əʊ','oe':'əʊ','oo':'uː','ue':'juː','ew':'juː',
-  'ar':'ɑː','or':'ɔː','ur':'ɜː','er':'ɜː','ir':'ɜː',
-  'oi':'ɔɪ','oy':'ɔɪ','ou':'aʊ','au':'ɔː','aw':'ɔː',
-  'ear':'ɪə','air':'eə','ure':'ʊə',
-  // Consonant blends (array = each component played separately in sequence)
-  'bl':['b','l'],'br':['b','r'],'cl':['k','l'],'cr':['k','r'],
-  'dr':['d','r'],'fl':['f','l'],'fr':['f','r'],'gl':['g','l'],
-  'gr':['g','r'],'pl':['p','l'],'pr':['p','r'],'sl':['s','l'],
-  'sm':['s','m'],'sn':['s','n'],'sp':['s','p'],'st':['s','t'],
-  'sw':['s','w'],'tr':['t','r'],'tw':['t','w'],'sk':['s','k'],
-  'nd':['n','d'],'mp':['m','p'],'lt':['l','t'],'nt':['n','t'],'nk':['n','k'],
-  'scr':['s','k','r'],'str':['s','t','r'],'spr':['s','p','r'],
-  // Split digraphs
-  'a_e':'eɪ','i_e':'aɪ','o_e':'əʊ','u_e':'juː','e_e':'iː',
-  // Suffix sequences (each element is an IPA key directly)
-  'ing':['ɪ','ŋ'],
-  'eme':['iː','m'],
+// ── CONTEXT PHRASES ────────────────────────────────────────────────────────────
+// When Azure is unavailable, speak a phrase that demonstrates the sound in context.
+// NEVER speak the bare grapheme text — that produces letter names, not phonemes.
+const CONTEXT_PHRASES = {
+  'ʃ':'shh as in shop',   'tʃ':'ch as in chip',    'ð':'th as in the',
+  'ŋ':'ng as in ring',    'f':'f as in fan',         'k':'k as in cat',
+  'g':'g as in got',      's':'sss as in sun',       'z':'zzz as in zip',
+  'p':'p as in pin',      'b':'b as in bat',         't':'t as in tap',
+  'd':'d as in dog',      'm':'mmm as in map',       'n':'n as in net',
+  'l':'l as in lip',      'r':'r as in red',         'w':'w as in wet',
+  'j':'y as in yes',      'h':'h as in hat',         'v':'v as in van',
+  'dʒ':'j as in jam',     'kw':'qu as in quiz',      'ks':'x as in fox',
+  'æ':'a as in cat',      'ɛ':'e as in bed',         'ɪ':'i as in sit',
+  'ɒ':'o as in hot',      'ʌ':'u as in cup',         'ʊ':'oo as in book',
+  'ə':'a as in about',
+  'eɪ':'ay as in rain',   'iː':'ee as in feet',      'aɪ':'ie as in night',
+  'əʊ':'oa as in boat',   'uː':'oo as in moon',      'aʊ':'ow as in cow',
+  'ɔɪ':'oi as in coin',   'ɑː':'ar as in car',       'ɔː':'or as in fork',
+  'ɜː':'ur as in turn',   'juː':'ue as in blue',     'ɪə':'ear as in hear',
+  'eə':'air as in chair', 'ʊə':'ure as in pure',
+  // Combined suffix sounds
+  'ɪŋ':'ing as in ring',  'iːm':'eem as in team',
+  'ʃən':'shun as in nation','tʃər':'cher as in teacher',
+  'ŋk':'nk as in bank',   'skr':'scr as in scrap',
+  'str':'str as in strap', 'spr':'spr as in spring',
 };
 
-// ── CONTEXT PHRASES for Web Speech fallback ───────────────────────────────────
-// Uses words that place the phoneme in a clear, audible context.
-// Never speaks the bare grapheme text (would say letter names, not sounds).
-const FALLBACK_PHRASES = {
-  'ʃ':'shh like in shop',    'tʃ':'ch like in chip',   'ð':'th like in the',
-  'ŋ':'ng like in ring',     'f':'f like in fan',       'k':'k like in cat',
-  'g':'g like in got',       's':'s like in sun',       'z':'z like in zip',
-  'p':'p like in pin',       'b':'b like in bat',       't':'t like in tap',
-  'd':'d like in dog',       'm':'m like in map',       'n':'n like in net',
-  'l':'l like in lip',       'r':'r like in red',       'w':'w like in wet',
-  'j':'y like in yes',       'h':'h like in hat',       'v':'v like in van',
-  'dʒ':'j like in jam',      'kw':'qu like in quiz',    'ks':'x like in fox',
-  'æ':'a like in cat',       'ɛ':'e like in bed',       'ɪ':'i like in sit',
-  'ɒ':'o like in hot',       'ʌ':'u like in cup',       'ʊ':'oo like in book',
-  'ə':'a like in about',
-  'eɪ':'ay like in rain',    'iː':'ee like in feet',    'aɪ':'ie like in night',
-  'əʊ':'oa like in boat',    'uː':'oo like in moon',    'aʊ':'ow like in cow',
-  'ɔɪ':'oi like in coin',    'ɑː':'ar like in car',     'ɔː':'or like in fork',
-  'ɜː':'ur like in turn',    'juː':'ue like in blue',   'ɪə':'ear like in hear',
-  'eə':'air like in chair',  'ʊə':'ure like in pure',
-};
-
-// ── API ───────────────────────────────────────────────────────────────────────
+// ── API ────────────────────────────────────────────────────────────────────────
 function apiBase() {
   const raw = (typeof __API_URL__ !== 'undefined' && __API_URL__) ? __API_URL__ : '/api';
   if (!raw || raw === '/api') return '/api';
@@ -79,99 +50,113 @@ function apiBase() {
   return p.replace(/\/$/, '').replace(/\/api$/, '') + '/api';
 }
 
-// Module-level cache: IPA → blob URL (survives re-renders)
-const _blobCache = {};
+// Module-level cache: ipa:grapheme → blob URL
+const _cache = {};
 
-/** Fetch one phoneme from the backend SSML synthesis endpoint. */
-async function fetchIpa(ipa, grapheme) {
-  if (_blobCache[ipa]) return _blobCache[ipa];
+async function fetchPhoneme(ipa, grapheme) {
+  const key = `${ipa}:${grapheme}`;
+  if (_cache[key]) return _cache[key];
   const token = localStorage.getItem('properly_token') || '';
   try {
     const res = await fetch(`${apiBase()}/ai/phoneme`, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{}) },
-      body: JSON.stringify({ ipa, grapheme: grapheme || ipa, rate: 0.52 }),
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', ...(token ? {Authorization:`Bearer ${token}`} : {}) },
+      body: JSON.stringify({ ipa, grapheme, rate: 0.52 }),
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return null;
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('audio')) return null;
+    if (!res.ok || !res.headers.get('content-type')?.includes('audio')) return null;
     const blob = new Blob([await res.arrayBuffer()], { type:'audio/mpeg' });
     const url  = URL.createObjectURL(blob);
-    _blobCache[ipa] = url;
+    _cache[key] = url;
     return url;
   } catch { return null; }
 }
 
-/** Resolve IPA → blob URL. Tries preload cache first, then on-demand. */
-async function resolveIpa(ipa, graphemeFallback) {
-  if (_blobCache[ipa]) return _blobCache[ipa];
-  // localStorage preload cache (44 phonemes from app startup)
+async function resolveIpa(ipa, grapheme) {
+  const key = `${ipa}:${grapheme}`;
+  if (_cache[key]) return _cache[key];
+  // Check preload cache (by IPA key only)
   const preloaded = getPhonemeUrl(ipa);
-  if (preloaded) { _blobCache[ipa] = preloaded; return preloaded; }
-  // On-demand: call Azure SSML synthesis directly
-  return fetchIpa(ipa, graphemeFallback);
+  if (preloaded) { _cache[key] = preloaded; return preloaded; }
+  // On-demand fetch
+  return fetchPhoneme(ipa, grapheme);
 }
 
 function playUrl(url) {
-  return new Promise(resolve => {
-    const a = new Audio(url);
-    a.onended = resolve; a.onerror = resolve;
-    a.play().catch(resolve);
-  });
+  return new Promise(r => { const a = new Audio(url); a.onended=r; a.onerror=r; a.play().catch(r); });
 }
 
-// ── TRIGGER PRELOAD (call when Phonics Guide opens) ───────────────────────────
+/** Trigger phoneme preload if cache isn't warm yet. */
 export async function triggerPhonicsPreload() {
   if (isCacheLoaded()) return;
-  const token = localStorage.getItem('properly_token') || '';
-  try { await preloadPhonemes(token); } catch {}
+  try { await preloadPhonemes(localStorage.getItem('properly_token') || ''); } catch {}
 }
 
-// ── HOOK ─────────────────────────────────────────────────────────────────────
+// ── HOOK ──────────────────────────────────────────────────────────────────────
 export function usePhonemePlayer() {
   const { speak } = useSpeech();
 
+  /**
+   * Play the phoneme sound for a grapheme string.
+   * Looks up phonicsEngine.js for ipa and blendOf data.
+   *
+   * - Single phonemes (sh, ng, ai, ee, igh...): fetched as one Azure SSML unit
+   * - Blends (bl, gr, fl, str...): each component played in quick sequence (55ms gap)
+   * - Combined suffixes (ing, tion, ture...): single SSML fetch → natural sound
+   */
   const playGrapheme = useCallback(async (grapheme) => {
-    const g = (grapheme || '').toLowerCase().trim();
-    const entry = GRAPHEME_TO_IPA[g];
+    const g     = (grapheme || '').toLowerCase().trim();
+    const entry = PHONEME_MAP[g];
 
     if (!entry) {
-      speak(g, { rate:0.7 }); return;
+      // Not in map — speak a generic description
+      speak(`${g} sound`, { rate: 0.75 });
+      return;
     }
 
-    // ── Blend / suffix sequence ────────────────────────────────────────────
-    if (Array.isArray(entry)) {
-      for (const part of entry) {
-        // part is either a direct IPA symbol ('ɪ','ŋ') or a grapheme key ('b','l')
-        const ipa = GRAPHEME_TO_IPA[part] ?? part; // resolve grapheme → IPA if needed
-        if (typeof ipa !== 'string') { continue; } // skip nested arrays
+    const { ipa, blendOf, type } = entry;
 
-        const url = await resolveIpa(ipa, part);
-        if (url) {
-          await playUrl(url);
-        } else {
-          speak(FALLBACK_PHRASES[ipa] || part, { rate:0.78 });
+    // ── Blends: play each component phoneme in quick sequence ──────────────
+    if (type === 'blend' && blendOf && blendOf.length > 0) {
+      for (const componentGrapheme of blendOf) {
+        const compIpa = getIpa(componentGrapheme);
+        if (compIpa) {
+          const url = await resolveIpa(compIpa, componentGrapheme);
+          if (url) await playUrl(url);
+          else speak(CONTEXT_PHRASES[compIpa] || componentGrapheme + ' sound', { rate: 0.78 });
         }
-        await new Promise(r => setTimeout(r, 110));
+        await new Promise(r => setTimeout(r, 55)); // 55ms gap — quick enough to sound connected
       }
       return;
     }
 
-    // ── Single phoneme (digraphs, vowels, consonants) ──────────────────────
-    const ipa = entry;
+    // ── Silent letter (split digraph 'e') — no sound ───────────────────────
+    if (type === 'split-e' || !ipa) return;
+
+    // ── Single phoneme (digraphs, vowels, consonants, suffixes, trigraphs) ──
+    // Combined IPA like 'ɪŋ', 'ʃən', 'eɪ' → fetched as ONE Azure SSML unit
     const url = await resolveIpa(ipa, g);
     if (url) { await playUrl(url); return; }
-    speak(FALLBACK_PHRASES[ipa] || `${g} sound`, { rate:0.78 });
 
+    // Last resort — context phrase, never bare letter text
+    speak(CONTEXT_PHRASES[ipa] || `${entry.example || g} sound`, { rate: 0.78 });
   }, [speak]);
 
-  const playWordByPhonemes = useCallback(async (sounds) => {
-    for (const s of sounds) { await playGrapheme(s); await new Promise(r => setTimeout(r,170)); }
+  /**
+   * Play phonemes for an array of grapheme strings in sequence.
+   */
+  const playWordByPhonemes = useCallback(async (graphemes) => {
+    for (const g of graphemes) {
+      await playGrapheme(g);
+      await new Promise(r => setTimeout(r, 180));
+    }
   }, [playGrapheme]);
 
+  /**
+   * Play a whole word naturally via Web Speech (or use useAzureTTS for better quality).
+   */
   const playWord = useCallback((word) => {
-    speak(word, { rate:0.78, lang:'en-GB' });
+    speak(word, { rate: 0.78, lang: 'en-GB' });
   }, [speak]);
 
   return { playGrapheme, playWordByPhonemes, playWord };
