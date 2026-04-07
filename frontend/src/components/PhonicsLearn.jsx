@@ -3,8 +3,9 @@
  * @description Interactive phonics tutor — white card interiors, real Azure phoneme
  *              sounds, step-by-step blending demos, mic practice with scoring.
  */
-import { useState, useRef } from 'react';
-import { usePhonemePlayer } from '../hooks/usePhonemePlayer';
+import React, { useState, useRef } from 'react';
+import { usePhonemePlayer, triggerPhonicsPreload } from '../hooks/usePhonemePlayer';
+import { isCacheLoaded } from '../services/phonemeCache';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useAzureTTS } from '../hooks/useAzureTTS';
 import { speechAPI } from '../services/api';
@@ -131,7 +132,7 @@ function TermPhonicsBreakdown({ term, accentColor }) {
   const playTile = async (idx) => {
     const chunk = breakdown[idx];
     setActiveTile(idx);
-    await playGrapheme(chunk.key, chunk.g);
+    await playGrapheme(chunk.key);
     setTimeout(() => setActiveTile(-1), 350);
   };
 
@@ -494,16 +495,19 @@ const PATTERN_COLORS = { C:'#7C3AED', V:'#EF4444', CC:'#7C3AED' };
 
 // ── SOUND TILE — light interior version ───────────────────────────────────────
 function SoundTile({ g, ipa, eg, color, size = 'md' }) {
-  const { playGrapheme } = usePhonemePlayer();
-  const { playWord } = usePhonemePlayer();
-  const [active, setActive] = useState(false);
+  const { playGrapheme, playWord } = usePhonemePlayer();
+  const [active, setActive]   = useState(false);
+  const [loading, setLoading] = useState(false);
   const isLg = size === 'lg';
 
   const click = async () => {
+    if (active || loading) return;
+    setLoading(true);
     setActive(true);
     await playGrapheme(g);
-    if (eg) { await new Promise(r => setTimeout(r, 280)); playWord(eg); }
-    setTimeout(() => setActive(false), 500);
+    if (eg) { await new Promise(r => setTimeout(r, 260)); playWord(eg); }
+    setActive(false);
+    setLoading(false);
   };
 
   return (
@@ -519,7 +523,10 @@ function SoundTile({ g, ipa, eg, color, size = 'md' }) {
       <span style={{ fontSize: isLg ? 20 : 16, fontWeight:900, color: active ? '#fff' : color, letterSpacing:'0.01em' }}>{g}</span>
       {ipa && <span style={{ fontSize:9, color: active ? 'rgba(255,255,255,0.8)' : `${color}90`, fontFamily:'var(--font-mono)' }}>/{ipa}/</span>}
       {eg  && <span style={{ fontSize: isLg ? 10 : 9, color: active ? 'rgba(255,255,255,0.75)' : '#9CA3AF', fontWeight:600 }}>{eg}</span>}
-      <span style={{ fontSize:10, color: active ? 'rgba(255,255,255,0.6)' : '#D1D5DB' }}>🔊</span>
+      <span style={{ fontSize:10, color: active ? 'rgba(255,255,255,0.6)' : '#D1D5DB',
+        animation: loading ? 'pl-pulse 0.6s infinite' : 'none' }}>
+        {loading ? '⏳' : '🔊'}
+      </span>
     </button>
   );
 }
@@ -1172,6 +1179,18 @@ function SectionCard({ section, index }) {
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function PhonicsLearn({ childPhase = 2 }) {
+  const [soundsReady, setSoundsReady] = React.useState(isCacheLoaded());
+
+  // Ensure phoneme cache is warm when Phonics Guide opens
+  React.useEffect(() => {
+    if (isCacheLoaded()) { setSoundsReady(true); return; }
+    triggerPhonicsPreload().then(() => setSoundsReady(true));
+    // Poll until loaded (preload runs in background)
+    const iv = setInterval(() => {
+      if (isCacheLoaded()) { setSoundsReady(true); clearInterval(iv); }
+    }, 800);
+    return () => clearInterval(iv);
+  }, []);
   return (
     <div>
       <p style={{ color:'var(--overlay-50)', fontSize:11, fontWeight:800, letterSpacing:'0.8px', marginBottom:12 }}>
@@ -1197,6 +1216,28 @@ export default function PhonicsLearn({ childPhase = 2 }) {
         </div>
       </div>
 
+      {/* Sounds loading indicator */}
+      {!soundsReady && (
+        <div style={{ background:'white', borderRadius:14, padding:'10px 16px', marginBottom:8,
+          boxShadow:'var(--shadow-lg)', display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:16, height:16, borderRadius:'50%',
+            border:'2.5px solid #7C3AED', borderTopColor:'transparent',
+            animation:'pl-spin 0.8s linear infinite', flexShrink:0 }}/>
+          <span style={{ fontSize:12, color:'#6B7280', fontWeight:600 }}>
+            Loading phoneme sounds… tap any tile and sounds will play as they load
+          </span>
+        </div>
+      )}
+      {soundsReady && (
+        <div style={{ background:'white', borderRadius:14, padding:'8px 16px', marginBottom:8,
+          boxShadow:'var(--shadow-lg)', display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:14 }}>✅</span>
+          <span style={{ fontSize:12, color:'#059669', fontWeight:700 }}>
+            All 44 phoneme sounds ready — tap any tile to hear the real sound!
+          </span>
+        </div>
+      )}
+
       {/* Card list */}
       <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
         <AlphabetCard index={0} />
@@ -1208,6 +1249,7 @@ export default function PhonicsLearn({ childPhase = 2 }) {
       <style>{`
         @keyframes pl-fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
         @keyframes pl-pulse  { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        @keyframes pl-spin   { to{transform:rotate(360deg)} }
       `}</style>
     </div>
   );
