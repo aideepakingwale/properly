@@ -698,7 +698,7 @@ function PhonemeDemo({ demo, color }) {
 // ── PRACTICE ROW — light interior ─────────────────────────────────────────────
 function PracticeRow({ word, sounds, spoken, accentColor }) {
   const { playWord } = usePhonemePlayer();
-  const { startRecording, stopRecording } = useAudioRecorder();
+  const { startRecording, stopRecording, error: micError } = useAudioRecorder();
   const [phase, setPhase] = useState('idle');
   const [score, setScore] = useState(null);
   const timerRef = useRef(null);
@@ -725,9 +725,15 @@ function PracticeRow({ word, sounds, spoken, accentColor }) {
     setPhase('thinking');
     try {
       const res = await speechAPI.assess(blob, word);
-      const s = res?.data?.accuracyScore ?? res?.data?.words?.[0]?.accuracyScore ?? null;
-      setScore(s);
-    } catch { setScore(null); }
+      // Axios interceptor unwraps: res = {success, data:{wordScores, overallAccuracy, ...}}
+      const overall   = res?.data?.overallAccuracy;
+      const firstWord = res?.data?.wordScores?.[0]?.score ?? res?.data?.wordScores?.[0]?.accuracyScore;
+      const s = overall ?? firstWord ?? null;
+      setScore(typeof s === 'number' ? Math.round(s) : null);
+    } catch (err) {
+      console.warn('[PhonicsLearn] assess error:', err?.message || err);
+      setScore(null);
+    }
     setPhase('result');
   };
 
@@ -771,6 +777,11 @@ function PracticeRow({ word, sounds, spoken, accentColor }) {
           {phase==='thinking' && <><span>⏳</span> Scoring…</>}
           {phase==='result'   && <><span>🎤</span> Again</>}
         </button>
+        {micError && phase === 'idle' && (
+          <span style={{ fontSize:11, color:'#EF4444', fontWeight:600 }}>
+            🎤 {micError.includes('denied') ? 'Mic blocked — allow in browser settings' : 'Mic unavailable'}
+          </span>
+        )}
         {phase === 'result' && (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
             <span style={{ padding:'4px 10px', borderRadius:50, fontSize:12, fontWeight:800,
@@ -1021,9 +1032,14 @@ function AlphabetCard({ index }) {
     setStates(p => ({...p, [item.l]:'thinking'}));
     try {
       const res = await speechAPI.assess(blob, item.eg);
-      const sc = res?.data?.accuracyScore ?? res?.data?.words?.[0]?.accuracyScore ?? null;
-      setStates(p => ({...p, [item.l]:{ score:sc }}));
-    } catch { setStates(p => ({...p, [item.l]:{ score:null }})); }
+      const overall   = res?.data?.overallAccuracy;
+      const firstWord = res?.data?.wordScores?.[0]?.score ?? res?.data?.wordScores?.[0]?.accuracyScore;
+      const sc = overall ?? firstWord ?? null;
+      setStates(p => ({...p, [item.l]:{ score: typeof sc==='number' ? Math.round(sc) : null }}));
+    } catch (err) {
+      console.warn('[AlphabetCard] assess error:', err?.message || err);
+      setStates(p => ({...p, [item.l]:{ score:null }}));
+    }
   };
 
   return (
