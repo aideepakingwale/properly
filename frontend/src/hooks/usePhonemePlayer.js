@@ -51,7 +51,15 @@ export const GRAPHEME_TO_IPA = {
   'scr':['s','k','r'], 'str':['s','t','r'], 'spr':['s','p','r'],
   // ── Split digraphs — use the long vowel IPA ─────────────────
   'a_e':'eɪ', 'i_e':'aɪ', 'o_e':'əʊ', 'u_e':'juː', 'e_e':'iː',
+  // ── Common suffixes (for phonics term pronunciation) ─────────
+  'ing': ['ɪ','ŋ'],   // blend: /ɪ/ + /ŋ/ (using IPA keys directly)
+  'eme': ['iː','m'],  // as in phoneme/grapheme ending
+  'tion':['ʃ','ə','n'],
 };
+
+// ── IPA KEY → BLOB URL (direct IPA playback bypass for suffix fragments) ─────
+// When the grapheme map value IS an IPA key (not a grapheme), play it directly
+export const DIRECT_IPA_KEYS = new Set(['ɪ','ŋ','iː','m','ə','n','ʃ','eɪ','aɪ','əʊ','uː','juː','ɑː','ɔː','ɜː','æ','ɛ','ɒ','ʌ','ʊ','p','b','t','d','k','ɡ','f','v','s','z','ʃ','h','dʒ','tʃ','m','n','ŋ','l','r','w','j','kw','ks']);
 
 /**
  * Play an Audio blob URL and return a promise that resolves when done.
@@ -80,15 +88,27 @@ export function usePhonemePlayer() {
     const g = grapheme.toLowerCase().trim();
     const ipaEntry = GRAPHEME_TO_IPA[g];
 
-    // ── Blends: play each component phoneme in sequence ──────────
+    // ── Blends/sequences: play each component phoneme in sequence ─
     if (Array.isArray(ipaEntry)) {
-      for (const ipa of ipaEntry) {
-        const url = sessionCache.current[ipa] || getPhonemeUrl(ipa);
+      for (const part of ipaEntry) {
+        // Each part may be a direct IPA key OR a grapheme key
+        // Try direct IPA lookup first (for suffix fragments like 'ɪ', 'ŋ', 'iː')
+        let url = sessionCache.current[part] || getPhonemeUrl(part);
         if (url) {
-          if (!sessionCache.current[ipa]) sessionCache.current[ipa] = url;
+          if (!sessionCache.current[part]) sessionCache.current[part] = url;
           await playBlobUrl(url);
-          await new Promise(r => setTimeout(r, 80)); // tiny gap between components
+        } else {
+          // Try as a grapheme key (e.g. 'n' → looks up IPA 'n' → gets URL)
+          const ipaViaGrapheme = GRAPHEME_TO_IPA[part];
+          if (typeof ipaViaGrapheme === 'string') {
+            const u2 = sessionCache.current[ipaViaGrapheme] || getPhonemeUrl(ipaViaGrapheme);
+            if (u2) {
+              if (!sessionCache.current[ipaViaGrapheme]) sessionCache.current[ipaViaGrapheme] = u2;
+              await playBlobUrl(u2);
+            }
+          }
         }
+        await new Promise(r => setTimeout(r, 90));
       }
       return;
     }

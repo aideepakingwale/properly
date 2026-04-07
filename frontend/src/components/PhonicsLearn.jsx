@@ -6,7 +6,7 @@
 import { useState, useRef } from 'react';
 import { usePhonemePlayer } from '../hooks/usePhonemePlayer';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { useSpeech } from '../hooks/useSpeech';
+import { useAzureTTS } from '../hooks/useAzureTTS';
 import { speechAPI } from '../services/api';
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
@@ -38,6 +38,220 @@ const ALPHABET = [
   {l:'v',ipa:'/v/',eg:'van'},{l:'w',ipa:'/w/',eg:'wet'},{l:'x',ipa:'/ks/',eg:'fox'},
   {l:'y',ipa:'/j/',eg:'yes'},{l:'z',ipa:'/z/',eg:'zip'},
 ];
+
+// ── PHONICS TERM BREAKDOWNS ──────────────────────────────────────────────────
+// Every phonics keyword broken into grapheme chunks with playable cache keys.
+// g = what to display, key = what to pass to playGrapheme(), ipa = what to show
+const TERM_BREAKDOWNS = {
+  // ── ph-o-n-eme: /f/-/əʊ/-/n/-/iːm/ ──────────────────────────
+  'Phoneme': [
+    { g:'ph',  key:'ph',  ipa:'f',  color:'#7C3AED' },
+    { g:'o',   key:'oa',  ipa:'əʊ', color:'#EF4444' },
+    { g:'n',   key:'n',   ipa:'n',  color:'#7C3AED' },
+    { g:'eme', key:'eme', ipa:'iːm',color:'#EF4444' },
+  ],
+  // ── gr-a-ph-eme: /ɡr/-/æ/-/f/-/iːm/ ─────────────────────────
+  'Grapheme': [
+    { g:'gr',  key:'gr',  ipa:'ɡr', color:'#7C3AED' },
+    { g:'a',   key:'a',   ipa:'æ',  color:'#EF4444' },
+    { g:'ph',  key:'ph',  ipa:'f',  color:'#7C3AED' },
+    { g:'eme', key:'eme', ipa:'iːm',color:'#EF4444' },
+  ],
+  // ── bl-e-nd-ing: /bl/-/ɛ/-/nd/-/ɪŋ/ ─────────────────────────
+  'Blending': [
+    { g:'bl',  key:'bl',  ipa:'bl', color:'#7C3AED' },
+    { g:'e',   key:'e',   ipa:'ɛ',  color:'#EF4444' },
+    { g:'nd',  key:'nd',  ipa:'nd', color:'#7C3AED' },
+    { g:'ing', key:'ing', ipa:'ɪŋ', color:'#7C3AED' },
+  ],
+  // ── s-e-g-m-e-nt-ing: /s/-/ɛ/-/ɡ/-/m/-/ɛ/-/nt/-/ɪŋ/ ────────
+  'Segmenting': [
+    { g:'s',   key:'s',   ipa:'s',  color:'#7C3AED' },
+    { g:'e',   key:'e',   ipa:'ɛ',  color:'#EF4444' },
+    { g:'g',   key:'g',   ipa:'ɡ',  color:'#7C3AED' },
+    { g:'m',   key:'m',   ipa:'m',  color:'#7C3AED' },
+    { g:'e',   key:'e',   ipa:'ɛ',  color:'#EF4444' },
+    { g:'nt',  key:'nt',  ipa:'nt', color:'#7C3AED' },
+    { g:'ing', key:'ing', ipa:'ɪŋ', color:'#7C3AED' },
+  ],
+  // ── d-ee-c-o-d-ing: /d/-/iː/-/k/-/əʊ/-/d/-/ɪŋ/ ─────────────
+  'Decoding': [
+    { g:'d',   key:'d',   ipa:'d',  color:'#7C3AED' },
+    { g:'ee',  key:'ee',  ipa:'iː', color:'#EF4444' },
+    { g:'c',   key:'c',   ipa:'k',  color:'#7C3AED' },
+    { g:'o',   key:'oa',  ipa:'əʊ', color:'#EF4444' },
+    { g:'d',   key:'d',   ipa:'d',  color:'#7C3AED' },
+    { g:'ing', key:'ing', ipa:'ɪŋ', color:'#7C3AED' },
+  ],
+  // ── e-n-c-o-d-ing: /ɪ/-/n/-/k/-/əʊ/-/d/-/ɪŋ/ ───────────────
+  'Encoding': [
+    { g:'e',   key:'e',   ipa:'ɪ',  color:'#EF4444' },
+    { g:'n',   key:'n',   ipa:'n',  color:'#7C3AED' },
+    { g:'c',   key:'c',   ipa:'k',  color:'#7C3AED' },
+    { g:'o',   key:'oa',  ipa:'əʊ', color:'#EF4444' },
+    { g:'d',   key:'d',   ipa:'d',  color:'#7C3AED' },
+    { g:'ing', key:'ing', ipa:'ɪŋ', color:'#7C3AED' },
+  ],
+  // ── d-i-gr-a-ph: /d/-/ɪ/-/ɡr/-/æ/-/f/ ────────────────────────
+  'Digraph': [
+    { g:'d',   key:'d',   ipa:'d',  color:'#7C3AED' },
+    { g:'i',   key:'i',   ipa:'ɪ',  color:'#EF4444' },
+    { g:'gr',  key:'gr',  ipa:'ɡr', color:'#7C3AED' },
+    { g:'a',   key:'a',   ipa:'æ',  color:'#EF4444' },
+    { g:'ph',  key:'ph',  ipa:'f',  color:'#7C3AED' },
+  ],
+  // ── tr-i-gr-a-ph: /tr/-/ɪ/-/ɡr/-/æ/-/f/ ─────────────────────
+  'Trigraph': [
+    { g:'tr',  key:'tr',  ipa:'tr', color:'#7C3AED' },
+    { g:'i',   key:'i',   ipa:'ɪ',  color:'#EF4444' },
+    { g:'gr',  key:'gr',  ipa:'ɡr', color:'#7C3AED' },
+    { g:'a',   key:'a',   ipa:'æ',  color:'#EF4444' },
+    { g:'ph',  key:'ph',  ipa:'f',  color:'#7C3AED' },
+  ],
+  // ── bl-e-nd: /bl/-/ɛ/-/nd/ ────────────────────────────────────
+  'Blend': [
+    { g:'bl',  key:'bl',  ipa:'bl', color:'#7C3AED' },
+    { g:'e',   key:'e',   ipa:'ɛ',  color:'#EF4444' },
+    { g:'nd',  key:'nd',  ipa:'nd', color:'#7C3AED' },
+  ],
+};
+
+// ── TERM PHONICS BREAKDOWN WIDGET ─────────────────────────────────────────────
+// Shows a phonics term decoded into its grapheme/phoneme tiles.
+// Tap any tile = hear that phoneme. Tap "Hear it phonics way" = all sounds + word.
+function TermPhonicsBreakdown({ term, accentColor }) {
+  const breakdown = TERM_BREAKDOWNS[term];
+  if (!breakdown) return null;
+
+  const { playGrapheme, playWord } = usePhonemePlayer();
+  const { sayText } = useAzureTTS();
+  const [activeTile, setActiveTile] = useState(-1);
+  const [playing, setPlaying] = useState(false);
+
+  const playTile = async (idx) => {
+    const chunk = breakdown[idx];
+    setActiveTile(idx);
+    await playGrapheme(chunk.key, chunk.g);
+    setTimeout(() => setActiveTile(-1), 350);
+  };
+
+  const playPhonicsWay = async () => {
+    if (playing) return;
+    setPlaying(true);
+    // 1. Play each phoneme in sequence with a gap
+    for (let i = 0; i < breakdown.length; i++) {
+      setActiveTile(i);
+      await playGrapheme(breakdown[i].key, breakdown[i].g);
+      await new Promise(r => setTimeout(r, 320));
+    }
+    setActiveTile(-1);
+    await new Promise(r => setTimeout(r, 450));
+    // 2. Play the whole word naturally via Azure TTS
+    await sayText(term);
+    setPlaying(false);
+  };
+
+  const vowelCount = breakdown.filter(b => b.color === '#EF4444').length;
+
+  return (
+    <div style={{
+      background: '#FAFAF9',
+      border: `2px solid ${accentColor}20`,
+      borderRadius: 16,
+      padding: '14px 16px',
+      marginBottom: 16,
+    }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+        <span style={{ fontSize:11, fontWeight:800, color:'#9CA3AF', textTransform:'uppercase', letterSpacing:'0.6px' }}>
+          📖 Phonics breakdown of
+        </span>
+        <span style={{ fontSize:13, fontWeight:900, color:accentColor }}>{term}</span>
+      </div>
+
+      {/* Grapheme tiles row */}
+      <div style={{ display:'flex', alignItems:'flex-end', gap:5, marginBottom:12, flexWrap:'wrap' }}>
+        {breakdown.map((chunk, i) => {
+          const isVowel = chunk.color === '#EF4444';
+          const isActive = activeTile === i;
+          return (
+            <button key={i} onClick={() => playTile(i)}
+              title={`Tap to hear /${chunk.ipa}/`}
+              style={{
+                display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                padding:'8px 10px', borderRadius:12, cursor:'pointer', minWidth:40,
+                border: `2px solid ${isActive ? chunk.color : chunk.color + '35'}`,
+                background: isActive ? chunk.color : isVowel ? '#FEF2F2' : '#F5F3FF',
+                transform: isActive ? 'scale(1.15) translateY(-4px)' : 'scale(1)',
+                boxShadow: isActive ? `0 6px 18px ${chunk.color}45` : '0 1px 3px rgba(0,0,0,0.06)',
+                transition: 'all 0.15s',
+              }}>
+              {/* Grapheme letter(s) */}
+              <span style={{
+                fontSize: chunk.g.length > 2 ? 14 : 18,
+                fontWeight: 900,
+                color: isActive ? '#fff' : chunk.color,
+                fontFamily: 'var(--font-display)',
+                letterSpacing: '0.01em',
+              }}>{chunk.g}</span>
+              {/* IPA below */}
+              <span style={{
+                fontSize: 9,
+                color: isActive ? 'rgba(255,255,255,0.85)' : '#9CA3AF',
+                fontFamily: 'var(--font-mono)',
+              }}>/{chunk.ipa}/</span>
+              <span style={{ fontSize:9, color: isActive?'rgba(255,255,255,0.6)':'#D1D5DB' }}>🔊</span>
+            </button>
+          );
+        })}
+
+        {/* Arrow + whole word */}
+        <span style={{ fontSize:16, color:'#D1D5DB', fontWeight:700, alignSelf:'center', paddingBottom:14 }}>→</span>
+        <button onClick={() => sayText(term)}
+          title={`Hear "${term}" spoken naturally`}
+          style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+            padding:'8px 14px', borderRadius:12, cursor:'pointer',
+            border:`2px solid ${accentColor}30`,
+            background: `${accentColor}08`,
+            transition:'all 0.15s',
+            alignSelf:'flex-end', marginBottom:0 }}>
+          <span style={{ fontSize:15, fontWeight:900, color:accentColor }}>{term}</span>
+          <span style={{ fontSize:9, color:'#9CA3AF' }}>whole word 🔊</span>
+        </button>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display:'flex', gap:14, marginBottom:12, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <div style={{ width:12, height:12, borderRadius:3, background:'#F5F3FF', border:'1.5px solid #7C3AED50' }}/>
+          <span style={{ fontSize:11, color:'#6B7280' }}>Consonant sound</span>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <div style={{ width:12, height:12, borderRadius:3, background:'#FEF2F2', border:'1.5px solid #EF444450' }}/>
+          <span style={{ fontSize:11, color:'#6B7280' }}>Vowel sound</span>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+          <span style={{ fontSize:11, color:'#6B7280' }}>
+            {breakdown.length} grapheme{breakdown.length!==1?'s':''} · {breakdown.length} sound{breakdown.length!==1?'s':''}
+          </span>
+        </div>
+      </div>
+
+      {/* Play phonics way button */}
+      <button onClick={playPhonicsWay} disabled={playing}
+        style={{ display:'inline-flex', alignItems:'center', gap:8,
+          padding:'9px 18px', borderRadius:50,
+          border:`1.5px solid ${accentColor}40`, background:`${accentColor}10`,
+          color:accentColor, cursor:'pointer', fontSize:12, fontWeight:800,
+          opacity:playing?0.6:1, transition:'all 0.15s',
+          boxShadow:`0 2px 8px ${accentColor}20` }}>
+        {playing
+          ? <><span>▶</span> Sounding out…</>
+          : <><span>🔊</span> Hear it the phonics way — sound by sound</>}
+      </button>
+    </div>
+  );
+}
 
 // Each concept: definition, detail, demo (step-by-step), soundTiles, practiceWords
 const CONCEPT_DATA = {
@@ -594,11 +808,14 @@ function MethodSteps({ steps, color }) {
 
 // ── CONCEPT DETAIL — light interior ──────────────────────────────────────────
 function ConceptDetail({ concept, accentColor }) {
-  const { speak } = useSpeech();
+  const { sayText } = useAzureTTS();
   const [showMore, setShowMore] = useState(false);
 
   return (
     <div style={{ animation:'pl-fadeUp 0.18s ease' }}>
+      {/* Phonics breakdown of the term itself — shown first */}
+      <TermPhonicsBreakdown term={concept.term} accentColor={accentColor} />
+
       <p style={{ fontSize:13, color:'#4B5563', lineHeight:1.75, marginBottom:16 }}>
         {concept.detail}
       </p>
@@ -696,7 +913,7 @@ function ConceptDetail({ concept, accentColor }) {
 
 // ── CONCEPT CARD ──────────────────────────────────────────────────────────────
 function ConceptCard({ concept, accentColor, isOpen, onToggle, index }) {
-  const { speak } = useSpeech();
+  const { sayText } = useAzureTTS();
   return (
     <div className="animate-slide-up" style={{ animationDelay:`${index * 0.05}s`,
       background:'white', borderRadius:22, overflow:'hidden',
@@ -731,7 +948,7 @@ function ConceptCard({ concept, accentColor, isOpen, onToggle, index }) {
         </div>
 
         <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-          <button onClick={e => { e.stopPropagation(); speak(`${concept.term}. ${concept.definition}`, { rate:0.82 }); }}
+          <button onClick={e => { e.stopPropagation(); sayText(`${concept.term}. ${concept.definition}`); }}
             title="Hear definition"
             style={{ background:`${accentColor}10`, border:`1px solid ${accentColor}20`,
               borderRadius:50, width:28, height:28, cursor:'pointer', fontSize:13,
